@@ -807,12 +807,12 @@
                       </div>
                       <div class="w-28">
                         <label class="block text-[10px] font-bold text-slate-600">Skor Tiap Nomor</label>
-                        <input type="number" step="0.5" min="0" id="cfg-pg-bobot" class="w-full px-2.5 py-1.5 rounded-lg border border-cyan-300 text-xs font-bold bg-white" />
+                        <input type="number" step="0.5" min="0" id="cfg-pg-bobot" oninput="updateKeyPreviewBadges()" placeholder="Skor" class="w-full px-2.5 py-1.5 rounded-lg border border-cyan-300 text-xs font-bold text-center bg-white" />
                       </div>
                     </div>
                     <div>
                       <label class="block text-xs font-bold text-slate-700 mb-1">Deretan Kunci Jawaban PG (Bisa tanpa koma: <code class="text-teal-700 font-extrabold">ABBCDAB...</code>):</label>
-                      <input type="text" id="cfg-pg-kunci" oninput="updateKeyPreviewBadges()" placeholder="Ketik langsung: ABBCDAB... atau pakai koma A,B,C,D..."
+                      <input type="text" id="cfg-pg-kunci" oninput="updateKeyPreviewBadges()" placeholder="Ketik langsung tanpa koma: ABBCDAB... atau pakai koma A,B,C,D..."
                              class="w-full px-3.5 py-2.5 rounded-xl border border-cyan-300 text-sm font-bold answer-token-input bg-white focus:border-teal-600 focus:outline-none" />
                       <div id="preview-pg-badges" class="flex flex-wrap gap-1.5 mt-2"></div>
                     </div>
@@ -830,12 +830,12 @@
                       </div>
                       <div class="w-28">
                         <label class="block text-[10px] font-bold text-slate-600">Skor Tiap Nomor</label>
-                        <input type="number" step="0.5" min="0" id="cfg-bs-bobot" class="w-full px-2.5 py-1.5 rounded-lg border border-emerald-300 text-xs font-bold bg-white" />
+                        <input type="number" step="0.5" min="0" id="cfg-bs-bobot" oninput="updateKeyPreviewBadges()" placeholder="Skor" class="w-full px-2.5 py-1.5 rounded-lg border border-emerald-300 text-xs font-bold text-center bg-white" />
                       </div>
                     </div>
                     <div>
                       <label class="block text-xs font-bold text-slate-700 mb-1">Deretan Kunci Benar/Salah (Bisa tanpa koma: <code class="text-emerald-700 font-extrabold">BSBBS...</code>):</label>
-                      <input type="text" id="cfg-bs-kunci" oninput="updateKeyPreviewBadges()" placeholder="Ketik langsung: BSBBS... atau pakai koma B,S,B,B,S"
+                      <input type="text" id="cfg-bs-kunci" oninput="updateKeyPreviewBadges()" placeholder="Ketik langsung tanpa koma: BSBBS... atau pakai koma B,S,B,B,S"
                              class="w-full px-3.5 py-2.5 rounded-xl border border-emerald-300 text-sm font-bold answer-token-input bg-white focus:border-teal-600 focus:outline-none" />
                       <div id="preview-bs-badges" class="flex flex-wrap gap-1.5 mt-2"></div>
                     </div>
@@ -937,36 +937,73 @@
               <form id="form-student-answer" onsubmit="handleSaveStudentAnswer(event)" class="space-y-4">
                 <input type="hidden" id="ans-edit-id" value="" />
                 
-                <!-- Quick Select Siswa dari Master Data Siswa -->
-                <div class="p-3.5 rounded-2xl bg-gradient-to-r from-teal-50/80 to-cyan-50/60 border border-teal-200/80 flex flex-wrap items-center justify-between gap-3">
-                  <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center text-xs shadow-sm">
-                      <i class="fa-solid fa-user-graduate"></i>
+                <!-- PILIH KELAS & SISWA LANGSUNG (TANPA KETIK MANUAL) -->
+                <div class="p-4 rounded-2xl bg-gradient-to-r from-teal-50/90 via-emerald-50/70 to-cyan-50/90 border border-teal-200/90 space-y-3 shadow-sm">
+                  <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center text-xs shadow-sm">
+                        <i class="fa-solid fa-user-check"></i>
+                      </div>
+                      <div>
+                        <h5 class="text-xs font-extrabold text-slate-900">Pilih Kelas &amp; Siswa Langsung</h5>
+                        <p class="text-[11px] text-slate-500">Pilih nama siswa dari daftar kelas tanpa perlu mengetik manual</p>
+                      </div>
                     </div>
-                    <div>
-                      <div class="text-xs font-bold text-slate-800">Pilih Siswa dari Data Master Siswa</div>
-                      <div class="text-[11px] text-slate-500">Pilih siswa agar NISN dan Nama terisi otomatis</div>
-                    </div>
+                    <div id="ans-info-score-status"></div>
                   </div>
-                  <div class="w-full sm:w-80">
-                    <input type="text" list="datalist-master-siswa" id="quick-pick-siswa" onchange="handleSelectStudentFromMaster(this.value)"
-                           placeholder="Cari atau pilih nama siswa..."
-                           class="w-full px-3.5 py-2 rounded-xl border border-teal-200 text-xs font-semibold focus:outline-none focus:border-teal-600 bg-white shadow-sm" />
-                    <datalist id="datalist-master-siswa"></datalist>
-                  </div>
-                </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">NISN / Nomor Induk Siswa</label>
-                    <input type="text" id="ans-nisn" required placeholder="Contoh: 0123456781"
-                           class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none" />
+                  <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    <!-- Dropdown Pilih Kelas -->
+                    <div class="sm:col-span-4">
+                      <label class="block text-[11px] font-extrabold text-slate-700 mb-1">
+                        <i class="fa-solid fa-school text-teal-600 mr-1"></i>1. Pilih Kelas:
+                      </label>
+                      <select id="ans-select-kelas" onchange="handleAnsKelasChange(this.value)"
+                              class="w-full px-3 py-2.5 rounded-xl border border-teal-300 text-xs font-bold bg-white text-slate-800 focus:outline-none focus:border-teal-600 shadow-sm cursor-pointer">
+                        <option value="">Semua Kelas</option>
+                      </select>
+                    </div>
+
+                    <!-- Dropdown Pilih Siswa -->
+                    <div class="sm:col-span-6">
+                      <label class="block text-[11px] font-extrabold text-slate-700 mb-1">
+                        <i class="fa-solid fa-user-graduate text-teal-600 mr-1"></i>2. Pilih Nama Siswa:
+                      </label>
+                      <select id="ans-select-siswa" onchange="handleAnsSiswaChange(this.value)"
+                              class="w-full px-3 py-2.5 rounded-xl border border-teal-300 text-xs font-bold bg-white text-slate-800 focus:outline-none focus:border-teal-600 shadow-sm cursor-pointer">
+                        <option value="">-- Pilih Nama Siswa --</option>
+                      </select>
+                    </div>
+
+                    <!-- Tombol Lanjut Siswa Berikutnya -->
+                    <div class="sm:col-span-2">
+                      <button type="button" onclick="handleSelectNextStudent()"
+                              class="w-full py-2.5 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md shadow-teal-600/20 transition flex items-center justify-center gap-1.5"
+                              title="Pindah ke Siswa Berikutnya">
+                        <span>Lanjut</span>
+                        <i class="fa-solid fa-arrow-right text-[11px]"></i>
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap Siswa</label>
-                    <input type="text" id="ans-nama" required placeholder="Contoh: Ahmad Fauzan"
-                           class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none" />
+
+                  <!-- Info Ringkas Siswa Terpilih (Readonly Badge) -->
+                  <div id="ans-student-info-strip" class="hidden items-center justify-between p-2.5 rounded-xl bg-white/95 border border-teal-200 text-xs">
+                    <div class="flex items-center gap-2">
+                      <span class="w-6 h-6 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-[10px]">
+                        <i class="fa-solid fa-id-card"></i>
+                      </span>
+                      <div>
+                        <span class="font-extrabold text-slate-900" id="ans-info-nama">-</span>
+                        <span class="text-slate-500 font-mono text-[11px]" id="ans-info-nisn">(NISN: -)</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-50 text-[10px] font-bold text-teal-700 border border-teal-200 ml-1" id="ans-info-kelas">-</span>
+                      </div>
+                    </div>
+                    <div id="ans-badge-status-detail" class="text-xs font-bold"></div>
                   </div>
+
+                  <!-- Hidden Inputs for NISN & Nama agar form save tetap kompatibel penuh -->
+                  <input type="hidden" id="ans-nisn" />
+                  <input type="hidden" id="ans-nama" />
                 </div>
 
                 <!-- Dynamic Question Inputs Based on Exam Config -->
@@ -981,7 +1018,7 @@
                       </label>
                       <span id="ans-pg-counter" class="text-[11px] font-bold text-cyan-700">0/10 Soal</span>
                     </div>
-                    <input type="text" id="ans-pg-input" oninput="liveCheckStudentInput()" placeholder="Ketik langsung: ABBCDAB... atau pakai koma A,B,C,D..."
+                    <input type="text" id="ans-pg-input" oninput="liveCheckStudentInput()" placeholder="Ketik langsung tanpa koma: ABBCDAB... atau pakai koma"
                            class="w-full px-3.5 py-2.5 rounded-xl border border-cyan-300 text-sm font-bold answer-token-input bg-white focus:border-teal-600 focus:outline-none" />
                     <div id="ans-pg-live-feedback" class="flex flex-wrap gap-1 mt-2"></div>
                   </div>
@@ -995,7 +1032,7 @@
                       </label>
                       <span id="ans-bs-counter" class="text-[11px] font-bold text-emerald-700">0/5 Soal</span>
                     </div>
-                    <input type="text" id="ans-bs-input" oninput="liveCheckStudentInput()" placeholder="Ketik langsung: BSBBS... atau pakai koma B,S,B,B,S"
+                    <input type="text" id="ans-bs-input" oninput="liveCheckStudentInput()" placeholder="Ketik langsung tanpa koma: BSBBS... atau pakai koma"
                            class="w-full px-3.5 py-2.5 rounded-xl border border-emerald-300 text-sm font-bold answer-token-input bg-white focus:border-teal-600 focus:outline-none" />
                     <div id="ans-bs-live-feedback" class="flex flex-wrap gap-1 mt-2"></div>
                   </div>
@@ -1353,27 +1390,14 @@
                     </div>
                   </div>
 
-                  <!-- 3. Status Guru -->
-                  <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Status Guru</label>
-                    <select id="acc-status-guru" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:border-teal-600 focus:outline-none">
-                      <option value="Belum Sertifikasi" selected>Belum Sertifikasi</option>
-                      <option value="Sudah Sertifikasi">Sudah Sertifikasi</option>
-                      <option value="PNS">PNS</option>
-                      <option value="PPPK">PPPK</option>
-                      <option value="GTT / Guru Honorer">GTT / Guru Honorer</option>
-                      <option value="Guru Tetap Yayasan (GTY)">Guru Tetap Yayasan (GTY)</option>
-                    </select>
-                  </div>
-
-                  <!-- 4. Jabatan / Tugas -->
+                  <!-- 3. Jabatan / Tugas -->
                   <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Jabatan / Tugas</label>
                     <input type="text" id="acc-jabatan" placeholder="Cth: Wali Kelas 1 / Guru Mapel"
                            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none placeholder:text-slate-400" />
                   </div>
 
-                  <!-- 5. Sandi Portal Guru -->
+                  <!-- 4. Sandi Portal Guru -->
                   <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Sandi Portal Guru</label>
                     <div class="relative">
@@ -1386,7 +1410,7 @@
                     </div>
                   </div>
 
-                  <!-- 6. Hak Akses / Peran -->
+                  <!-- 5. Hak Akses / Peran -->
                   <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Hak Akses / Peran</label>
                     <select id="acc-role" onchange="handleGuruRoleChange()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:border-teal-600 focus:outline-none">
@@ -1396,7 +1420,7 @@
                     </select>
                   </div>
 
-                  <!-- 7. Mapel yang Diampu (Khusus Guru Mapel) -->
+                  <!-- 6. Mapel yang Diampu (Khusus Guru Mapel) -->
                   <div id="section-mapel-diampu" class="p-3.5 rounded-2xl border border-purple-200 bg-purple-50/30 space-y-2.5">
                     <div class="flex items-start gap-2">
                       <i class="fa-solid fa-book-open text-purple-600 text-sm mt-0.5"></i>
@@ -1412,6 +1436,10 @@
                       <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
                         <input type="checkbox" name="acc-mapel" value="Al Qur'an Hadis" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
                         <span class="truncate">Al Qur'an Hadis</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="Baca Tulis Al Qur'an" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">Baca Tulis Al Qur'an</span>
                       </label>
                       <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
                         <input type="checkbox" name="acc-mapel" value="Akidah Akhlak" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
@@ -1500,7 +1528,6 @@
                         <th class="py-3 px-3">No</th>
                         <th class="py-3 px-3">Nama &amp; Identitas</th>
                         <th class="py-3 px-3">Hak Akses</th>
-                        <th class="py-3 px-3">Status</th>
                         <th class="py-3 px-3">Jabatan &amp; Mapel</th>
                         <th class="py-3 px-3">Sandi</th>
                         <th class="py-3 px-3 text-center">Aksi</th>
@@ -1826,13 +1853,13 @@
             </div>
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Kunci Jawaban PG Awal (Bisa tanpa koma: <code class="text-teal-700 font-bold">ABBCD...</code> atau pakai koma)</label>
-            <input type="text" id="new-exam-pg" placeholder="Contoh: ABBCDAB atau A,B,C,D..." value="ABCDABCDAB"
+            <label class="block text-xs font-bold text-slate-700 mb-1">Kunci Jawaban PG Awal (Tanpa koma: <code class="text-teal-700 font-bold">ABBCD...</code> atau pakai koma)</label>
+            <input type="text" id="new-exam-pg" placeholder="Contoh: ABBCDAB atau A,B,C,D..." value=""
                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold answer-token-input" />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Kunci Jawaban Benar/Salah Awal (Bisa tanpa koma: <code class="text-emerald-700 font-bold">BSBB...</code> atau pakai koma)</label>
-            <input type="text" id="new-exam-bs" placeholder="Contoh: BSBB atau B,S,B,B" value="BSBSB"
+            <label class="block text-xs font-bold text-slate-700 mb-1">Kunci Jawaban Benar/Salah Awal (Tanpa koma: <code class="text-emerald-700 font-bold">BSBB...</code> atau pakai koma)</label>
+            <input type="text" id="new-exam-bs" placeholder="Contoh: BSBBS atau B,S,B,B" value=""
                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold answer-token-input" />
           </div>
           <div class="flex justify-end gap-2 pt-3">
@@ -2290,9 +2317,10 @@
         const ans = (studentPG[idx] || '').toUpperCase();
         return ans === kunci.toUpperCase() ? 1 : 0;
       });
+      const pgBobotVal = (examObj.pgBobot !== undefined && examObj.pgBobot !== null && examObj.pgBobot !== '') ? (Number(examObj.pgBobot) || 0) : 0;
       const pgTotalBenar = pgScores.reduce((a, b) => a + b, 0);
-      const pgSkorPerolehan = pgTotalBenar * (Number(examObj.pgBobot) || 1);
-      const pgSkorMaks = examObj.pgKunci.length * (Number(examObj.pgBobot) || 1);
+      const pgSkorPerolehan = pgTotalBenar * pgBobotVal;
+      const pgSkorMaks = examObj.pgKunci.length * pgBobotVal;
 
       // 2. Evaluate Benar/Salah
       const studentBS = parseCommaList(rawRec.bsRaw);
@@ -2300,9 +2328,10 @@
         const ans = (studentBS[idx] || '').toUpperCase();
         return ans === kunci.toUpperCase() ? 1 : 0;
       });
+      const bsBobotVal = (examObj.bsBobot !== undefined && examObj.bsBobot !== null && examObj.bsBobot !== '') ? (Number(examObj.bsBobot) || 0) : 0;
       const bsTotalBenar = bsScores.reduce((a, b) => a + b, 0);
-      const bsSkorPerolehan = bsTotalBenar * (Number(examObj.bsBobot) || 1);
-      const bsSkorMaks = examObj.bsKunci.length * (Number(examObj.bsBobot) || 1);
+      const bsSkorPerolehan = bsTotalBenar * bsBobotVal;
+      const bsSkorMaks = examObj.bsKunci.length * bsBobotVal;
 
       // 3. Evaluate Isian Singkat (Supports either numeric score or exact keyword match)
       const studentIsianTokens = parseCommaList(rawRec.isianRaw, false);
@@ -2387,8 +2416,8 @@
 
       // 4. Deretan karakter langsung tanpa koma (misal: "ABBCDAB..." atau "BSBB...")
       if (isContinuousCharAllowed && trimmed.length > 1) {
-        // Jika seluruhnya berupa huruf alfabet (seperti opsi A-Z / B-S)
-        if (/^[a-zA-Z]+$/.test(trimmed)) {
+        // Jika seluruhnya berupa huruf alfabet atau strip (seperti opsi A-Z / B-S / -)
+        if (/^[a-zA-Z\-]+$/.test(trimmed)) {
           return trimmed.split('').filter(s => s.trim().length > 0);
         }
       }
@@ -2755,7 +2784,7 @@
           kodeSoal: `PG-${idx + 1}`,
           tipe: 'PG',
           kunciLabel: kunci,
-          skorMaks: exam.pgBobot,
+          skorMaks: (exam.pgBobot !== undefined && exam.pgBobot !== null && exam.pgBobot !== '') ? exam.pgBobot : '-',
           rataLabel: `${correctCount}/${N} Siswa`,
           P,
           D,
@@ -2783,7 +2812,7 @@
           kodeSoal: `BS-${idx + 1}`,
           tipe: 'BS',
           kunciLabel: kunci === 'B' ? 'Benar (B)' : 'Salah (S)',
-          skorMaks: exam.bsBobot,
+          skorMaks: (exam.bsBobot !== undefined && exam.bsBobot !== null && exam.bsBobot !== '') ? exam.bsBobot : '-',
           rataLabel: `${correctCount}/${N} Siswa`,
           P,
           D,
@@ -3052,11 +3081,11 @@
       document.getElementById('cfg-tapel').value = exam.tahunAjaran || '';
       document.getElementById('cfg-tanggal').value = exam.tanggal || '';
 
-      document.getElementById('cfg-pg-bobot').value = exam.pgBobot || 1;
-      document.getElementById('cfg-pg-kunci').value = (exam.pgKunci || []).join(',');
+      document.getElementById('cfg-pg-bobot').value = (exam.pgBobot !== undefined && exam.pgBobot !== null && exam.pgBobot !== '') ? exam.pgBobot : '';
+      document.getElementById('cfg-pg-kunci').value = (exam.pgKunci || []).join('');
 
-      document.getElementById('cfg-bs-bobot').value = exam.bsBobot || 1;
-      document.getElementById('cfg-bs-kunci').value = (exam.bsKunci || []).join(',');
+      document.getElementById('cfg-bs-bobot').value = (exam.bsBobot !== undefined && exam.bsBobot !== null && exam.bsBobot !== '') ? exam.bsBobot : '';
+      document.getElementById('cfg-bs-kunci').value = (exam.bsKunci || []).join('');
 
       document.getElementById('cfg-isian-kunci').value = (exam.isianKunci || []).join(',');
       document.getElementById('cfg-isian-maks').value = (exam.isianMaks || []).join(',');
@@ -3068,9 +3097,11 @@
 
     window.updateKeyPreviewBadges = function() {
       const pgArr = parseCommaList(document.getElementById('cfg-pg-kunci').value.toUpperCase());
-      const pgBobot = Number(document.getElementById('cfg-pg-bobot').value) || 0;
+      const pgBobotVal = (document.getElementById('cfg-pg-bobot')?.value || '').trim();
+      const pgBobot = pgBobotVal !== '' ? (Number(pgBobotVal) || 0) : 0;
       const bsArr = parseCommaList(document.getElementById('cfg-bs-kunci').value.toUpperCase());
-      const bsBobot = Number(document.getElementById('cfg-bs-bobot').value) || 0;
+      const bsBobotVal = (document.getElementById('cfg-bs-bobot')?.value || '').trim();
+      const bsBobot = bsBobotVal !== '' ? (Number(bsBobotVal) || 0) : 0;
       const isianKunci = parseCommaList(document.getElementById('cfg-isian-kunci').value, false);
       const isianMaks = parseCommaList(document.getElementById('cfg-isian-maks').value, false).map(Number);
       const uraianMaks = parseCommaList(document.getElementById('cfg-uraian-maks').value, false).map(Number);
@@ -3114,16 +3145,24 @@
       exam.tahunAjaran = document.getElementById('cfg-tapel').value.trim();
       exam.tanggal = document.getElementById('cfg-tanggal').value;
 
-      exam.pgBobot = Number(document.getElementById('cfg-pg-bobot').value) || 1;
+      const rawPgBobot = (document.getElementById('cfg-pg-bobot')?.value || '').trim();
+      exam.pgBobot = rawPgBobot !== '' ? (Number(rawPgBobot) || 0) : '';
       exam.pgKunci = parseCommaList(document.getElementById('cfg-pg-kunci').value.toUpperCase());
 
-      exam.bsBobot = Number(document.getElementById('cfg-bs-bobot').value) || 1;
+      const rawBsBobot = (document.getElementById('cfg-bs-bobot')?.value || '').trim();
+      exam.bsBobot = rawBsBobot !== '' ? (Number(rawBsBobot) || 0) : '';
       exam.bsKunci = parseCommaList(document.getElementById('cfg-bs-kunci').value.toUpperCase());
 
       exam.isianKunci = parseCommaList(document.getElementById('cfg-isian-kunci').value.toUpperCase(), false);
-      exam.isianMaks = parseCommaList(document.getElementById('cfg-isian-maks').value, false).map(n => Number(n) || 2);
+      exam.isianMaks = parseCommaList(document.getElementById('cfg-isian-maks').value, false).map(n => {
+        const num = Number(n);
+        return isNaN(num) ? 0 : num;
+      });
 
-      exam.uraianMaks = parseCommaList(document.getElementById('cfg-uraian-maks').value, false).map(n => Number(n) || 10);
+      exam.uraianMaks = parseCommaList(document.getElementById('cfg-uraian-maks').value, false).map(n => {
+        const num = Number(n);
+        return isNaN(num) ? 0 : num;
+      });
 
       await saveDocToCloud('paket_ujian', exam.id, exam);
 
@@ -3165,12 +3204,12 @@
         waliKelas: 'Wali Kelas',
         tanggal: new Date().toISOString().split('T')[0],
         pgKunci: parseCommaList(document.getElementById('new-exam-pg').value.toUpperCase()),
-        pgBobot: 5,
+        pgBobot: '',
         bsKunci: parseCommaList(document.getElementById('new-exam-bs').value.toUpperCase()),
-        bsBobot: 5,
-        isianKunci: ['KUNCI1', 'KUNCI2'],
-        isianMaks: [5, 5],
-        uraianMaks: [10, 15]
+        bsBobot: '',
+        isianKunci: [],
+        isianMaks: [],
+        uraianMaks: []
       };
 
       paketUjianList.push(newExam);
@@ -3202,18 +3241,168 @@
     };
 
     // =========================================================
-    // 8. FAST STUDENT ANSWER INPUT VIEW
+    // 8. FAST STUDENT ANSWER INPUT VIEW (PILIH KELAS & SISWA LANGSUNG)
     // =========================================================
+    window.syncAnsSelectKelasOptions = function(preferredKelas) {
+      const selectKelas = document.getElementById('ans-select-kelas');
+      if (!selectKelas) return;
+      const distinctClasses = [...new Set((masterSiswaList || []).map(s => s.kelas).filter(Boolean))].sort();
+
+      const currentVal = selectKelas.value || '';
+      let toSelect = preferredKelas !== undefined ? preferredKelas : currentVal;
+
+      const exam = getActiveExam();
+      if (!toSelect && exam && exam.kelas) {
+        const examKl = exam.kelas.toLowerCase();
+        const matched = distinctClasses.find(k => examKl.includes(k.toLowerCase()) || k.toLowerCase().includes(examKl));
+        if (matched) toSelect = matched;
+      }
+
+      let html = '<option value="">Semua Kelas</option>';
+      distinctClasses.forEach(k => {
+        html += `<option value="${k}">${k}</option>`;
+      });
+      selectKelas.innerHTML = html;
+
+      if (toSelect && distinctClasses.includes(toSelect)) {
+        selectKelas.value = toSelect;
+      } else {
+        selectKelas.value = '';
+      }
+    };
+
+    window.syncAnsSelectSiswaOptions = function(selectedNisn) {
+      const selectSiswa = document.getElementById('ans-select-siswa');
+      const selectKelas = document.getElementById('ans-select-kelas');
+      if (!selectSiswa) return;
+
+      const kelasVal = selectKelas ? selectKelas.value : '';
+      const exam = getActiveExam();
+      const examId = exam ? exam.id : '';
+
+      const answeredMap = new Map();
+      if (examId) {
+        (jawabanSiswaList || []).forEach(j => {
+          if (j.ujianId === examId) {
+            answeredMap.set(j.nisn, j);
+          }
+        });
+      }
+
+      let students = (masterSiswaList || []);
+      if (kelasVal) {
+        students = students.filter(s => s.kelas === kelasVal);
+      }
+      students = [...students].sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
+
+      if (students.length === 0) {
+        selectSiswa.innerHTML = `<option value="">-- Belum ada data siswa ${kelasVal ? 'di ' + kelasVal : ''} --</option>`;
+        return;
+      }
+
+      let html = `<option value="">-- Pilih Siswa (${students.length} Siswa) --</option>`;
+      students.forEach((s, idx) => {
+        const ans = answeredMap.get(s.nisn);
+        const statusText = ans ? `[✓ Nilai: ${ans.nilaiAkhir}]` : `[Belum Dinilai]`;
+        const isSel = s.nisn === selectedNisn;
+        html += `<option value="${s.nisn}" ${isSel ? 'selected' : ''}>${idx + 1}. ${s.nama} (${s.nisn})${!kelasVal ? ' - ' + s.kelas : ''} ${statusText}</option>`;
+      });
+      selectSiswa.innerHTML = html;
+
+      if (selectedNisn) {
+        selectSiswa.value = selectedNisn;
+      }
+    };
+
+    window.handleAnsKelasChange = function(kelas) {
+      window.syncAnsSelectSiswaOptions('');
+      window.resetStudentAnswerForm(false);
+    };
+
+    window.handleAnsSiswaChange = function(nisn) {
+      if (!nisn) {
+        window.resetStudentAnswerForm(false);
+        return;
+      }
+
+      const s = masterSiswaList.find(x => x.nisn === nisn);
+      if (!s) return;
+
+      document.getElementById('ans-nisn').value = s.nisn;
+      document.getElementById('ans-nama').value = s.nama;
+
+      const infoStrip = document.getElementById('ans-student-info-strip');
+      if (infoStrip) {
+        infoStrip.classList.remove('hidden');
+        infoStrip.classList.add('flex');
+        document.getElementById('ans-info-nama').textContent = s.nama;
+        document.getElementById('ans-info-nisn').textContent = `(NISN: ${s.nisn})`;
+        document.getElementById('ans-info-kelas').textContent = s.kelas || '-';
+      }
+
+      const exam = getActiveExam();
+      if (!exam) return;
+
+      const existing = (jawabanSiswaList || []).find(j => j.ujianId === exam.id && j.nisn === s.nisn);
+      if (existing) {
+        document.getElementById('ans-edit-id').value = existing.id;
+        document.getElementById('ans-pg-input').value = (existing.studentPG && existing.studentPG.length > 0 ? existing.studentPG : parseCommaList(existing.pgRaw)).join('');
+        document.getElementById('ans-bs-input').value = (existing.studentBS && existing.studentBS.length > 0 ? existing.studentBS : parseCommaList(existing.bsRaw)).join('');
+        document.getElementById('ans-isian-input').value = existing.isianRaw || '';
+        document.getElementById('ans-uraian-input').value = existing.uraianRaw || '';
+        document.getElementById('form-student-title').textContent = `Edit Jawaban: ${s.nama}`;
+        document.getElementById('btn-save-student-label').textContent = 'Perbarui Nilai Siswa';
+        const badgeDetail = document.getElementById('ans-badge-status-detail');
+        if (badgeDetail) {
+          badgeDetail.innerHTML = `<span class="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-[11px]"><i class="fa-solid fa-check mr-1"></i>Sudah Dinilai: ${existing.nilaiAkhir} (Mode Edit)</span>`;
+        }
+      } else {
+        document.getElementById('ans-edit-id').value = '';
+        document.getElementById('ans-pg-input').value = '';
+        document.getElementById('ans-bs-input').value = '';
+        document.getElementById('ans-isian-input').value = '';
+        document.getElementById('ans-uraian-input').value = '';
+        document.getElementById('form-student-title').textContent = `Input Jawaban: ${s.nama}`;
+        document.getElementById('btn-save-student-label').textContent = 'Simpan & Analisis Jawaban Siswa';
+        const badgeDetail = document.getElementById('ans-badge-status-detail');
+        if (badgeDetail) {
+          badgeDetail.innerHTML = `<span class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 font-bold text-[11px]"><i class="fa-solid fa-pen mr-1"></i>Belum Ada Nilai (Siap Diisi)</span>`;
+        }
+      }
+
+      window.liveCheckStudentInput();
+
+      setTimeout(() => {
+        const pgInput = document.getElementById('ans-pg-input');
+        if (pgInput) pgInput.focus();
+      }, 50);
+    };
+
+    window.handleSelectNextStudent = function() {
+      const selectSiswa = document.getElementById('ans-select-siswa');
+      if (!selectSiswa || selectSiswa.options.length <= 1) {
+        showToast('Tidak ada siswa berikutnya dalam daftar kelas ini.', 'info');
+        return;
+      }
+      const currentIdx = selectSiswa.selectedIndex;
+      let nextIdx = currentIdx + 1;
+      if (nextIdx >= selectSiswa.options.length) {
+        showToast('Anda sudah berada di akhir daftar siswa kelas ini.', 'info');
+        return;
+      }
+      const nextNisn = selectSiswa.options[nextIdx].value;
+      if (nextNisn) {
+        selectSiswa.value = nextNisn;
+        window.handleAnsSiswaChange(nextNisn);
+      }
+    };
+
     function renderStudentInputView() {
       const exam = getActiveExam();
 
-      // Update student datalist for quick auto-completion
-      const datalist = document.getElementById('datalist-master-siswa');
-      if (datalist) {
-        datalist.innerHTML = (masterSiswaList || []).map(s => 
-          `<option value="${s.nisn} - ${s.nama}">${s.kelas} (${s.jk === 'L' ? 'Laki-laki' : 'Perempuan'})</option>`
-        ).join('');
-      }
+      window.syncAnsSelectKelasOptions();
+      const currentSelectedNisn = document.getElementById('ans-nisn')?.value || '';
+      window.syncAnsSelectSiswaOptions(currentSelectedNisn);
 
       if (!exam) {
         document.getElementById('strip-key-pg').textContent = '-';
@@ -3224,8 +3413,8 @@
       }
 
       // Update Top Key Reference Strip
-      document.getElementById('strip-key-pg').textContent = (exam.pgKunci || []).join(',') || '-';
-      document.getElementById('strip-key-bs').textContent = (exam.bsKunci || []).join(',') || '-';
+      document.getElementById('strip-key-pg').textContent = (exam.pgKunci || []).join('') || '-';
+      document.getElementById('strip-key-bs').textContent = (exam.bsKunci || []).join('') || '-';
       document.getElementById('strip-key-isian').textContent = (exam.isianKunci || []).map((k, i) => `${k}(${(exam.isianMaks || [])[i] || 0})`).join(', ') || '-';
       document.getElementById('strip-key-uraian').textContent = (exam.uraianMaks || []).join(', ') || '-';
 
@@ -3242,18 +3431,10 @@
         `${x.nisn} - ${x.nama}` === val || x.nisn === val || (x.nama || '').toLowerCase() === val.toLowerCase()
       );
       if (s) {
-        document.getElementById('ans-nisn').value = s.nisn;
-        document.getElementById('ans-nama').value = s.nama;
-        const exam = getActiveExam();
-        if (exam) {
-          const existing = jawabanSiswaList.find(j => j.ujianId === exam.id && j.nisn === s.nisn);
-          if (existing) {
-            window.editStudentAnswer(existing.id);
-            showToast(`Memuat data jawaban yang sudah ada untuk ${s.nama}.`, 'info');
-          } else {
-            showToast(`Siswa ${s.nama} (${s.nisn}) dipilih dari Data Master.`, 'success');
-          }
-        }
+        const selectKelas = document.getElementById('ans-select-kelas');
+        if (selectKelas && s.kelas) selectKelas.value = s.kelas;
+        window.syncAnsSelectSiswaOptions(s.nisn);
+        window.handleAnsSiswaChange(s.nisn);
       }
     };
 
@@ -3311,8 +3492,17 @@
       const editId = document.getElementById('ans-edit-id').value;
       const nisn = document.getElementById('ans-nisn').value.trim();
       const namaSiswa = document.getElementById('ans-nama').value.trim();
-      const pgRaw = document.getElementById('ans-pg-input').value.toUpperCase();
-      const bsRaw = document.getElementById('ans-bs-input').value.toUpperCase();
+
+      if (!nisn || !namaSiswa) {
+        showToast('Silakan pilih kelas dan siswa terlebih dahulu dari daftar di atas.', 'warning');
+        document.getElementById('ans-select-siswa')?.focus();
+        return;
+      }
+
+      const rawPg = document.getElementById('ans-pg-input').value.toUpperCase();
+      const rawBs = document.getElementById('ans-bs-input').value.toUpperCase();
+      const pgRaw = parseCommaList(rawPg).join('');
+      const bsRaw = parseCommaList(rawBs).join('');
       const isianRaw = document.getElementById('ans-isian-input').value;
       const uraianRaw = document.getElementById('ans-uraian-input').value;
 
@@ -3354,17 +3544,32 @@
         await saveDocToCloud('master_siswa', newSiswa.id, newSiswa);
       }
 
-      window.resetStudentAnswerForm();
       renderAllViews();
       animateButtonSaveFeedback(e, 'Jawaban Tersimpan!');
       showToast(`Jawaban & nilai ${namaSiswa} (${evaluated.nilaiAkhir}) berhasil disimpan!`, 'success');
+
+      // Refresh status di dropdown siswa & auto-pindah ke siswa berikutnya
+      window.syncAnsSelectSiswaOptions(nisn);
+      window.handleSelectNextStudent();
     };
 
-    window.resetStudentAnswerForm = function() {
+    window.resetStudentAnswerForm = function(resetClass = false) {
       document.getElementById('ans-edit-id').value = '';
       document.getElementById('ans-nisn').value = '';
       document.getElementById('ans-nama').value = '';
-      document.getElementById('quick-pick-siswa').value = '';
+      if (resetClass) {
+        const selectKelas = document.getElementById('ans-select-kelas');
+        if (selectKelas) selectKelas.value = '';
+        window.syncAnsSelectSiswaOptions('');
+      } else {
+        const selectSiswa = document.getElementById('ans-select-siswa');
+        if (selectSiswa) selectSiswa.value = '';
+      }
+      const infoStrip = document.getElementById('ans-student-info-strip');
+      if (infoStrip) {
+        infoStrip.classList.add('hidden');
+        infoStrip.classList.remove('flex');
+      }
       document.getElementById('ans-pg-input').value = '';
       document.getElementById('ans-bs-input').value = '';
       document.getElementById('ans-isian-input').value = '';
@@ -3377,11 +3582,35 @@
     window.editStudentAnswer = function(id) {
       const rec = jawabanSiswaList.find(j => j.id === id);
       if (!rec) return;
+
+      const s = masterSiswaList.find(x => x.nisn === rec.nisn);
+      const studentClass = s ? s.kelas : (rec.kelas || '');
+
+      const selectKelas = document.getElementById('ans-select-kelas');
+      if (selectKelas && studentClass) {
+        selectKelas.value = studentClass;
+      }
+      window.syncAnsSelectSiswaOptions(rec.nisn);
+
       document.getElementById('ans-edit-id').value = rec.id;
       document.getElementById('ans-nisn').value = rec.nisn;
       document.getElementById('ans-nama').value = rec.namaSiswa;
-      document.getElementById('ans-pg-input').value = rec.pgRaw;
-      document.getElementById('ans-bs-input').value = rec.bsRaw;
+
+      const infoStrip = document.getElementById('ans-student-info-strip');
+      if (infoStrip) {
+        infoStrip.classList.remove('hidden');
+        infoStrip.classList.add('flex');
+        document.getElementById('ans-info-nama').textContent = rec.namaSiswa;
+        document.getElementById('ans-info-nisn').textContent = `(NISN: ${rec.nisn})`;
+        document.getElementById('ans-info-kelas').textContent = studentClass || '-';
+        const badgeDetail = document.getElementById('ans-badge-status-detail');
+        if (badgeDetail) {
+          badgeDetail.innerHTML = `<span class="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-[11px]"><i class="fa-solid fa-check mr-1"></i>Sudah Dinilai: ${rec.nilaiAkhir} (Mode Edit)</span>`;
+        }
+      }
+
+      document.getElementById('ans-pg-input').value = (rec.studentPG && rec.studentPG.length > 0 ? rec.studentPG : parseCommaList(rec.pgRaw)).join('');
+      document.getElementById('ans-bs-input').value = (rec.studentBS && rec.studentBS.length > 0 ? rec.studentBS : parseCommaList(rec.bsRaw)).join('');
       document.getElementById('ans-isian-input').value = rec.isianRaw;
       document.getElementById('ans-uraian-input').value = rec.uraianRaw;
       document.getElementById('form-student-title').textContent = `Edit Jawaban: ${rec.namaSiswa}`;
@@ -3428,6 +3657,8 @@
 
       tbody.innerHTML = list.map((s, idx) => {
         const isTuntas = s.nilaiAkhir >= exam.kkm;
+        const displayPg = (s.studentPG && s.studentPG.length > 0 ? s.studentPG : parseCommaList(s.pgRaw)).join('');
+        const displayBs = (s.studentBS && s.studentBS.length > 0 ? s.studentBS : parseCommaList(s.bsRaw)).join('');
         return `
           <tr class="hover:bg-slate-50/80 transition">
             <td class="py-3 px-3 font-bold text-slate-500">${idx + 1}</td>
@@ -3436,11 +3667,11 @@
               <div class="text-[11px] font-mono text-slate-400">NISN: ${s.nisn}</div>
             </td>
             <td class="py-3 px-3">
-              <div class="font-mono text-[11px] font-bold text-slate-700">${s.pgRaw || '-'}</div>
+              <div class="font-mono text-[11px] font-bold text-slate-700">${displayPg || '-'}</div>
               <div class="text-[10px] font-bold text-cyan-600">Benar: ${s.pgTotalBenar}/${(exam.pgKunci || []).length} (Skor: ${s.pgSkorPerolehan})</div>
             </td>
             <td class="py-3 px-3">
-              <div class="font-mono text-[11px] font-bold text-slate-700">${s.bsRaw || '-'}</div>
+              <div class="font-mono text-[11px] font-bold text-slate-700">${displayBs || '-'}</div>
               <div class="text-[10px] font-bold text-emerald-600">Benar: ${s.bsTotalBenar}/${(exam.bsKunci || []).length} (Skor: ${s.bsSkorPerolehan})</div>
             </td>
             <td class="py-3 px-3 font-mono font-bold text-violet-700">${(s.isianScores || []).join(', ')} <span class="text-slate-400">(${s.isianSkorPerolehan})</span></td>
@@ -4047,16 +4278,6 @@
           ? `<div class="flex flex-wrap gap-1 mt-1">${mapels.map(m => `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">${m}</span>`).join('')}</div>`
           : '';
 
-        let statusBadge = 'bg-slate-100 text-slate-700';
-        const st = (acc.statusGuru || 'Belum Sertifikasi').toLowerCase();
-        if (st.includes('sudah')) {
-          statusBadge = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
-        } else if (st.includes('pns') || st.includes('pppk')) {
-          statusBadge = 'bg-blue-100 text-blue-800 border border-blue-200';
-        } else {
-          statusBadge = 'bg-amber-50 text-amber-800 border border-amber-200';
-        }
-
         return `
           <tr class="hover:bg-slate-50 transition">
             <td class="py-3 px-3 font-bold text-slate-500">${idx + 1}</td>
@@ -4070,11 +4291,6 @@
             <td class="py-3 px-3">
               <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${roleBadge}">
                 ${roleLabel}
-              </span>
-            </td>
-            <td class="py-3 px-3">
-              <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${statusBadge}">
-                ${acc.statusGuru || 'Belum Sertifikasi'}
               </span>
             </td>
             <td class="py-3 px-3">
@@ -4116,7 +4332,6 @@
       let rawNomorId = document.getElementById('acc-nomor-id').value.trim();
       if (rawNomorId.endsWith('.0')) rawNomorId = rawNomorId.slice(0, -2);
       const nomorId = rawNomorId;
-      const statusGuru = document.getElementById('acc-status-guru').value;
       const jabatan = document.getElementById('acc-jabatan').value.trim();
       const role = document.getElementById('acc-role').value;
       const password = document.getElementById('acc-password').value.trim() || 'user123';
@@ -4148,7 +4363,6 @@
         nama,
         jenisId,
         nomorId,
-        statusGuru,
         jabatan: jabatan || (checkedMapel.length > 0 ? checkedMapel.join(', ') : 'Guru Mapel'),
         kelas: jabatan || (checkedMapel.length > 0 ? checkedMapel.join(', ') : 'Guru Mapel'),
         role,
@@ -4177,7 +4391,6 @@
       document.getElementById('acc-nama').value = acc.nama || '';
       document.getElementById('acc-jenis-id').value = acc.jenisId || 'NIP';
       document.getElementById('acc-nomor-id').value = acc.nomorId || '';
-      document.getElementById('acc-status-guru').value = acc.statusGuru || 'Belum Sertifikasi';
       document.getElementById('acc-jabatan').value = acc.jabatan || acc.kelas || '';
       document.getElementById('acc-password').value = acc.password || 'user123';
       document.getElementById('acc-role').value = acc.role || 'guru_mapel';
@@ -4200,7 +4413,6 @@
       document.getElementById('acc-nama').value = '';
       document.getElementById('acc-jenis-id').value = 'NIP';
       document.getElementById('acc-nomor-id').value = '';
-      document.getElementById('acc-status-guru').value = 'Belum Sertifikasi';
       document.getElementById('acc-jabatan').value = '';
       document.getElementById('acc-password').value = 'user123';
       document.getElementById('acc-role').value = 'guru_mapel';
@@ -4236,7 +4448,6 @@
         'Nama Lengkap & Gelar',
         'Jenis ID (NIP/NUPTK/PegID/NIK/Lainnya)',
         'Nomor Identitas',
-        'Status Guru (Belum Sertifikasi/Sudah Sertifikasi/PNS/PPPK/GTT)',
         'Jabatan / Tugas',
         'Sandi Portal Guru',
         'Hak Akses (guru_mapel / wali_kelas)',
@@ -4247,7 +4458,6 @@
           'KODAR BULDANI',
           'NUPTK',
           '1510197300000001',
-          'Belum Sertifikasi',
           'Guru Mapel',
           '15101973',
           'guru_mapel',
@@ -4257,7 +4467,6 @@
           'ABDURRAHMAN, S.Pd',
           'PegID',
           '2709199500000002',
-          'Belum Sertifikasi',
           'Wali Kelas 6',
           '27091995',
           'wali_kelas',
@@ -4270,9 +4479,8 @@
         { wch: 18 },
         { wch: 22 },
         { wch: 24 },
-        { wch: 24 },
         { wch: 18 },
-        { wch: 20 },
+        { wch: 22 },
         { wch: 40 }
       ];
       const wb = XLSX.utils.book_new();
@@ -4298,7 +4506,6 @@
           'Jenis ID',
           'Nomor Identitas',
           'Username Login',
-          'Status Guru',
           'Jabatan / Tugas',
           'Hak Akses / Peran',
           'Mapel yang Diampu',
@@ -4317,7 +4524,6 @@
           acc.jenisId || 'NIP',
           acc.nomorId || '-',
           acc.username,
-          acc.statusGuru || 'Belum Sertifikasi',
           acc.jabatan || acc.kelas || '-',
           rName,
           mapelStr,
@@ -4331,7 +4537,6 @@
         { wch: 12 },
         { wch: 22 },
         { wch: 18 },
-        { wch: 22 },
         { wch: 24 },
         { wch: 20 },
         { wch: 36 },
@@ -4490,7 +4695,6 @@
               nama,
               jenisId,
               nomorId,
-              statusGuru,
               jabatan: jabatan || (mapelDiampu.length > 0 ? mapelDiampu.join(', ') : (role === 'wali_kelas' ? 'Wali Kelas' : 'Guru Mapel')),
               kelas: jabatan || (mapelDiampu.length > 0 ? mapelDiampu.join(', ') : (role === 'wali_kelas' ? 'Wali Kelas' : 'Guru Mapel')),
               role,
@@ -4720,10 +4924,10 @@
             s.nisn,
             s.namaSiswa,
             s.kelas,
-            s.pgRaw,
+            (s.studentPG && s.studentPG.length > 0 ? s.studentPG : parseCommaList(s.pgRaw)).join(''),
             s.pgTotalBenar,
             s.pgSkorPerolehan,
-            s.bsRaw,
+            (s.studentBS && s.studentBS.length > 0 ? s.studentBS : parseCommaList(s.bsRaw)).join(''),
             s.bsTotalBenar,
             s.bsSkorPerolehan,
             s.isianSkorPerolehan,
@@ -4854,8 +5058,8 @@
           idx + 1,
           s.nisn,
           s.namaSiswa,
-          `${s.pgRaw} (${s.pgSkorPerolehan})`,
-          `${s.bsRaw} (${s.bsSkorPerolehan})`,
+          `${(s.studentPG && s.studentPG.length > 0 ? s.studentPG : parseCommaList(s.pgRaw)).join('')} (${s.pgSkorPerolehan})`,
+          `${(s.studentBS && s.studentBS.length > 0 ? s.studentBS : parseCommaList(s.bsRaw)).join('')} (${s.bsSkorPerolehan})`,
           s.isianSkorPerolehan,
           s.uraianSkorPerolehan,
           `${s.totalSkorPerolehan}/${s.skorMaksimal}`,
