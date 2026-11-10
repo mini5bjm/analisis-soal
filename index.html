@@ -816,22 +816,23 @@
                     <i class="fa-solid fa-square-check text-teal-600"></i>
                     <span id="label-checklist-mapel">Ceklist Mapel yang Diampu:</span>
                   </span>
-                  <div id="admin-mapel-batch-actions" class="hidden items-center gap-2">
-                    <button type="button" onclick="batchCheckAll13Mapel(true)" class="px-3 py-1.5 rounded-xl bg-teal-100 hover:bg-teal-200 text-teal-800 text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-                      <i class="fa-solid fa-check-double"></i>
-                      <span>Centang Semua 13 Mapel</span>
-                    </button>
-                    <button type="button" onclick="batchCheckAll13Mapel(false)" class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition flex items-center gap-1.5 border border-rose-200">
-                      <i class="fa-solid fa-trash-can"></i>
-                      <span>Hapus Semua Paket</span>
-                    </button>
-                  </div>
                 </div>
 
                 <!-- Grid of Interactive Checklist Mapel Pills -->
                 <div id="container-mapel-pills" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 pt-1">
                 </div>
               </div>
+            </div>
+
+            <!-- Empty State Hint when no exam selected yet -->
+            <div id="paket-empty-key-hint" class="hidden gyan-card rounded-3xl p-8 text-center space-y-2 border border-dashed border-teal-300 bg-white/80">
+              <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center text-lg mx-auto">
+                <i class="fa-solid fa-hand-pointer"></i>
+              </div>
+              <h4 class="text-sm font-extrabold text-slate-900">Belum Ada Mapel yang Diaktifkan</h4>
+              <p class="text-xs text-slate-500 max-w-md mx-auto">
+                Silakan pilih mata pelajaran dari dropdown atau centang kotak ceklist di atas untuk mulai mengatur kunci jawaban &amp; bobot soal.
+              </p>
             </div>
 
             <!-- Active Exam Key Editor Form -->
@@ -2959,10 +2960,11 @@
       document.getElementById('user-avatar-badge').textContent = initials || 'GR';
 
       // Terapkan pembatasan hak akses menu sesuai peran
+      const safeMenu = (currentUser.role === 'admin' && ['paket', 'input'].includes(initialMenu)) ? 'dashboard' : (initialMenu || 'dashboard');
       applyRoleAccess();
 
       renderAllViews();
-      navigateMenu(initialMenu || 'dashboard');
+      navigateMenu(safeMenu);
     }
 
     // =========================================================
@@ -2973,12 +2975,12 @@
       const role = currentUser.role;
 
       // 1. Definisikan menu yang diizinkan untuk setiap hak akses:
-      // - Admin: dashboard, data siswa, data guru, master paket ujian, analisis butir soal, rekap nilai dan unduh, pengaturan
-      // - Wali Kelas: dashboard, data siswa (kelas yang diampu), master ujian, input jawaban siswa, analisis butir soal, rekap nilai
-      // - Guru Mapel: dashboard, master ujian (mapel diampu kelas 1-6), input jawaban siswa, analisis butir soal, rekap nilai (tanpa data siswa)
+      // - Admin: dashboard, data siswa, data guru, analisis butir soal, rekap nilai dan unduh, pengaturan (tanpa Master Paket Ujian & Input)
+      // - Wali Kelas: dashboard, data siswa (kelas yang diampu), master paket ujian, input jawaban siswa, analisis butir soal, rekap nilai
+      // - Guru Mapel: dashboard, master paket ujian (mapel diampu kelas 1-6), input jawaban siswa, analisis butir soal, rekap nilai (tanpa data siswa)
       let allowedMenus = [];
       if (role === 'admin') {
-        allowedMenus = ['dashboard', 'siswa', 'peserta', 'paket', 'analisis', 'rekap', 'pengaturan'];
+        allowedMenus = ['dashboard', 'siswa', 'peserta', 'analisis', 'rekap', 'pengaturan'];
       } else if (role === 'wali_kelas') {
         allowedMenus = ['dashboard', 'siswa', 'paket', 'input', 'analisis', 'rekap'];
       } else if (role === 'guru_mapel') {
@@ -3252,7 +3254,7 @@
     // =========================================================
     window.navigateMenu = function(menuKey) {
       const role = currentUser ? currentUser.role : 'admin';
-      let allowedMenus = ['dashboard', 'siswa', 'peserta', 'paket', 'analisis', 'rekap', 'pengaturan'];
+      let allowedMenus = ['dashboard', 'siswa', 'peserta', 'analisis', 'rekap', 'pengaturan'];
       if (role === 'wali_kelas') {
         allowedMenus = ['dashboard', 'siswa', 'paket', 'input', 'analisis', 'rekap'];
       } else if (role === 'guru_mapel') {
@@ -3665,7 +3667,7 @@
       const exam = getActiveExam();
       if (!exam) {
         document.getElementById('dash-exam-title').innerHTML = `Belum Ada Paket Ujian Aktif`;
-        document.getElementById('dash-exam-subtitle').textContent = `Mulai dengan membuat paket ujian baru pada menu 'Master Ujian & Kunci'.`;
+        document.getElementById('dash-exam-subtitle').textContent = `Silakan buka menu 'Master Paket Ujian' untuk memilih atau mencentang mapel yang diampu.`;
         document.getElementById('dash-kkm-badge').textContent = `KKM: -`;
         document.getElementById('dash-count-pg').textContent = `0 Soal`;
         document.getElementById('dash-count-bs').textContent = `0 Soal`;
@@ -3901,47 +3903,47 @@
     };
 
     function renderExamConfigView() {
+      // Master Paket Ujian hanya untuk Wali Kelas & Guru Mapel
+      if (currentUser && currentUser.role === 'admin') {
+        return;
+      }
+
       const formCard = document.getElementById('form-key-editor')?.closest('.gyan-card');
+      const emptyHintCard = document.getElementById('paket-empty-key-hint');
       const containerPills = document.getElementById('container-mapel-pills');
       const dropdownSelect = document.getElementById('paket-select-dropdown');
-      const adminActions = document.getElementById('admin-mapel-batch-actions');
       const labelChecklist = document.getElementById('label-checklist-mapel');
 
       const currentJenis = document.getElementById('paket-filter-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
-      let currentKelas = document.getElementById('paket-filter-kelas')?.value;
-      if (!currentKelas) {
-        currentKelas = currentUser?.kelas && currentUser.kelas.includes('Kelas') ? currentUser.kelas : 'Kelas 6';
-        const selK = document.getElementById('paket-filter-kelas');
-        if (selK) selK.value = currentKelas;
-      }
 
-      // Pre-fill filter kelas sesuai wali kelas
-      if (currentUser && currentUser.role === 'wali_kelas' && currentUser.kelas) {
-        const selK = document.getElementById('paket-filter-kelas');
-        if (selK && [...selK.options].some(o => o.value === currentUser.kelas)) {
-          selK.value = currentUser.kelas;
-          currentKelas = currentUser.kelas;
+      // Filter Tingkat Kelas: Wali Kelas hanya melihat kelas yang diampu, Guru Mapel bisa pilih Kelas 1-6
+      const selK = document.getElementById('paket-filter-kelas');
+      let currentKelas = selK?.value || 'Kelas 6';
+      if (selK) {
+        const allKelasOpts = ['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6'];
+        let allowedKelasOpts = allKelasOpts;
+        if (currentUser && currentUser.role === 'wali_kelas') {
+          const matchedKelas = allKelasOpts.filter(k => isClassMatch(k, currentUser));
+          if (matchedKelas.length > 0) {
+            allowedKelasOpts = matchedKelas;
+          }
         }
+        const prevVal = selK.value;
+        selK.innerHTML = allowedKelasOpts.map(k => `<option value="${k}">${k}</option>`).join('');
+        if (allowedKelasOpts.includes(prevVal)) {
+          selK.value = prevVal;
+        } else if (currentUser && currentUser.role === 'guru_mapel') {
+          selK.value = allowedKelasOpts.includes('Kelas 6') ? 'Kelas 6' : allowedKelasOpts[0];
+        } else {
+          selK.value = allowedKelasOpts[0];
+        }
+        currentKelas = selK.value;
       }
 
       const allowedMapels = getTeacherAllowedMapels();
-      const isAdmin = !currentUser || currentUser.role === 'admin';
-
-      // Tampilkan tombol batch untuk admin
-      if (adminActions) {
-        if (isAdmin) {
-          adminActions.classList.remove('hidden');
-          adminActions.classList.add('flex');
-        } else {
-          adminActions.classList.add('hidden');
-          adminActions.classList.remove('flex');
-        }
-      }
 
       if (labelChecklist) {
-        labelChecklist.textContent = isAdmin
-          ? `Ceklist 13 Mapel Madrasah (${currentKelas}):`
-          : `Ceklist Mapel yang Diampu (${currentUser.nama}):`;
+        labelChecklist.textContent = `Ceklist Mapel yang Diampu (${currentUser?.nama || 'Guru'}):`;
       }
 
       const jenisKey = (currentJenis.match(/\(([^)]+)\)/)?.[1] || currentJenis).toLowerCase();
@@ -3953,17 +3955,13 @@
         return matchMapel && matchKelas && matchJenis;
       });
 
-      // Pastikan ada exam aktif dari allowedMapels jika belum ada (hanya auto-aktifkan untuk user Guru)
+      // Sinkronkan activeExamId jika ada paket yang cocok (tanpa auto-create agar ceklist tetap kendali guru)
       let exam = getActiveExam();
       if (!exam && allowedMapels.length > 0) {
         const found = allowedMapels.map(m => findExamByFilter(m)).find(Boolean);
         if (found) {
           activeExamId = found.id;
           exam = found;
-        } else if (!isAdmin) {
-          const autoEx = getOrCreateExamForMapel(allowedMapels[0], currentJenis, currentKelas);
-          activeExamId = autoEx.id;
-          exam = autoEx;
         }
       }
 
@@ -4006,13 +4004,18 @@
 
       // Populate Quick Dropdown in Master Paket
       if (dropdownSelect) {
+        let hasSelectedInFilter = false;
         let optHtml = '';
         allowedMapels.forEach(m => {
           const ex = findExamByFilter(m);
           const val = ex ? ex.id : `create:${m}`;
           const isSel = ex && ex.id === activeExamId;
-          optHtml += `<option value="${val}" ${isSel ? 'selected' : ''}>${m} (${ex ? 'Aktif' : 'Ceklist untuk Aktif'})</option>`;
+          if (isSel) hasSelectedInFilter = true;
+          optHtml += `<option value="${val}" ${isSel ? 'selected' : ''}>${m}${ex ? ' (Aktif)' : ''}</option>`;
         });
+        if (!hasSelectedInFilter) {
+          optHtml = `<option value="" selected>-- Pilih Mapel --</option>` + optHtml;
+        }
         dropdownSelect.innerHTML = optHtml;
       }
 
@@ -4021,10 +4024,13 @@
       if (iSelect) {
         const userExList = getUserExams();
         let iOptHtml = '';
+        let hasSelectedInput = false;
         userExList.forEach(p => {
           const cleanTitle = (p.judulUjian || '').includes(p.mapel) ? p.judulUjian : `${p.mapel} - ${p.judulUjian}`;
           const label = p.kelas ? `${cleanTitle} (${p.kelas})` : cleanTitle;
-          iOptHtml += `<option value="${p.id}" ${p.id === activeExamId ? 'selected' : ''}>${label}</option>`;
+          const isSel = p.id === activeExamId;
+          if (isSel) hasSelectedInput = true;
+          iOptHtml += `<option value="${p.id}" ${isSel ? 'selected' : ''}>${label}</option>`;
         });
         allowedMapels.forEach(m => {
           const hasEx = findExamByFilter(m);
@@ -4032,6 +4038,9 @@
             iOptHtml += `<option value="create:${m}">${m} - ${currentJenis} (${currentKelas})</option>`;
           }
         });
+        if (!hasSelectedInput && iOptHtml) {
+          iOptHtml = `<option value="" selected>-- Pilih Paket Ujian --</option>` + iOptHtml;
+        }
         iSelect.innerHTML = iOptHtml;
       }
 
@@ -4053,10 +4062,12 @@
       // Fill Editor Form
       if (!exam) {
         if (formCard) formCard.classList.add('hidden');
+        if (emptyHintCard) emptyHintCard.classList.remove('hidden');
         return;
       }
 
       if (formCard) formCard.classList.remove('hidden');
+      if (emptyHintCard) emptyHintCard.classList.add('hidden');
 
       // Fill Editor Form
       document.getElementById('editor-exam-heading').textContent = `Edit Kunci Jawaban: ${exam.mapel} (${exam.kelas})`;
@@ -4376,7 +4387,7 @@
             await deleteDocFromCloud('jawaban_siswa', rem.id);
           }
           jawabanSiswaList = (jawabanSiswaList || []).filter(j => j.ujianId !== examId);
-          activeExamId = paketUjianList[0]?.id || '';
+          activeExamId = getUserExams()[0]?.id || '';
           renderAllViews();
           showToast('Paket ujian berhasil dihapus.', 'info');
         }
@@ -4679,7 +4690,7 @@
       e.preventDefault();
       const exam = getActiveExam();
       if (!exam) {
-        showToast('Pilih atau buat paket ujian terlebih dahulu.', 'error');
+        showToast('Silakan pilih mata pelajaran pada pilihan Paket Ujian di atas terlebih dahulu.', 'error');
         return;
       }
 
@@ -4905,7 +4916,10 @@
       const exam = getActiveExam();
       if (!exam) {
         if (thead) thead.innerHTML = '';
-        tbody.innerHTML = `<tr><td colspan="12" class="py-8 text-center text-slate-400 font-semibold">Pilih atau buat paket ujian terlebih dahulu.</td></tr>`;
+        const msg = (currentUser && currentUser.role === 'admin')
+          ? 'Belum ada paket ujian yang dibuat oleh Wali Kelas atau Guru Mapel.'
+          : 'Silakan pilih atau ceklist mapel pada menu Master Paket Ujian terlebih dahulu.';
+        tbody.innerHTML = `<tr><td colspan="12" class="py-8 text-center text-slate-400 font-semibold">${msg}</td></tr>`;
         if (tfoot) tfoot.innerHTML = '';
         document.getElementById('analisis-stat-total').textContent = '-';
         document.getElementById('analisis-stat-rata').textContent = '-';
@@ -5186,7 +5200,10 @@
 
       const exam = getActiveExam();
       if (!exam) {
-        tbody.innerHTML = `<tr><td colspan="11" class="py-8 text-center text-slate-400 font-semibold">Pilih atau buat paket ujian terlebih dahulu.</td></tr>`;
+        const msg = (currentUser && currentUser.role === 'admin')
+          ? 'Belum ada data rekap ujian dari Wali Kelas atau Guru Mapel.'
+          : 'Silakan pilih atau ceklist mapel pada menu Master Paket Ujian terlebih dahulu.';
+        tbody.innerHTML = `<tr><td colspan="11" class="py-8 text-center text-slate-400 font-semibold">${msg}</td></tr>`;
         return;
       }
 
