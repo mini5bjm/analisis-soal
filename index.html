@@ -376,7 +376,7 @@
           </div>
 
           <!-- Active Exam Selector Box in Sidebar -->
-          <div class="px-4 pt-4">
+          <div id="sidebar-exam-selector-container" class="px-4 pt-4">
             <div class="p-3.5 rounded-2xl bg-gradient-to-br from-cyan-50/90 to-teal-50/70 border border-teal-100">
               <label class="block text-[10px] font-extrabold uppercase tracking-wider text-teal-700 mb-1">
                 <i class="fa-solid fa-folder-open mr-1"></i> Paket Ujian Aktif:
@@ -529,36 +529,36 @@
                 <!-- Right Active Key Quick Summary Card -->
                 <div class="lg:col-span-4 bg-white/90 rounded-2xl p-5 border border-teal-100 shadow-sm space-y-3">
                   <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                    <span class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Komposisi Instrumen</span>
+                    <span id="dash-composition-heading" class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Komposisi Instrumen</span>
                     <span id="dash-kkm-badge" class="px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-extrabold">KKM: 75</span>
                   </div>
                   <div class="grid grid-cols-2 gap-2.5 text-xs">
                     <div class="p-2.5 rounded-xl bg-cyan-50/70 border border-cyan-100 flex items-center gap-2.5">
-                      <div class="w-8 h-8 rounded-lg bg-cyan-500 text-white flex items-center justify-center font-bold shrink-0">PG</div>
+                      <div id="dash-badge-pg" class="w-8 h-8 rounded-lg bg-cyan-500 text-white flex items-center justify-center font-bold shrink-0">PG</div>
                       <div>
                         <div class="font-extrabold text-slate-900" id="dash-count-pg">10 Soal</div>
-                        <div class="text-[11px] text-slate-500">Pilihan Ganda</div>
+                        <div id="dash-sub-pg" class="text-[11px] text-slate-500">Pilihan Ganda</div>
                       </div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center gap-2.5">
-                      <div class="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold shrink-0">BS</div>
+                      <div id="dash-badge-bs" class="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold shrink-0">BS</div>
                       <div>
                         <div class="font-extrabold text-slate-900" id="dash-count-bs">5 Soal</div>
-                        <div class="text-[11px] text-slate-500">Benar / Salah</div>
+                        <div id="dash-sub-bs" class="text-[11px] text-slate-500">Benar / Salah</div>
                       </div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-violet-50/70 border border-violet-100 flex items-center gap-2.5">
-                      <div class="w-8 h-8 rounded-lg bg-violet-500 text-white flex items-center justify-center font-bold shrink-0">IS</div>
+                      <div id="dash-badge-isian" class="w-8 h-8 rounded-lg bg-violet-500 text-white flex items-center justify-center font-bold shrink-0">IS</div>
                       <div>
                         <div class="font-extrabold text-slate-900" id="dash-count-isian">5 Soal</div>
-                        <div class="text-[11px] text-slate-500">Isian Singkat</div>
+                        <div id="dash-sub-isian" class="text-[11px] text-slate-500">Isian Singkat</div>
                       </div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-amber-50/70 border border-amber-100 flex items-center gap-2.5">
-                      <div class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold shrink-0">UR</div>
+                      <div id="dash-badge-uraian" class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold shrink-0">UR</div>
                       <div>
                         <div class="font-extrabold text-slate-900" id="dash-count-uraian">3 Soal</div>
-                        <div class="text-[11px] text-slate-500">Uraian / Esai</div>
+                        <div id="dash-sub-uraian" class="text-[11px] text-slate-500">Uraian / Esai</div>
                       </div>
                     </div>
                   </div>
@@ -1148,6 +1148,14 @@
                 <div class="flex flex-wrap items-center gap-3">
                   <div class="flex items-center gap-2">
                     <label class="text-xs font-extrabold text-slate-700 whitespace-nowrap">
+                      <i class="fa-solid fa-folder-open text-teal-600 mr-1"></i>Paket Ujian:
+                    </label>
+                    <select id="analisis-select-exam" onchange="handleChangeActiveExam(this.value)"
+                            class="px-3 py-2 rounded-xl border border-teal-300 text-xs font-bold bg-white text-slate-800 focus:outline-none focus:border-teal-600 shadow-sm cursor-pointer max-w-[210px] truncate">
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <label class="text-xs font-extrabold text-slate-700 whitespace-nowrap">
                       <i class="fa-solid fa-school text-teal-600 mr-1"></i>Kelas:
                     </label>
                     <select id="analisis-filter-kelas" onchange="renderItemAnalysisView()"
@@ -1241,6 +1249,14 @@
                   <p class="text-xs text-slate-500 mt-0.5">Urutan peringkat siswa berdasarkan Nilai Akhir beserta rincian perolehan skor tiap jenis soal.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
+                  <div class="flex items-center gap-2 mr-2">
+                    <label class="text-xs font-extrabold text-slate-700 whitespace-nowrap">
+                      <i class="fa-solid fa-folder-open text-teal-600 mr-1"></i>Paket Ujian:
+                    </label>
+                    <select id="rekap-select-exam" onchange="handleChangeActiveExam(this.value)"
+                            class="px-3 py-2 rounded-xl border border-teal-300 text-xs font-bold bg-white text-slate-800 focus:outline-none focus:border-teal-600 shadow-sm cursor-pointer max-w-[210px] truncate">
+                    </select>
+                  </div>
                   <button type="button" onclick="exportFullExcel()" class="px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md flex items-center gap-2 transition">
                     <i class="fa-solid fa-file-excel"></i>
                     <span>Unduh Excel (.xlsx)</span>
@@ -1914,8 +1930,8 @@
                      class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold" />
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Kelas &amp; Semester</label>
-              <input type="text" id="new-exam-kelas" required value="Kelas VI-A / Ganjil"
+              <label class="block text-xs font-bold text-slate-700 mb-1">Kelas</label>
+              <input type="text" id="new-exam-kelas" required value="Kelas 6" placeholder="Contoh: Kelas 6"
                      class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold" />
             </div>
           </div>
@@ -2332,6 +2348,20 @@
         masterSiswaList = seed.seedSiswa || [];
         jawabanSiswaList = seed.rawStudentResponses || [];
       }
+
+      // Bersihkan teks semester/tahun dari nama kelas paket ujian dan jawaban jika ada
+      (paketUjianList || []).forEach(p => {
+        if (p.kelas && (p.kelas.toLowerCase().includes('ganjil') || p.kelas.toLowerCase().includes('genap') || p.kelas.includes('/'))) {
+          p.kelas = p.kelas.replace(/\s*\/\s*ganjil/i, '').replace(/\s*\/\s*genap/i, '').replace(/\s*\/\s*semester\s*\d*/i, '').trim();
+          if (p.kelas.toLowerCase() === 'kelas vi' || p.kelas.toLowerCase() === 'kelas vi-a') p.kelas = 'Kelas 6';
+        }
+      });
+      (jawabanSiswaList || []).forEach(j => {
+        if (j.kelas && (j.kelas.toLowerCase().includes('ganjil') || j.kelas.toLowerCase().includes('genap') || j.kelas.includes('/'))) {
+          j.kelas = j.kelas.replace(/\s*\/\s*ganjil/i, '').replace(/\s*\/\s*genap/i, '').replace(/\s*\/\s*semester\s*\d*/i, '').trim();
+          if (j.kelas.toLowerCase() === 'kelas vi' || j.kelas.toLowerCase() === 'kelas vi-a') j.kelas = 'Kelas 6';
+        }
+      });
 
       // Bersihkan akun admin agar tidak tercampur di daftar guru
       pesertaAccounts = (pesertaAccounts || []).filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
@@ -2758,7 +2788,17 @@
         dashInputBtn.style.display = allowedMenus.includes('input') ? '' : 'none';
       }
 
-      // 5. Update Impersonation Banner (Beralih Akun Guru oleh Admin)
+      // 5. Tampilkan / sembunyikan Paket Ujian Aktif di Sidebar & Mobile Header (Hilangkan untuk Admin)
+      const sidebarExamBox = document.getElementById('sidebar-exam-selector-container');
+      if (sidebarExamBox) {
+        sidebarExamBox.style.display = (role === 'admin') ? 'none' : '';
+      }
+      const mobileExamSel = document.getElementById('mobile-exam-select');
+      if (mobileExamSel) {
+        mobileExamSel.style.display = (role === 'admin') ? 'none' : '';
+      }
+
+      // 6. Update Impersonation Banner (Beralih Akun Guru oleh Admin)
       const impBanner = document.getElementById('impersonation-banner');
       const impText = document.getElementById('impersonation-banner-text');
       const isImpersonating = currentUser.isImpersonated || Boolean(window.impersonatorAdmin) || Boolean(localStorage.getItem('smart_anabutir_impersonator_v2'));
@@ -3072,8 +3112,12 @@
       }
       const sSelect = document.getElementById('sidebar-exam-select');
       const mSelect = document.getElementById('mobile-exam-select');
+      const aSelect = document.getElementById('analisis-select-exam');
+      const rSelect = document.getElementById('rekap-select-exam');
       if (sSelect) sSelect.value = newExamId;
       if (mSelect) mSelect.value = newExamId;
+      if (aSelect) aSelect.value = newExamId;
+      if (rSelect) rSelect.value = newExamId;
       renderAllViews();
       showToast('Paket ujian aktif berhasil diganti.', 'info');
     };
@@ -3261,8 +3305,12 @@
 
       const sSelect = document.getElementById('sidebar-exam-select');
       const mSelect = document.getElementById('mobile-exam-select');
+      const aSelect = document.getElementById('analisis-select-exam');
+      const rSelect = document.getElementById('rekap-select-exam');
       if (sSelect) sSelect.innerHTML = optionsHtml;
       if (mSelect) mSelect.innerHTML = optionsHtml;
+      if (aSelect) aSelect.innerHTML = optionsHtml;
+      if (rSelect) rSelect.innerHTML = optionsHtml;
 
       // Populate Datalists for Guru Mapel & Wali Kelas in Exam Form
       const guruMapelDatalist = document.getElementById('datalist-guru-mapel');
@@ -3291,10 +3339,100 @@
     }
 
     function renderDashboardView() {
+      // 1. Tampilan Khusus Administrator Utama (Bebas dari Paket Ujian Aktif)
+      if (currentUser && currentUser.role === 'admin') {
+        const schoolName = (appSettings && appSettings.namaSekolah) ? appSettings.namaSekolah : 'Madrasah';
+        const totalSiswaAll = (masterSiswaList || []).length;
+        const totalGuruAll = (pesertaAccounts || []).filter(a => a.id !== 'usr_admin' && a.role !== 'admin').length;
+        const totalPaketAll = (paketUjianList || []).length;
+        const totalJawabanAll = (jawabanSiswaList || []).length;
+
+        document.getElementById('dash-exam-title').innerHTML = `Panel Administrator`;
+        document.getElementById('dash-exam-subtitle').textContent =
+          `Selamat datang di SmartAnabutir - ${schoolName}. Kelola Data Siswa, Data Guru, tinjau Peta Jawaban Siswa per Kelas, serta unduh Rekap Nilai & Laporan Evaluasi.`;
+
+        const headingComp = document.getElementById('dash-composition-heading');
+        if (headingComp) headingComp.textContent = 'Ringkasan Sistem';
+        document.getElementById('dash-kkm-badge').textContent = `Admin Utama`;
+
+        const badgePg = document.getElementById('dash-badge-pg');
+        const badgeBs = document.getElementById('dash-badge-bs');
+        const badgeIs = document.getElementById('dash-badge-isian');
+        const badgeUr = document.getElementById('dash-badge-uraian');
+        if (badgePg) badgePg.textContent = 'SIS';
+        if (badgeBs) badgeBs.textContent = 'GUR';
+        if (badgeIs) badgeIs.textContent = 'PKT';
+        if (badgeUr) badgeUr.textContent = 'RSP';
+
+        document.getElementById('dash-count-pg').textContent = `${totalSiswaAll} Siswa`;
+        document.getElementById('dash-count-bs').textContent = `${totalGuruAll} Guru`;
+        document.getElementById('dash-count-isian').textContent = `${totalPaketAll} Paket`;
+        document.getElementById('dash-count-uraian').textContent = `${totalJawabanAll} Respon`;
+
+        const subPg = document.getElementById('dash-sub-pg');
+        const subBs = document.getElementById('dash-sub-bs');
+        const subIs = document.getElementById('dash-sub-isian');
+        const subUr = document.getElementById('dash-sub-uraian');
+        if (subPg) subPg.textContent = 'Total Siswa';
+        if (subBs) subBs.textContent = 'Total Guru';
+        if (subIs) subIs.textContent = 'Paket Ujian';
+        if (subUr) subUr.textContent = 'Respon Jawaban';
+
+        document.getElementById('stat-total-siswa').textContent = totalSiswaAll;
+        document.getElementById('stat-rata-nilai').textContent = totalGuruAll;
+        document.getElementById('stat-ketuntasan').textContent = `${totalPaketAll}`;
+        document.getElementById('stat-butir-baik').textContent = `${totalJawabanAll}`;
+
+        const statLabelSiswa = document.getElementById('stat-total-siswa')?.nextElementSibling;
+        const statLabelRata = document.getElementById('stat-rata-nilai')?.nextElementSibling;
+        const statLabelTuntas = document.getElementById('stat-ketuntasan')?.nextElementSibling;
+        const statLabelBaik = document.getElementById('stat-butir-baik')?.nextElementSibling;
+        if (statLabelSiswa) statLabelSiswa.textContent = 'Total Siswa Terdaftar';
+        if (statLabelRata) statLabelRata.textContent = 'Tenaga Guru Terdaftar';
+        if (statLabelTuntas) statLabelTuntas.textContent = 'Total Paket Ujian';
+        if (statLabelBaik) statLabelBaik.textContent = 'Total Respon Siswa';
+
+        document.getElementById('card-desc-difficulty').textContent =
+          `Sistem mencatat ${totalPaketAll} paket ujian dan ${totalGuruAll} guru terdaftar.`;
+        document.getElementById('card-desc-discrim').textContent =
+          `Tinjau analisis jawaban siswa per kelas secara lengkap di menu Jawaban Siswa per Kelas.`;
+        return;
+      }
+
+      // 2. Tampilan Guru & Wali Kelas (Berbasis Paket Ujian Aktif yang Diampu)
+      const headingComp = document.getElementById('dash-composition-heading');
+      if (headingComp) headingComp.textContent = 'Komposisi Instrumen';
+      const badgePg = document.getElementById('dash-badge-pg');
+      const badgeBs = document.getElementById('dash-badge-bs');
+      const badgeIs = document.getElementById('dash-badge-isian');
+      const badgeUr = document.getElementById('dash-badge-uraian');
+      if (badgePg) badgePg.textContent = 'PG';
+      if (badgeBs) badgeBs.textContent = 'BS';
+      if (badgeIs) badgeIs.textContent = 'IS';
+      if (badgeUr) badgeUr.textContent = 'UR';
+
+      const subPg = document.getElementById('dash-sub-pg');
+      const subBs = document.getElementById('dash-sub-bs');
+      const subIs = document.getElementById('dash-sub-isian');
+      const subUr = document.getElementById('dash-sub-uraian');
+      if (subPg) subPg.textContent = 'Pilihan Ganda';
+      if (subBs) subBs.textContent = 'Benar / Salah';
+      if (subIs) subIs.textContent = 'Isian Singkat';
+      if (subUr) subUr.textContent = 'Uraian / Esai';
+
+      const statLabelSiswa = document.getElementById('stat-total-siswa')?.nextElementSibling;
+      const statLabelRata = document.getElementById('stat-rata-nilai')?.nextElementSibling;
+      const statLabelTuntas = document.getElementById('stat-ketuntasan')?.nextElementSibling;
+      const statLabelBaik = document.getElementById('stat-butir-baik')?.nextElementSibling;
+      if (statLabelSiswa) statLabelSiswa.textContent = 'Peserta Dianalisis';
+      if (statLabelRata) statLabelRata.textContent = 'Rata-rata Kelas';
+      if (statLabelTuntas) statLabelTuntas.textContent = 'Ketuntasan (≥ KKM)';
+      if (statLabelBaik) statLabelBaik.textContent = 'Soal Kualitas Baik';
+
       const exam = getActiveExam();
       if (!exam) {
         document.getElementById('dash-exam-title').innerHTML = `Belum Ada Paket Ujian Aktif`;
-        document.getElementById('dash-exam-subtitle').textContent = `Mulai dengan membuat paket ujian baru pada menu 'Master Ujian & Kunci' atau kelola Data Siswa & Data Guru.`;
+        document.getElementById('dash-exam-subtitle').textContent = `Mulai dengan membuat paket ujian baru pada menu 'Master Ujian & Kunci'.`;
         document.getElementById('dash-kkm-badge').textContent = `KKM: -`;
         document.getElementById('dash-count-pg').textContent = `0 Soal`;
         document.getElementById('dash-count-bs').textContent = `0 Soal`;
@@ -4131,24 +4269,71 @@
       // 1. Sinkronkan Dropdown Filter Kelas
       const selectKelas = document.getElementById('analisis-filter-kelas');
       if (selectKelas) {
-        const curKelasVal = selectKelas.value || 'ALL';
-        let distinctClasses = [...new Set([
+        const curKelasVal = selectKelas.value || '';
+
+        let rawClasses = [...new Set([
           ...(masterSiswaList || []).map(s => s.kelas),
-          ...getActiveExamStudents().map(s => s.kelas)
-        ].filter(Boolean))].sort();
+          ...getActiveExamStudents().map(s => {
+            const ms = (masterSiswaList || []).find(m => String(m.nisn).trim() === String(s.nisn).trim());
+            return ms ? ms.kelas : s.kelas;
+          })
+        ].filter(Boolean))];
+
+        // Format dan bersihkan kelas: buang semester 'Ganjil', 'Genap', '/', 'Semester', dll
+        let distinctClasses = rawClasses
+          .map(c => String(c).trim())
+          .filter(c => {
+            const lower = c.toLowerCase();
+            return !lower.includes('ganjil') && !lower.includes('genap') && !lower.includes('/') && !lower.includes('semester');
+          });
+
+        // Format nama kelas agar tidak ada duplikasi 'Kelas Kelas 1'
+        const formatClassLabel = (c) => {
+          if (!c) return '';
+          const str = String(c).trim();
+          return /^kelas\b/i.test(str) ? str : `Kelas ${str}`;
+        };
+
+        // Buang duplikasi setelah diformat (misal '1' dan 'Kelas 1' menjadi satu 'Kelas 1')
+        distinctClasses = [...new Set(distinctClasses.map(c => formatClassLabel(c)))].sort((a, b) => {
+          const numA = parseInt(a.replace(/\D/g, '') || '0', 10);
+          const numB = parseInt(b.replace(/\D/g, '') || '0', 10);
+          return numA - numB || a.localeCompare(b);
+        });
+
+        // Jika master siswa belum ada kelas, default kelas 1 - 6
+        if (distinctClasses.length === 0) {
+          distinctClasses = ['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6'];
+        }
 
         if (currentUser && currentUser.role === 'wali_kelas') {
           distinctClasses = distinctClasses.filter(c => isClassMatch(c, currentUser));
         }
 
-        let optHtml = (currentUser && currentUser.role === 'wali_kelas') ? '' : '<option value="ALL">Semua Kelas</option>';
+        const isAdmin = currentUser && currentUser.role === 'admin';
+
+        // PENTING: Untuk user admin hilangkan opsi 'Semua Kelas' (tampilkan per kelas langsung).
+        // Begitu juga untuk wali kelas (hanya kelas yang diampu).
+        let optHtml = (isAdmin || (currentUser && currentUser.role === 'wali_kelas'))
+          ? ''
+          : '<option value="ALL">Semua Kelas</option>';
+
         distinctClasses.forEach(c => {
-          optHtml += `<option value="${c}" ${c === curKelasVal ? 'selected' : ''}>Kelas ${c}</option>`;
+          optHtml += `<option value="${c}" ${c === curKelasVal ? 'selected' : ''}>${c}</option>`;
         });
         selectKelas.innerHTML = optHtml;
+
+        // Jika pada admin atau wali kelas, jika curKelasVal kosong, 'ALL', atau tidak ada di list, otomatis pilih kelas pertama
+        if (isAdmin || (currentUser && currentUser.role === 'wali_kelas')) {
+          if (!curKelasVal || curKelasVal === 'ALL' || !distinctClasses.includes(curKelasVal)) {
+            selectKelas.value = distinctClasses[0] || '';
+          } else {
+            selectKelas.value = curKelasVal;
+          }
+        }
       }
 
-      const filterKelas = selectKelas ? selectKelas.value : 'ALL';
+      const filterKelas = selectKelas ? selectKelas.value : '';
       const selectTipe = document.getElementById('analisis-filter-tipe');
       const filterTipe = selectTipe ? selectTipe.value : 'PG';
 
@@ -4177,11 +4362,12 @@
 
       // 3. Filter Siswa untuk Ujian Aktif
       let examStudents = [...getActiveExamStudents()];
-      if (filterKelas !== 'ALL') {
+      if (filterKelas && filterKelas !== 'ALL') {
         examStudents = examStudents.filter(s => {
           const ms = (masterSiswaList || []).find(m => String(m.nisn).trim() === String(s.nisn).trim());
           const stClass = ms ? ms.kelas : (s.kelas || '');
-          return stClass === filterKelas;
+          if (stClass === filterKelas) return true;
+          return isClassMatch(filterKelas, { kelas: stClass, role: 'wali_kelas' });
         });
       }
 
@@ -4192,7 +4378,8 @@
       const totalSiswa = examStudents.length;
       if (totalSiswa === 0) {
         if (thead) thead.innerHTML = '';
-        tbody.innerHTML = `<tr><td colspan="${questions.length + 7}" class="py-8 text-center text-slate-400 font-semibold">Belum ada jawaban siswa yang diinput untuk ${filterKelas === 'ALL' ? 'ujian ini' : 'Kelas ' + filterKelas}.</td></tr>`;
+        const emptyLabel = (filterKelas && filterKelas !== 'ALL') ? filterKelas : 'kelas ini';
+        tbody.innerHTML = `<tr><td colspan="${questions.length + 7}" class="py-8 text-center text-slate-400 font-semibold">Belum ada jawaban siswa yang diinput untuk ${emptyLabel}.</td></tr>`;
         if (tfoot) tfoot.innerHTML = '';
         document.getElementById('analisis-stat-total').textContent = '0 Siswa';
         document.getElementById('analisis-stat-rata').textContent = '0.0';
@@ -4364,6 +4551,13 @@
 
       tbody.innerHTML = students.map((s, idx) => {
         const isTuntas = s.nilaiAkhir >= exam.kkm;
+        const isAdmin = currentUser && currentUser.role === 'admin';
+        const editBtnHtml = isAdmin ? '' : `
+          <button onclick="editStudentAnswerFromRekap('${s.id}')" class="w-7 h-7 rounded-lg bg-teal-50 hover:bg-teal-600 text-teal-600 hover:text-white flex items-center justify-center transition" title="Edit Jawaban Siswa">
+            <i class="fa-solid fa-pen text-[11px]"></i>
+          </button>
+        `;
+
         return `
           <tr class="hover:bg-slate-50/80 transition">
             <td class="py-3 px-3 text-center font-extrabold text-slate-700">#${idx + 1}</td>
@@ -4384,9 +4578,7 @@
             </td>
             <td class="py-3 px-3 text-center">
               <div class="flex items-center justify-center gap-1.5">
-                <button onclick="editStudentAnswerFromRekap('${s.id}')" class="w-7 h-7 rounded-lg bg-teal-50 hover:bg-teal-600 text-teal-600 hover:text-white flex items-center justify-center transition" title="Edit Jawaban Siswa">
-                  <i class="fa-solid fa-pen text-[11px]"></i>
-                </button>
+                ${editBtnHtml}
                 <button onclick="deleteStudentAnswerFromRekap('${s.id}')" class="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white flex items-center justify-center transition" title="Hapus Nilai Siswa">
                   <i class="fa-solid fa-trash text-[11px]"></i>
                 </button>
@@ -4398,7 +4590,7 @@
     }
 
     window.editStudentAnswerFromRekap = function(id) {
-      window.navigateMenu('jawaban');
+      window.navigateMenu('input');
       window.editStudentAnswer(id);
     };
 
