@@ -223,7 +223,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- LOGIN SCREEN (HYBRID AUTHENTICATION)       -->
+    <!-- LOGIN SCREEN                               -->
     <!-- ========================================== -->
     <div id="login-screen" class="fixed inset-0 z-[100001] overflow-y-auto bg-slate-100 flex items-center justify-center p-4">
       <div class="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 bg-white rounded-3xl shadow-[0_20px_60px_rgba(15,23,42,0.12)] border border-slate-200 overflow-hidden">
@@ -283,7 +283,7 @@
           </div>
 
           <div class="mt-8 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-slate-400 relative z-10">
-            <span><i class="fa-solid fa-shield-halved text-teal-400 mr-1.5"></i>Hybrid Cloud Database</span>
+            <span><i class="fa-solid fa-shield-halved text-teal-400 mr-1.5"></i>Sistem Terproteksi</span>
             <span id="login-mode-badge" class="px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-semibold">Mode Siap Pakai</span>
           </div>
         </div>
@@ -311,19 +311,19 @@
           <!-- Form Login -->
           <form id="login-form" onsubmit="handleLoginSubmit(event)" class="space-y-4">
             <div id="field-admin-email">
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Username / Email Administrator</label>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Username Administrator</label>
               <div class="relative">
                 <i class="fa-solid fa-user-shield absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                <input type="text" id="login-email" placeholder="Masukkan username atau email admin"
+                <input type="text" id="login-email" placeholder="Masukkan username administrator"
                        class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition" />
               </div>
             </div>
 
             <div id="field-guru-username" class="hidden">
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Username / Email Guru / Wali Kelas</label>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">NIP / Username Guru / Wali Kelas</label>
               <div class="relative">
                 <i class="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                <input type="text" id="login-username" placeholder="Masukkan username atau email Anda"
+                <input type="text" id="login-username" placeholder="Masukkan NIP atau username guru"
                        class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition" />
               </div>
             </div>
@@ -1866,7 +1866,7 @@
     let db = null;
     let auth = null;
     let isCloudConnected = false;
-    let collection, doc, setDoc, deleteDoc, getDocs, signInWithEmailAndPassword;
+    let collection, doc, setDoc, deleteDoc, getDocs;
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'smart-anabutir-app';
 
     let currentLoginTab = 'admin';
@@ -1954,7 +1954,6 @@
           setDoc = fbFirestore.setDoc;
           deleteDoc = fbFirestore.deleteDoc;
           getDocs = fbFirestore.getDocs;
-          signInWithEmailAndPassword = fbAuth.signInWithEmailAndPassword;
 
           const app = fbApp.getApps().length === 0 ? fbApp.initializeApp(firebaseConfig) : fbApp.getApps()[0];
           db = fbFirestore.getFirestore(app);
@@ -2043,10 +2042,24 @@
               }
             }
             if (cloudAccounts.length > 0) {
-              const cloudUsernames = new Set(cloudAccounts.map(a => (a.username || '').toLowerCase()));
-              const localOnly = (pesertaAccounts || []).filter(a => a.username && !cloudUsernames.has(a.username.toLowerCase()));
-              pesertaAccounts = [...cloudAccounts, ...localOnly];
-              if (!pesertaAccounts.some(a => a.username && a.username.toLowerCase() === 'admin')) {
+              const localMap = new Map((pesertaAccounts || []).map(a => [a.id, a]));
+              const mergedAccounts = cloudAccounts.map(c => {
+                const l = localMap.get(c.id);
+                if (!l) return c;
+                // Jika akun admin di lokal sudah pernah diubah (bukan bawaan 'admin'/'admin123'), prioritaskan lokal
+                if (l.role === 'admin' && (l.username !== 'admin' || l.password !== 'admin123')) {
+                  try { setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', l.id), l); } catch(e){}
+                  return l;
+                }
+                if (l.updatedAt && c.updatedAt) {
+                  return l.updatedAt >= c.updatedAt ? l : c;
+                }
+                return c;
+              });
+              const cloudIds = new Set(cloudAccounts.map(a => a.id));
+              const localOnly = (pesertaAccounts || []).filter(a => a.id && !cloudIds.has(a.id));
+              pesertaAccounts = [...mergedAccounts, ...localOnly];
+              if (!pesertaAccounts.some(a => a.role === 'admin')) {
                 pesertaAccounts.unshift(seed.seedAccounts[0]);
               }
               localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
@@ -2054,6 +2067,9 @@
               // Jika cloud kosong, pertahankan akun guru lokal dari localStorage (jangan timpa ke seed dummy)!
               if (!pesertaAccounts || pesertaAccounts.length === 0) {
                 pesertaAccounts = seed.seedAccounts;
+                localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
+              } else if (!pesertaAccounts.some(a => a.role === 'admin')) {
+                pesertaAccounts.unshift(seed.seedAccounts[0]);
                 localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
               } else {
                 Promise.allSettled(
@@ -2149,11 +2165,15 @@
         jawabanSiswaList = seed.rawStudentResponses || [];
       }
 
-      // Pastikan ada akun admin default jika kosong
+      // Pastikan ada akun admin jika belum ada sama sekali
       if (!pesertaAccounts || pesertaAccounts.length === 0) {
         pesertaAccounts = [
           { id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' }
         ];
+      } else if (!pesertaAccounts.some(a => a.role === 'admin')) {
+        pesertaAccounts.unshift(
+          { id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' }
+        );
       }
     }
 
@@ -2396,13 +2416,13 @@
         ? (document.getElementById('login-email')?.value || '').trim()
         : (document.getElementById('login-username')?.value || '').trim();
 
-      // Fallback jika pengguna mengisi tab sebelah lalu berganti tab
+      // Fallback jika pengguna mengisi input tab sebelah lalu berganti tab
       if (!rawIdentifier) {
         rawIdentifier = (document.getElementById('login-email')?.value || document.getElementById('login-username')?.value || '').trim();
       }
 
       if (!rawIdentifier || !pass) {
-        showToast('Mohon lengkapi Username/Email dan Password.', 'error');
+        showToast('Mohon lengkapi Username dan Kata Sandi.', 'error');
         return;
       }
 
@@ -2419,114 +2439,85 @@
       }
 
       try {
-        // 1. Cek kecocokan pada daftar akun lokal/Firestore (users_peserta)
-        const foundAccount = (pesertaAccounts || []).find(
-          u => ((u.username && u.username.toLowerCase() === rawIdentifier.toLowerCase()) ||
-                (u.email && u.email.toLowerCase() === rawIdentifier.toLowerCase()) ||
-                (u.nomorId && String(u.nomorId).trim() === rawIdentifier.trim())) &&
-               u.password === pass
+        // =========================================================
+        // JALUR 1: LOGIN ADMINISTRATOR
+        // HANYA MENGGUNAKAN USERNAME & PASSWORD YANG DIATUR DI APLIKASI
+        // AKSES MASUK VIA FIREBASE UNTUK USER ADMIN TELAH DIHILANGKAN
+        // =========================================================
+        if (currentLoginTab === 'admin') {
+          const adminAcc = (pesertaAccounts || []).find(a => a.role === 'admin');
+          let isMatch = false;
+          let matchedAdmin = null;
+
+          if (adminAcc) {
+            // Cocokkan HANYA dengan username & password admin yang disimpan di aplikasi
+            const matchUser = (adminAcc.username || '').trim().toLowerCase() === rawIdentifier.toLowerCase();
+            const matchPass = (adminAcc.password || '').trim() === pass;
+            if (matchUser && matchPass) {
+              isMatch = true;
+              matchedAdmin = adminAcc;
+            }
+          } else if (rawIdentifier.toLowerCase() === 'admin' && pass === 'admin123') {
+            // Inisialisasi bawaan awal hanya jika belum pernah ada akun admin di database
+            isMatch = true;
+            matchedAdmin = {
+              id: 'usr_admin',
+              role: 'admin',
+              nama: 'Administrator Utama',
+              username: 'admin',
+              password: 'admin123',
+              kelas: 'Semua Mapel'
+            };
+            if (!pesertaAccounts) pesertaAccounts = [];
+            pesertaAccounts.unshift(matchedAdmin);
+            try {
+              localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
+            } catch (err) {}
+          }
+
+          if (isMatch && matchedAdmin) {
+            currentUser = {
+              role: 'admin',
+              nama: matchedAdmin.nama || 'Administrator Utama',
+              username: matchedAdmin.username,
+              kelas: matchedAdmin.kelas || 'Semua Mapel'
+            };
+            saveSessionState(currentUser, 'dashboard');
+            applyUserSession('dashboard', true);
+            showToast(`Selamat datang kembali, ${currentUser.nama}!`, 'success');
+            return;
+          } else {
+            showToast('Username atau Kata Sandi Administrator salah. Silakan periksa kembali.', 'error');
+            return;
+          }
+        }
+
+        // =========================================================
+        // JALUR 2: LOGIN GURU & WALI KELAS
+        // HANYA MENGGUNAKAN DATA GURU YANG DIDAFTARKAN DI APLIKASI
+        // =========================================================
+        const foundTeacher = (pesertaAccounts || []).find(
+          u => u.role !== 'admin' &&
+               ((u.username && u.username.toLowerCase() === rawIdentifier.toLowerCase()) ||
+                (u.nomorId && String(u.nomorId).trim() === rawIdentifier.trim()) ||
+                (u.email && u.email.toLowerCase() === rawIdentifier.toLowerCase())) &&
+               (u.password || '').trim() === pass
         );
 
-        if (foundAccount) {
+        if (foundTeacher) {
           currentUser = {
-            role: foundAccount.role === 'admin' ? 'admin' : (foundAccount.role === 'wali_kelas' ? 'wali_kelas' : 'guru_mapel'),
-            nama: foundAccount.nama,
-            username: foundAccount.username,
-            kelas: foundAccount.kelas || 'Semua Mapel'
+            role: foundTeacher.role === 'wali_kelas' ? 'wali_kelas' : 'guru_mapel',
+            nama: foundTeacher.nama,
+            username: foundTeacher.username || foundTeacher.nomorId,
+            kelas: foundTeacher.kelas || foundTeacher.jabatan || 'Guru Mapel'
           };
           saveSessionState(currentUser, 'dashboard');
           applyUserSession('dashboard', true);
-          showToast(`Selamat datang kembali, ${foundAccount.nama}!`, 'success');
+          showToast(`Selamat datang kembali, ${foundTeacher.nama}!`, 'success');
           return;
         }
 
-        // 2. Cek akun Administrator bawaan darurat (admin / admin123)
-        if (rawIdentifier.toLowerCase() === 'admin' && pass === 'admin123') {
-          currentUser = {
-            role: 'admin',
-            nama: 'Administrator Utama',
-            username: 'admin',
-            kelas: 'Semua Mapel'
-          };
-          saveSessionState(currentUser, 'dashboard');
-          applyUserSession('dashboard', true);
-          showToast('Selamat datang kembali, Administrator!', 'success');
-          return;
-        }
-
-        // 3. Autentikasi langsung via Firebase Authentication (jika format email / terhubung)
-        if (rawIdentifier.includes('@')) {
-          // Pastikan Firebase Auth modul termuat
-          if (!auth || !signInWithEmailAndPassword) {
-            try {
-              const fbApp = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-              const fbAuth = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-              const app = fbApp.getApps().length === 0 ? fbApp.initializeApp(firebaseConfig) : fbApp.getApps()[0];
-              auth = fbAuth.getAuth(app);
-              signInWithEmailAndPassword = fbAuth.signInWithEmailAndPassword;
-            } catch (err) {
-              console.warn('Gagal memuat Firebase Auth SDK:', err);
-            }
-          }
-
-          if (auth && signInWithEmailAndPassword) {
-            try {
-              const userCredential = await signInWithEmailAndPassword(auth, rawIdentifier, pass);
-              const fbUser = userCredential.user;
-
-              // Cari apakah ada profil tersimpan di users_peserta
-              const matchedPeserta = (pesertaAccounts || []).find(
-                p => (p.username && p.username.toLowerCase() === rawIdentifier.toLowerCase()) ||
-                     (p.email && p.email.toLowerCase() === rawIdentifier.toLowerCase())
-              );
-
-              if (matchedPeserta) {
-                currentUser = {
-                  role: matchedPeserta.role || (currentLoginTab === 'admin' ? 'admin' : 'guru_mapel'),
-                  nama: matchedPeserta.nama || fbUser.displayName || rawIdentifier.split('@')[0],
-                  username: matchedPeserta.username || rawIdentifier,
-                  kelas: matchedPeserta.kelas || 'Semua Mapel'
-                };
-              } else {
-                const isAdmin = currentLoginTab === 'admin' || rawIdentifier.toLowerCase().includes('admin');
-                currentUser = {
-                  role: isAdmin ? 'admin' : 'guru_mapel',
-                  nama: fbUser.displayName || (rawIdentifier.split('@')[0].toUpperCase()),
-                  username: rawIdentifier,
-                  kelas: isAdmin ? 'Semua Mapel' : 'Guru Mapel'
-                };
-              }
-
-              saveSessionState(currentUser, 'dashboard');
-              applyUserSession('dashboard', true);
-              showToast(`Berhasil masuk via Firebase: ${currentUser.nama}`, 'success');
-              return;
-            } catch (authErr) {
-              console.warn('Firebase signInWithEmailAndPassword gagal:', authErr);
-              let errMsg = 'Gagal masuk dengan Firebase Authentication.';
-              if (authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password' || authErr.code === 'auth/user-not-found') {
-                errMsg = 'Email atau Kata Sandi Firebase tidak sesuai. Silakan periksa kembali.';
-              } else if (authErr.code === 'auth/invalid-email') {
-                errMsg = 'Format email tidak valid (contoh: admin@sekolah.sch.id).';
-              } else if (authErr.code === 'auth/too-many-requests') {
-                errMsg = 'Terlalu banyak percobaan gagal. Silakan tunggu beberapa saat lagi.';
-              } else if (authErr.code === 'auth/operation-not-allowed') {
-                errMsg = 'Metode Email/Password belum diaktifkan di Firebase Console > Authentication > Sign-in method.';
-              } else if (authErr.message) {
-                errMsg = `Firebase Auth: ${authErr.message}`;
-              }
-              showToast(errMsg, 'error');
-              return;
-            }
-          }
-        }
-
-        // 4. Jika tidak cocok dan bukan format email
-        if (!rawIdentifier.includes('@')) {
-          showToast('Username atau Kata Sandi tidak cocok. Jika Anda mendaftar melalui Firebase Authentication, pastikan memasukkan alamat Email lengkap yang terdaftar.', 'error');
-        } else {
-          showToast('Email atau Kata Sandi tidak cocok.', 'error');
-        }
+        showToast('NIP / Username atau Kata Sandi Guru salah. Silakan periksa kembali.', 'error');
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
@@ -4125,6 +4116,10 @@
     window.deletePesertaAccount = function(id) {
       const acc = pesertaAccounts.find(a => a.id === id);
       if (!acc) return;
+      if (acc.role === 'admin') {
+        showToast('Akun Administrator utama tidak dapat dihapus demi keamanan sistem.', 'warning');
+        return;
+      }
       showConfirmModal(
         'Hapus Akun Guru?',
         `Apakah Anda yakin ingin menghapus data akun ${acc.nama} (${acc.username})?`,
@@ -4391,7 +4386,7 @@
           }
 
           // Pastikan akun admin tidak pernah hilang
-          if (!pesertaAccounts.some(a => a.username && a.username.toLowerCase() === 'admin')) {
+          if (!pesertaAccounts.some(a => a.role === 'admin')) {
             pesertaAccounts.unshift({ id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' });
           }
 
@@ -4455,13 +4450,15 @@
       if (inpKamad && !inpKamad.matches(':focus')) inpKamad.value = appSettings.kepalaSekolah || '';
 
       // 5. Input Fields di Form User Admin
-      const adminAcc = (pesertaAccounts || []).find(a => a.role === 'admin') || (pesertaAccounts || [])[0];
-      if (adminAcc) {
-        const inpAdminUser = document.getElementById('setting-admin-username');
-        if (inpAdminUser && !inpAdminUser.matches(':focus')) inpAdminUser.value = adminAcc.username || 'admin';
-        const inpAdminNama = document.getElementById('setting-admin-nama');
-        if (inpAdminNama && !inpAdminNama.matches(':focus')) inpAdminNama.value = adminAcc.nama || 'Administrator Utama';
+      let adminAcc = (pesertaAccounts || []).find(a => a.role === 'admin');
+      if (!adminAcc) {
+        adminAcc = { id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' };
+        pesertaAccounts.unshift(adminAcc);
       }
+      const inpAdminUser = document.getElementById('setting-admin-username');
+      if (inpAdminUser && !inpAdminUser.matches(':focus')) inpAdminUser.value = adminAcc.username || 'admin';
+      const inpAdminNama = document.getElementById('setting-admin-nama');
+      if (inpAdminNama && !inpAdminNama.matches(':focus')) inpAdminNama.value = adminAcc.nama || 'Administrator Utama';
     }
 
     function renderPengaturanView() {
@@ -4523,6 +4520,7 @@
 
       adminAcc.username = newUsername;
       adminAcc.nama = newNama;
+      adminAcc.updatedAt = Date.now();
 
       // Update sesi aktif jika login sebagai admin
       if (currentUser && currentUser.role === 'admin') {
@@ -4583,18 +4581,7 @@
       }
 
       adminAcc.password = newPass;
-
-      // Sinkronkan ke Firebase Auth jika pengguna login dengan akun Firebase
-      if (auth && auth.currentUser) {
-        try {
-          const fbAuth = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-          if (fbAuth.updatePassword) {
-            await fbAuth.updatePassword(auth.currentUser, newPass);
-          }
-        } catch (fbErr) {
-          console.info('Catatan sinkronisasi kata sandi Firebase:', fbErr.message);
-        }
-      }
+      adminAcc.updatedAt = Date.now();
 
       await saveDocToCloud('users_peserta', adminAcc.id, adminAcc);
       renderPesertaAccountsTable();
