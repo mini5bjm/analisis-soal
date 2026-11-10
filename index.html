@@ -256,19 +256,19 @@
           <!-- Form Login -->
           <form id="login-form" onsubmit="handleLoginSubmit(event)" class="space-y-4">
             <div id="field-admin-email">
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Email Administrator</label>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Username / Email Administrator</label>
               <div class="relative">
-                <i class="fa-solid fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                <input type="email" id="login-email" placeholder="Masukkan email admin"
+                <i class="fa-solid fa-user-shield absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="text" id="login-email" placeholder="Masukkan username atau email (contoh: admin)"
                        class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition" />
               </div>
             </div>
 
             <div id="field-guru-username" class="hidden">
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Username</label>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Username Guru</label>
               <div class="relative">
                 <i class="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                <input type="text" id="login-username" placeholder="Masukkan username"
+                <input type="text" id="login-username" placeholder="Masukkan username (contoh: guru1)"
                        class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition" />
               </div>
             </div>
@@ -291,6 +291,28 @@
               <span>Masuk ke Aplikasi</span>
               <i class="fa-solid fa-arrow-right"></i>
             </button>
+
+            <!-- Info Akun Default -->
+            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600 space-y-1">
+              <div class="font-extrabold text-slate-800 flex items-center gap-1.5">
+                <i class="fa-solid fa-key text-teal-600"></i>
+                <span>Akun Akses Cepat (Klik untuk isi otomatis):</span>
+              </div>
+              <div class="flex flex-wrap gap-1.5 pt-1">
+                <button type="button" onclick="fillDemoLogin('admin', 'admin', 'admin123')" class="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-mono font-bold transition">
+                  Admin: admin / admin123
+                </button>
+                <button type="button" onclick="fillDemoLogin('admin', 'sitiaminah', 'guru123')" class="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-mono font-bold transition">
+                  Admin 2: sitiaminah / guru123
+                </button>
+                <button type="button" onclick="fillDemoLogin('guru', 'guru1', 'guru123')" class="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-mono font-bold transition">
+                  Guru 1: guru1 / guru123
+                </button>
+                <button type="button" onclick="fillDemoLogin('guru', 'guru2', 'guru123')" class="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-mono font-bold transition">
+                  Guru 2: guru2 / guru123
+                </button>
+              </div>
+            </div>
           </form>
         </div>
 
@@ -1009,6 +1031,93 @@
           </section>
 
           <!-- ========================================== -->
+          <!-- VIEW 4: ANALISIS BUTIR SOAL                -->
+          <!-- ========================================== -->
+          <section id="view-analisis" class="view-section hidden space-y-6">
+            <div class="gyan-card rounded-3xl p-6 space-y-5">
+              <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <span class="text-xs font-extrabold uppercase tracking-[0.2em] text-teal-600">PSIKOMETRI &amp; VALIDITAS BUTIR</span>
+                  <h3 class="text-xl font-extrabold text-slate-900">Analisis Tingkat Kesukaran (P), Daya Pembeda (D) &amp; Pengecoh</h3>
+                  <p class="text-xs text-slate-500 mt-0.5">Perhitungan otomatis berdasarkan kelompok atas (Upper 50%) dan kelompok bawah (Lower 50%).</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5" id="item-filter-tabs">
+                  <button type="button" onclick="filterItemAnalysis('ALL')" data-filter="ALL" class="px-3.5 py-2 rounded-full text-xs font-bold bg-teal-600 text-white shadow-sm transition">Semua Butir</button>
+                  <button type="button" onclick="filterItemAnalysis('PG')" data-filter="PG" class="px-3.5 py-2 rounded-full text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Pilihan Ganda</button>
+                  <button type="button" onclick="filterItemAnalysis('BS')" data-filter="BS" class="px-3.5 py-2 rounded-full text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Benar/Salah</button>
+                  <button type="button" onclick="filterItemAnalysis('ISIAN')" data-filter="ISIAN" class="px-3.5 py-2 rounded-full text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Isian</button>
+                  <button type="button" onclick="filterItemAnalysis('URAIAN')" data-filter="URAIAN" class="px-3.5 py-2 rounded-full text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Uraian</button>
+                </div>
+              </div>
+
+              <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
+                      <th class="py-3 px-3">Kode</th>
+                      <th class="py-3 px-3">Tipe</th>
+                      <th class="py-3 px-3">Kunci / Maks</th>
+                      <th class="py-3 px-3">Proporsi / Rata</th>
+                      <th class="py-3 px-3 text-center">Indeks P</th>
+                      <th class="py-3 px-3 text-center">Kesukaran</th>
+                      <th class="py-3 px-3 text-center">Indeks D</th>
+                      <th class="py-3 px-3 text-center">Daya Pembeda</th>
+                      <th class="py-3 px-3">Sebaran Jawaban / Pengecoh</th>
+                      <th class="py-3 px-3 text-center">Kesimpulan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-item-analysis" class="divide-y divide-slate-200 text-xs bg-white"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- ========================================== -->
+          <!-- VIEW 5: REKAP NILAI & UNDUH LAPORAN        -->
+          <!-- ========================================== -->
+          <section id="view-rekap" class="view-section hidden space-y-6">
+            <div class="gyan-card rounded-3xl p-6 space-y-5">
+              <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <span class="text-xs font-extrabold uppercase tracking-[0.2em] text-teal-600">LAPORAN EVALUASI RESMI</span>
+                  <h3 class="text-xl font-extrabold text-slate-900">Rekapitulasi Nilai Akhir &amp; Peringkat Kelas</h3>
+                  <p class="text-xs text-slate-500 mt-0.5">Urutan peringkat siswa berdasarkan Nilai Akhir beserta rincian perolehan skor tiap jenis soal.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button type="button" onclick="exportFullExcel()" class="px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md flex items-center gap-2 transition">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>Unduh Excel (.xlsx)</span>
+                  </button>
+                  <button type="button" onclick="exportOfficialPDF()" class="px-5 py-2.5 rounded-full bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md flex items-center gap-2 transition">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span>Unduh Laporan PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
+                      <th class="py-3 px-3 text-center">Rank</th>
+                      <th class="py-3 px-3">NISN</th>
+                      <th class="py-3 px-3">Nama Lengkap Siswa</th>
+                      <th class="py-3 px-3 text-center">Skor PG</th>
+                      <th class="py-3 px-3 text-center">Skor B/S</th>
+                      <th class="py-3 px-3 text-center">Skor Isian</th>
+                      <th class="py-3 px-3 text-center">Skor Uraian</th>
+                      <th class="py-3 px-3 text-center">Total Skor</th>
+                      <th class="py-3 px-3 text-center">Nilai Akhir</th>
+                      <th class="py-3 px-3 text-center">Ketuntasan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-rekap-nilai" class="divide-y divide-slate-200 text-xs bg-white"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- ========================================== -->
           <!-- VIEW 6: MANAJEMEN AKUN GURU & ADMIN        -->
           <!-- ========================================== -->
           <section id="view-peserta" class="view-section hidden space-y-6">
@@ -1196,11 +1305,8 @@
   <!-- ========================================================= -->
   <!-- APPLICATION LOGIC & FIREBASE HYBRID INTEGRATION           -->
   <!-- ========================================================= -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+  <script>
+  (() => {
     // KONFIGURASI APLIKASI
     const IS_PREVIEW = false; // Terhubung penuh ke Firebase project Anda
     // PASTE FIREBASE CONFIG ANDA DI SINI
@@ -1213,10 +1319,11 @@
       appId: "1:244244594393:web:1726e51d3e08e0db2708c8"
     };
 
-    // Global State
+    // Global State & Firebase SDK Functions (Lazy-loaded agar aplikasi tetap jalan meski offline)
     let db = null;
     let auth = null;
     let isCloudConnected = false;
+    let collection, doc, setDoc, deleteDoc, getDocs, signInWithEmailAndPassword;
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'smart-anabutir-app';
 
     let currentLoginTab = 'admin';
@@ -1283,26 +1390,39 @@
     // 2. INITIAL DUMMY DATA GENERATOR (autoSetupDatabase)
     // =========================================================
     async function autoSetupDatabase() {
+      const seed = getInitialSeedData();
+      // Muat data awal secara instan agar akun login langsung tersedia tanpa harus menunggu jaringan
+      loadLocalSeed(seed);
+
       try {
         if (!IS_PREVIEW && typeof firebaseConfig !== 'undefined' && firebaseConfig.apiKey !== "API_KEY_ANDA") {
-          const app = initializeApp(firebaseConfig);
-          db = getFirestore(app);
-          auth = getAuth(app);
-          isCloudConnected = true;
+          const fbApp = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+          const fbAuth = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+          const fbFirestore = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+          collection = fbFirestore.collection;
+          doc = fbFirestore.doc;
+          setDoc = fbFirestore.setDoc;
+          deleteDoc = fbFirestore.deleteDoc;
+          getDocs = fbFirestore.getDocs;
+          signInWithEmailAndPassword = fbAuth.signInWithEmailAndPassword;
+
+          const app = fbApp.initializeApp(firebaseConfig);
+          db = fbFirestore.getFirestore(app);
+          auth = fbAuth.getAuth(app);
           
           if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(auth, __initial_auth_token);
+            await fbAuth.signInWithCustomToken(auth, __initial_auth_token);
           } else {
-            await signInAnonymously(auth);
+            await fbAuth.signInAnonymously(auth);
           }
+          isCloudConnected = true;
           document.getElementById('login-mode-badge').textContent = "Terhubung ke Firebase (Live)";
           document.getElementById('sync-status-pill').innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i>Cloud Terhubung';
         }
       } catch (err) {
         console.warn('Firebase init fallback to local memory:', err);
       }
-
-      const seed = getInitialSeedData();
 
       // Cek apakah data sudah ada di Firestore atau gunakan Local State
       if (isCloudConnected && db) {
@@ -1324,7 +1444,15 @@
             }
             pesertaAccounts = seed.seedAccounts;
           } else {
-            pesertaAccounts = accSnap.docs.map(d => d.data());
+            const cloudAccounts = accSnap.docs.map(d => d.data());
+            // Pastikan akun bawaan tetap ada jika belum tersimpan di cloud
+            const merged = [...cloudAccounts];
+            for (const defAcc of seed.seedAccounts) {
+              if (!merged.some(a => a.username && a.username.toLowerCase() === defAcc.username.toLowerCase())) {
+                merged.push(defAcc);
+              }
+            }
+            pesertaAccounts = merged;
           }
 
           const ansSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa'));
@@ -1345,8 +1473,6 @@
           console.warn('Firestore fetch error, using local seed:', e);
           loadLocalSeed(seed);
         }
-      } else {
-        loadLocalSeed(seed);
       }
 
       if (paketUjianList.length > 0 && !paketUjianList.some(p => p.id === activeExamId)) {
@@ -1382,9 +1508,34 @@
         }
       }
     }
+
+    // =========================================================
+    // 3. SEED DATA & SCORING ENGINE
+    // =========================================================
+    function getInitialSeedData() {
+      const seedExams = [
+        {
+          id: 'ujian_pas_pai_6',
+          judulUjian: 'Penilaian Akhir Semester (PAS) Ganjil',
+          mapel: 'Al-Qur\'an Hadis',
+          kelas: 'Kelas VI-A / Ganjil',
+          tahunAjaran: '2026/2027',
+          kkm: 75,
+          guruMapel: 'Ust. H. M. Ridwan, S.Pd.I',
+          waliKelas: 'Hj. Siti Aminah, M.Pd',
+          tanggal: '2026-11-10',
+          pgKunci: ['A', 'B', 'C', 'D', 'A', 'C', 'B', 'D', 'A', 'B'],
+          pgBobot: 4,
+          bsKunci: ['B', 'S', 'B', 'B', 'S'],
+          bsBobot: 3,
+          isianKunci: ['MAKKAH', 'MADINAH', '17', 'SUBUH', 'WAJIB'],
+          isianMaks: [3, 3, 3, 3, 3],
+          uraianMaks: [10, 10, 10]
+        }
       ];
 
       const seedAccounts = [
+        { id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' },
         { id: 'usr_g1', username: 'guru1', password: 'guru123', nama: 'Ust. H. M. Ridwan, S.Pd.I', kelas: 'Al-Qur\'an Hadis & Fikih', role: 'guru' },
         { id: 'usr_g2', username: 'guru2', password: 'guru123', nama: 'Budi Santoso, S.Pd', kelas: 'Matematika & Sains', role: 'guru' },
         { id: 'usr_g3', username: 'sitiaminah', password: 'guru123', nama: 'Hj. Siti Aminah, M.Pd', kelas: 'Koordinator Kurikulum', role: 'admin' }
@@ -1520,6 +1671,16 @@
       }
     };
 
+    window.fillDemoLogin = function(role, userOrEmail, pass) {
+      window.switchLoginRole(role);
+      if (role === 'admin') {
+        document.getElementById('login-email').value = userOrEmail;
+      } else {
+        document.getElementById('login-username').value = userOrEmail;
+      }
+      document.getElementById('login-password').value = pass;
+    };
+
     window.togglePasswordVisibility = function(inputId, iconId) {
       const input = document.getElementById(inputId);
       const icon = document.getElementById(iconId);
@@ -1535,67 +1696,73 @@
     window.handleLoginSubmit = async function(e) {
       e.preventDefault();
       const pass = document.getElementById('login-password').value.trim();
+      const rawIdentifier = currentLoginTab === 'admin'
+        ? document.getElementById('login-email').value.trim()
+        : document.getElementById('login-username').value.trim();
 
-      if (currentLoginTab === 'admin') {
-        const email = document.getElementById('login-email').value.trim();
-        if (!email || !pass) {
-          showToast('Mohon lengkapi Email dan Password Administrator.', 'error');
-          return;
-        }
-
-        // If connected to custom Firebase outside preview, try Firebase Auth first
-        if (!IS_PREVIEW && auth && firebaseConfig.apiKey !== "API_KEY_ANDA") {
-          try {
-            await signInWithEmailAndPassword(auth, email, pass);
-          } catch (authErr) {
-            showToast('Login Firebase Auth gagal: Periksa email/password Admin di konsol Firebase.', 'error');
-            return;
-          }
-        } else {
-          // Validasi Admin default
-          if (pass !== 'admin123' && pass.length < 4) {
-            showToast('Password Administrator tidak sesuai.', 'error');
-            return;
-          }
-        }
-
-        currentUser = {
-          role: 'admin',
-          nama: 'Administrator Utama',
-          username: email,
-          kelas: 'Semua Mapel'
-        };
-        saveSessionState(currentUser, 'dashboard');
-        applyUserSession('dashboard');
-        showToast('Selamat datang kembali, Administrator!', 'success');
-
-      } else {
-        // Hybrid Login: Validasi Guru terhadap koleksi users_peserta
-        const uname = document.getElementById('login-username').value.trim();
-        if (!uname || !pass) {
-          showToast('Mohon lengkapi Username dan Password.', 'error');
-          return;
-        }
-
-        const found = pesertaAccounts.find(
-          u => u.username.toLowerCase() === uname.toLowerCase() && u.password === pass
-        );
-
-        if (!found) {
-          showToast('Username atau Password tidak cocok.', 'error');
-          return;
-        }
-
-        currentUser = {
-          role: found.role === 'admin' ? 'admin' : 'guru',
-          nama: found.nama,
-          username: found.username,
-          kelas: found.kelas
-        };
-        saveSessionState(currentUser, 'dashboard');
-        applyUserSession('dashboard');
-        showToast(`Selamat datang, ${found.nama}!`, 'success');
+      if (!rawIdentifier || !pass) {
+        showToast('Mohon lengkapi Username/Email dan Password.', 'error');
+        return;
       }
+
+      // Pastikan daftar akun minimal terisi dari seed jika belum termuat
+      if (!pesertaAccounts || pesertaAccounts.length === 0) {
+        loadLocalSeed(getInitialSeedData());
+      }
+
+      // 1. Cek kecocokan pada daftar akun (users_peserta) baik Admin maupun Guru
+      const foundAccount = pesertaAccounts.find(
+        u => u.username && u.username.toLowerCase() === rawIdentifier.toLowerCase() && u.password === pass
+      );
+
+      if (foundAccount) {
+        currentUser = {
+          role: foundAccount.role === 'admin' ? 'admin' : 'guru',
+          nama: foundAccount.nama,
+          username: foundAccount.username,
+          kelas: foundAccount.kelas
+        };
+        saveSessionState(currentUser, 'dashboard');
+        applyUserSession('dashboard');
+        showToast(`Selamat datang, ${foundAccount.nama}!`, 'success');
+        return;
+      }
+
+      // 2. Jika pada tab Admin: dukung login default admin123 atau Firebase Auth
+      if (currentLoginTab === 'admin') {
+        if (pass === 'admin123') {
+          currentUser = {
+            role: 'admin',
+            nama: 'Administrator Utama',
+            username: rawIdentifier,
+            kelas: 'Semua Mapel'
+          };
+          saveSessionState(currentUser, 'dashboard');
+          applyUserSession('dashboard');
+          showToast('Selamat datang kembali, Administrator!', 'success');
+          return;
+        }
+
+        if (!IS_PREVIEW && auth && firebaseConfig.apiKey !== "API_KEY_ANDA" && rawIdentifier.includes('@')) {
+          try {
+            await signInWithEmailAndPassword(auth, rawIdentifier, pass);
+            currentUser = {
+              role: 'admin',
+              nama: 'Administrator Utama',
+              username: rawIdentifier,
+              kelas: 'Semua Mapel'
+            };
+            saveSessionState(currentUser, 'dashboard');
+            applyUserSession('dashboard');
+            showToast('Selamat datang kembali, Administrator!', 'success');
+            return;
+          } catch (authErr) {
+            // Lanjut ke pesan gagal di bawah
+          }
+        }
+      }
+
+      showToast('Username/Email atau Password tidak cocok. Silakan cek daftar akun di bawah.', 'error');
     };
 
     function applyUserSession(initialMenu = 'dashboard') {
@@ -2324,6 +2491,107 @@
     };
 
     // =========================================================
+    // 9. TABEL ANALISIS BUTIR SOAL & REKAP NILAI VIEWS
+    // =========================================================
+    window.filterItemAnalysis = function(filterType) {
+      currentItemFilter = filterType;
+      document.querySelectorAll('#item-filter-tabs button').forEach(btn => {
+        const isActive = btn.getAttribute('data-filter') === filterType;
+        btn.className = isActive
+          ? 'px-3.5 py-2 rounded-full text-xs font-bold bg-teal-600 text-white shadow-sm transition'
+          : 'px-3.5 py-2 rounded-full text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+      });
+      renderItemAnalysisView();
+    };
+
+    function renderItemAnalysisView() {
+      const tbody = document.getElementById('tbody-item-analysis');
+      if (!tbody) return;
+
+      const allItems = computeFullItemAnalysis();
+      const filtered = currentItemFilter === 'ALL'
+        ? allItems
+        : allItems.filter(i => i.tipe === currentItemFilter);
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="py-8 text-center text-slate-400 font-semibold">Tidak ada butir soal untuk filter ini.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(item => {
+        const pBadge = item.katP === 'Mudah'
+          ? 'bg-sky-50 text-sky-700 border-sky-200'
+          : item.katP === 'Sedang'
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+          : 'bg-amber-50 text-amber-700 border-amber-200';
+
+        const rekBadge = item.rekomendasi === 'Diterima / Baik'
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+          : item.rekomendasi === 'Perlu Direvisi'
+          ? 'bg-amber-50 text-amber-700 border-amber-200'
+          : 'bg-rose-50 text-rose-700 border-rose-200';
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="py-3 px-3 font-mono font-extrabold text-slate-900">${item.kodeSoal}</td>
+            <td class="py-3 px-3">
+              <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">${item.tipe}</span>
+            </td>
+            <td class="py-3 px-3 font-mono font-bold text-teal-700">${item.kunciLabel}</td>
+            <td class="py-3 px-3 font-semibold text-slate-600">${item.rataLabel}</td>
+            <td class="py-3 px-3 text-center font-mono font-extrabold text-slate-900">${item.P.toFixed(2)}</td>
+            <td class="py-3 px-3 text-center">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${pBadge}">${item.katP}</span>
+            </td>
+            <td class="py-3 px-3 text-center font-mono font-extrabold text-slate-900">${item.D.toFixed(2)}</td>
+            <td class="py-3 px-3 text-center font-bold text-slate-700">${item.katD}</td>
+            <td class="py-3 px-3 font-mono text-[11px] text-slate-600">${item.sebaranText}</td>
+            <td class="py-3 px-3 text-center">
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${rekBadge}">${item.rekomendasi}</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderRekapNilaiView() {
+      const tbody = document.getElementById('tbody-rekap-nilai');
+      if (!tbody) return;
+
+      const exam = getActiveExam();
+      const students = [...getActiveExamStudents()].sort((a, b) => b.nilaiAkhir - a.nilaiAkhir);
+
+      if (students.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="py-8 text-center text-slate-400 font-semibold">Belum ada data nilai siswa pada paket ujian ini.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = students.map((s, idx) => {
+        const isTuntas = s.nilaiAkhir >= exam.kkm;
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="py-3 px-3 text-center font-extrabold text-slate-700">#${idx + 1}</td>
+            <td class="py-3 px-3 font-mono text-slate-500">${s.nisn}</td>
+            <td class="py-3 px-3 font-extrabold text-slate-900">${s.namaSiswa}</td>
+            <td class="py-3 px-3 text-center font-mono font-bold text-cyan-700">${s.pgSkorPerolehan}</td>
+            <td class="py-3 px-3 text-center font-mono font-bold text-emerald-700">${s.bsSkorPerolehan}</td>
+            <td class="py-3 px-3 text-center font-mono font-bold text-violet-700">${s.isianSkorPerolehan}</td>
+            <td class="py-3 px-3 text-center font-mono font-bold text-amber-700">${s.uraianSkorPerolehan}</td>
+            <td class="py-3 px-3 text-center font-mono font-extrabold text-slate-800">${s.totalSkorPerolehan}/${s.skorMaksimal}</td>
+            <td class="py-3 px-3 text-center">
+              <span class="px-2.5 py-1 rounded-xl bg-slate-900 text-white font-extrabold text-xs">${s.nilaiAkhir}</span>
+            </td>
+            <td class="py-3 px-3 text-center">
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold ${isTuntas ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
+                ${s.statusKetuntasan}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // =========================================================
     // 10. MANAJEMEN AKUN GURU & ADMIN (HYBRID AUTH DB)
     // =========================================================
     function renderPesertaAccountsView() {
@@ -2709,9 +2977,10 @@
     // =========================================================
     // 14. INITIALIZE ON WINDOW LOAD
     // =========================================================
+    loadLocalSeed(getInitialSeedData());
+
     window.addEventListener('DOMContentLoaded', async () => {
       initSingleFilePWA();
-      await autoSetupDatabase();
 
       // Cek apakah ada sesi login yang tersimpan agar saat di-refresh tidak kembali ke halaman login
       const savedSession = loadSessionState();
@@ -2722,7 +2991,13 @@
         }
         applyUserSession(savedSession.menu || 'dashboard');
       }
+
+      await autoSetupDatabase();
+      if (currentUser) {
+        renderAllViews();
+      }
     });
+  })();
   </script>
 </body>
 </html>
