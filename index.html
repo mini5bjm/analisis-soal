@@ -141,6 +141,61 @@
     @media print {
       .no-print { display: none !important; }
     }
+
+    /* Animation Keyframes (Login, Logout, Save Feedback) */
+    @keyframes fadeInScale {
+      from {
+        opacity: 0;
+        transform: scale(0.96) translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    @keyframes fadeOutScale {
+      from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+      to {
+        opacity: 0;
+        transform: scale(0.96) translateY(-6px);
+      }
+    }
+
+    @keyframes savePulse {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.06); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes syncPulseRing {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .animate-fade-in-scale {
+      animation: fadeInScale 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .animate-fade-out-scale {
+      animation: fadeOutScale 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .animate-save-pulse {
+      animation: savePulse 0.4s ease-in-out;
+    }
+
+    .animate-sync-ring {
+      animation: syncPulseRing 1.1s ease-out;
+    }
+
+    #login-screen, #app-shell {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
   </style>
 </head>
 <body class="bg-slate-50 antialiased selection:bg-teal-600 selection:text-white">
@@ -185,7 +240,7 @@
                    alt="Logo Madrasah" class="w-12 h-12 rounded-2xl object-contain bg-white p-1.5 shadow-md" />
               <div>
                 <span class="text-[11px] font-bold uppercase tracking-[0.22em] text-teal-400 block">SMART ANABUTIR PRO</span>
-                <h1 class="text-lg font-extrabold tracking-tight text-white">MI Al-Hikmah Akademik</h1>
+                <h1 id="banner-school-name" class="text-lg font-extrabold tracking-tight text-white">MI Al-Hikmah Terpadu</h1>
               </div>
             </div>
 
@@ -316,7 +371,7 @@
                 <span class="text-sm font-extrabold tracking-tight text-slate-900 truncate">SMART</span>
                 <span class="text-sm font-extrabold tracking-tight text-teal-600 truncate">ANABUTIR</span>
               </div>
-              <p class="text-[11px] font-semibold text-slate-400 truncate">Analisis Soal &amp; Nilai Terpadu</p>
+              <p id="sidebar-school-sub" class="text-[11px] font-semibold text-slate-400 truncate">MI Al-Hikmah Terpadu</p>
             </div>
           </div>
 
@@ -361,6 +416,10 @@
             <button onclick="navigateMenu('rekap')" data-menu="rekap" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-full text-xs font-bold transition-all">
               <span class="w-7 h-7 rounded-lg bg-rose-500/15 text-rose-600 flex items-center justify-center"><i class="fa-solid fa-file-export"></i></span>
               <span>Rekap Nilai &amp; Unduh</span>
+            </button>
+            <button onclick="navigateMenu('pengaturan')" data-menu="pengaturan" class="nav-item role-admin-only w-full flex items-center gap-3 px-4 py-3 rounded-full text-xs font-bold transition-all">
+              <span class="w-7 h-7 rounded-lg bg-slate-500/15 text-slate-700 flex items-center justify-center"><i class="fa-solid fa-gear"></i></span>
+              <span>Pengaturan</span>
             </button>
           </nav>
         </div>
@@ -412,15 +471,7 @@
                     class="lg:hidden bg-teal-50 text-xs font-bold text-teal-900 rounded-full px-3 py-2 border border-teal-200 max-w-[165px] truncate">
             </select>
 
-            <button onclick="exportFullExcel()" class="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 transition">
-              <i class="fa-solid fa-file-excel"></i>
-              <span class="hidden sm:inline">Download Excel</span>
-            </button>
-            <button onclick="exportOfficialPDF()" class="px-4 py-2 rounded-full bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 transition">
-              <i class="fa-solid fa-file-pdf"></i>
-              <span class="hidden sm:inline">Download PDF</span>
-            </button>
-            <button onclick="handleLogout()" class="lg:hidden w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
+            <button onclick="handleLogout()" class="lg:hidden w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center" title="Keluar">
               <i class="fa-solid fa-power-off text-xs"></i>
             </button>
           </div>
@@ -751,7 +802,7 @@
                         <span class="w-8 h-8 rounded-xl bg-cyan-500 text-white flex items-center justify-center font-bold text-xs">PG</span>
                         <div>
                           <h5 class="text-sm font-extrabold text-slate-900">1. Soal Pilihan Ganda (A,B,C,D,E)</h5>
-                          <p class="text-[11px] text-slate-500">Ketik kunci jawaban berurutan dipisah koma</p>
+                          <p class="text-[11px] text-slate-500">Bisa diketik langsung tanpa koma (<code class="text-teal-700 font-bold">ABBCDAB...</code>) atau dipisah koma</p>
                         </div>
                       </div>
                       <div class="w-28">
@@ -760,8 +811,8 @@
                       </div>
                     </div>
                     <div>
-                      <label class="block text-xs font-bold text-slate-700 mb-1">Deretan Kunci Jawaban PG (Kosongkan jika tidak ada soal PG):</label>
-                      <input type="text" id="cfg-pg-kunci" oninput="updateKeyPreviewBadges()" placeholder="Contoh: A,B,C,D,A,C,B,D,A,B"
+                      <label class="block text-xs font-bold text-slate-700 mb-1">Deretan Kunci Jawaban PG (Bisa tanpa koma: <code class="text-teal-700 font-extrabold">ABBCDAB...</code>):</label>
+                      <input type="text" id="cfg-pg-kunci" oninput="updateKeyPreviewBadges()" placeholder="Ketik langsung: ABBCDAB... atau pakai koma A,B,C,D..."
                              class="w-full px-3.5 py-2.5 rounded-xl border border-cyan-300 text-sm font-bold answer-token-input bg-white focus:border-teal-600 focus:outline-none" />
                       <div id="preview-pg-badges" class="flex flex-wrap gap-1.5 mt-2"></div>
                     </div>
@@ -774,7 +825,7 @@
                         <span class="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-xs">B/S</span>
                         <div>
                           <h5 class="text-sm font-extrabold text-slate-900">2. Soal Benar / Salah (B,S)</h5>
-                          <p class="text-[11px] text-slate-500">Ketik B untuk Benar dan S untuk Salah dipisah koma</p>
+                          <p class="text-[11px] text-slate-500">Bisa diketik langsung tanpa koma (<code class="text-emerald-700 font-bold">BSBBS...</code>) atau dipisah koma</p>
                         </div>
                       </div>
                       <div class="w-28">
@@ -783,8 +834,8 @@
                       </div>
                     </div>
                     <div>
-                      <label class="block text-xs font-bold text-slate-700 mb-1">Deretan Kunci Benar/Salah (Contoh: B,S,B,B,S):</label>
-                      <input type="text" id="cfg-bs-kunci" oninput="updateKeyPreviewBadges()" placeholder="Contoh: B,S,B,B,S"
+                      <label class="block text-xs font-bold text-slate-700 mb-1">Deretan Kunci Benar/Salah (Bisa tanpa koma: <code class="text-emerald-700 font-extrabold">BSBBS...</code>):</label>
+                      <input type="text" id="cfg-bs-kunci" oninput="updateKeyPreviewBadges()" placeholder="Ketik langsung: BSBBS... atau pakai koma B,S,B,B,S"
                              class="w-full px-3.5 py-2.5 rounded-xl border border-emerald-300 text-sm font-bold answer-token-input bg-white focus:border-teal-600 focus:outline-none" />
                       <div id="preview-bs-badges" class="flex flex-wrap gap-1.5 mt-2"></div>
                     </div>
@@ -926,11 +977,11 @@
                     <div class="flex items-center justify-between mb-1.5">
                       <label class="text-xs font-extrabold text-slate-800">
                         <span class="inline-block w-2 h-2 rounded-full bg-cyan-500 mr-1"></span>
-                        Jawaban Pilihan Ganda Siswa (Pisahkan koma <code class="text-teal-700">A,B,C,D...</code>)
+                        Jawaban Pilihan Ganda Siswa (Bisa tanpa koma: <code class="text-teal-700 font-bold">ABBCDAB...</code>)
                       </label>
                       <span id="ans-pg-counter" class="text-[11px] font-bold text-cyan-700">0/10 Soal</span>
                     </div>
-                    <input type="text" id="ans-pg-input" oninput="liveCheckStudentInput()" placeholder="Ketik: A,B,C,D,A,C,B,D,A,B"
+                    <input type="text" id="ans-pg-input" oninput="liveCheckStudentInput()" placeholder="Ketik langsung: ABBCDAB... atau pakai koma A,B,C,D..."
                            class="w-full px-3.5 py-2.5 rounded-xl border border-cyan-300 text-sm font-bold answer-token-input bg-white focus:border-teal-600 focus:outline-none" />
                     <div id="ans-pg-live-feedback" class="flex flex-wrap gap-1 mt-2"></div>
                   </div>
@@ -940,11 +991,11 @@
                     <div class="flex items-center justify-between mb-1.5">
                       <label class="text-xs font-extrabold text-slate-800">
                         <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1"></span>
-                        Jawaban Benar / Salah Siswa (Pisahkan koma <code class="text-emerald-700">B,S,B...</code>)
+                        Jawaban Benar / Salah Siswa (Bisa tanpa koma: <code class="text-emerald-700 font-bold">BSBBS...</code>)
                       </label>
                       <span id="ans-bs-counter" class="text-[11px] font-bold text-emerald-700">0/5 Soal</span>
                     </div>
-                    <input type="text" id="ans-bs-input" oninput="liveCheckStudentInput()" placeholder="Ketik: B,S,B,B,S"
+                    <input type="text" id="ans-bs-input" oninput="liveCheckStudentInput()" placeholder="Ketik langsung: BSBBS... atau pakai koma B,S,B,B,S"
                            class="w-full px-3.5 py-2.5 rounded-xl border border-emerald-300 text-sm font-bold answer-token-input bg-white focus:border-teal-600 focus:outline-none" />
                     <div id="ans-bs-live-feedback" class="flex flex-wrap gap-1 mt-2"></div>
                   </div>
@@ -1362,10 +1413,237 @@
             </div>
           </section>
 
+          <!-- ========================================== -->
+          <!-- 8. VIEW: PENGATURAN SEKOLAH & ADMIN        -->
+          <!-- ========================================== -->
+          <section id="view-pengaturan" class="view-section hidden space-y-6 role-admin-only">
+            
+            <!-- Header Banner -->
+            <div class="rounded-3xl bg-gradient-to-r from-slate-900 via-navy-900 to-teal-950 p-6 sm:p-8 text-white relative overflow-hidden shadow-xl border border-teal-500/20">
+              <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none"></div>
+              <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-bold mb-3">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Pusat Konfigurasi Sistem</span>
+                  </div>
+                  <h3 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-3">
+                    <span>Pengaturan Sekolah &amp; Akun Admin</span>
+                  </h3>
+                  <p class="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                    Atur nama sekolah/madrasah untuk ditampilkan pada kop laporan resmi PDF &amp; Excel, serta kelola nama pengguna dan kata sandi akses Administrator.
+                  </p>
+                </div>
+                <div class="flex items-center gap-2 self-start md:self-auto shrink-0">
+                  <span class="px-3 py-1.5 rounded-xl bg-white/10 text-xs font-bold text-teal-200 border border-white/10 flex items-center gap-1.5">
+                    <i class="fa-solid fa-shield-halved text-teal-400"></i>
+                    <span>Akses Administrator</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Grid 2 Kolom untuk Kartu Pengaturan -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+              <!-- Kolom Kiri (lg:col-span-6): Identitas Sekolah & Madrasah -->
+              <div class="lg:col-span-6">
+                <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col justify-between h-full">
+                  <div>
+                    <div class="flex items-center gap-3 pb-4 mb-5 border-b border-slate-100">
+                      <div class="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center text-lg font-bold border border-teal-100">
+                        <i class="fa-solid fa-school"></i>
+                      </div>
+                      <div>
+                        <h4 class="text-base font-extrabold text-slate-900">Identitas Sekolah / Madrasah</h4>
+                        <p class="text-xs text-slate-500">Nama dan identitas ini akan dicetak pada kop laporan resmi dan file unduhan.</p>
+                      </div>
+                    </div>
+
+                    <form id="form-setting-sekolah" onsubmit="handleSaveSchoolSettings(event)" class="space-y-4">
+                      <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Nama Madrasah / Sekolah <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                          <i class="fa-solid fa-graduation-cap absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                          <input type="text" id="setting-nama-sekolah" required placeholder="Contoh: MI Al-Hikmah Terpadu"
+                                 class="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition" />
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">Dicetak sebagai judul utama kop laporan PDF dan cover sheet Excel.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Sub-Judul / Instansi Pembina
+                        </label>
+                        <div class="relative">
+                          <i class="fa-solid fa-landmark absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                          <input type="text" id="setting-sub-sekolah" placeholder="Contoh: Kementerian Agama Republik Indonesia"
+                                 class="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Alamat / Kontak Lembaga
+                        </label>
+                        <div class="relative">
+                          <i class="fa-solid fa-map-location-dot absolute left-4 top-3 text-slate-400 text-sm"></i>
+                          <textarea id="setting-alamat-sekolah" rows="2" placeholder="Contoh: Jl. Madrasah No. 12, Telp (021) 123456"
+                                    class="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition"></textarea>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Nama Kepala Madrasah / Kamad
+                        </label>
+                        <div class="relative">
+                          <i class="fa-solid fa-user-tie absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                          <input type="text" id="setting-kamad" placeholder="Contoh: Ust. H. Ahmad Fauzi, M.Pd"
+                                 class="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition" />
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">Dicetak pada kolom tanda tangan mengetahui pimpinan di lembar laporan PDF.</p>
+                      </div>
+
+                      <div class="pt-3 border-t border-slate-100 flex justify-end">
+                        <button type="submit" class="py-2.5 px-6 rounded-full bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md shadow-teal-600/20 transition flex items-center gap-2">
+                          <i class="fa-solid fa-floppy-disk"></i>
+                          <span>Simpan Identitas Sekolah</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Kolom Kanan (lg:col-span-6): Akun & Kata Sandi Administrator -->
+              <div class="lg:col-span-6 space-y-6">
+
+                <!-- Sub-Card 1: Ubah Username & Profil Administrator -->
+                <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">
+                  <div class="flex items-center gap-3 pb-4 mb-5 border-b border-slate-100">
+                    <div class="w-10 h-10 rounded-2xl bg-cyan-50 text-cyan-700 flex items-center justify-center text-lg font-bold border border-cyan-100">
+                      <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                    <div>
+                      <h4 class="text-base font-extrabold text-slate-900">User Administrator</h4>
+                      <p class="text-xs text-slate-500">Ubah nama tampilan dan username login Administrator.</p>
+                    </div>
+                  </div>
+
+                  <form id="form-setting-admin-user" onsubmit="handleSaveAdminUser(event)" class="space-y-4">
+                    <div>
+                      <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Nama Lengkap Administrator <span class="text-rose-500">*</span>
+                      </label>
+                      <div class="relative">
+                        <i class="fa-solid fa-id-card absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="setting-admin-nama" required placeholder="Contoh: Administrator Utama"
+                               class="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold focus:outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-500/20 transition" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Username Login Admin <span class="text-rose-500">*</span>
+                      </label>
+                      <div class="relative">
+                        <i class="fa-solid fa-at absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="setting-admin-username" required placeholder="Contoh: admin"
+                               class="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold focus:outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-500/20 transition" />
+                      </div>
+                      <p class="text-[11px] text-slate-400 mt-1">Username ini digunakan untuk login pada tab Administrator.</p>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-100 flex justify-end">
+                      <button type="submit" class="py-2.5 px-6 rounded-full bg-cyan-700 hover:bg-cyan-800 text-white font-bold text-xs shadow-md shadow-cyan-700/20 transition flex items-center gap-2">
+                        <i class="fa-solid fa-user-check"></i>
+                        <span>Perbarui Akun Admin</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <!-- Sub-Card 2: Ganti Kata Sandi Administrator -->
+                <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">
+                  <div class="flex items-center gap-3 pb-4 mb-5 border-b border-slate-100">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center text-lg font-bold border border-amber-100">
+                      <i class="fa-solid fa-key"></i>
+                    </div>
+                    <div>
+                      <h4 class="text-base font-extrabold text-slate-900">Kata Sandi Administrator</h4>
+                      <p class="text-xs text-slate-500">Ganti kata sandi login Administrator demi keamanan data evaluasi.</p>
+                    </div>
+                  </div>
+
+                  <form id="form-setting-admin-pass" onsubmit="handleSaveAdminPassword(event)" class="space-y-4">
+                    <div>
+                      <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Kata Sandi Saat Ini <span class="text-rose-500">*</span>
+                      </label>
+                      <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="password" id="setting-admin-cur-pass" required placeholder="Masukkan kata sandi saat ini"
+                               class="w-full pl-11 pr-11 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition" />
+                        <button type="button" onclick="togglePasswordVisibility('setting-admin-cur-pass', 'toggle-cur-pass-icon')"
+                                class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-600 p-1">
+                          <i id="toggle-cur-pass-icon" class="fa-solid fa-eye text-sm"></i>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Kata Sandi Baru <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                          <i class="fa-solid fa-shield-keyhole absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                          <input type="password" id="setting-admin-new-pass" required minlength="4" placeholder="Minimal 4 karakter"
+                                 class="w-full pl-11 pr-11 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition" />
+                          <button type="button" onclick="togglePasswordVisibility('setting-admin-new-pass', 'toggle-new-pass-icon')"
+                                  class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-600 p-1">
+                            <i id="toggle-new-pass-icon" class="fa-solid fa-eye text-sm"></i>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Konfirmasi Sandi Baru <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                          <i class="fa-solid fa-check-double absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                          <input type="password" id="setting-admin-confirm-pass" required minlength="4" placeholder="Ulangi sandi baru"
+                                 class="w-full pl-11 pr-11 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition" />
+                          <button type="button" onclick="togglePasswordVisibility('setting-admin-confirm-pass', 'toggle-confirm-pass-icon')"
+                                  class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-600 p-1">
+                            <i id="toggle-confirm-pass-icon" class="fa-solid fa-eye text-sm"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-100 flex justify-end">
+                      <button type="submit" class="py-2.5 px-6 rounded-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md shadow-amber-600/20 transition flex items-center gap-2">
+                        <i class="fa-solid fa-key"></i>
+                        <span>Ubah Kata Sandi Admin</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+              </div>
+            </div>
+
+          </section>
+
           <!-- Dark Navy Corporate Footer (Exact GyanAstra Reference) -->
           <footer class="rounded-2xl bg-navy-950 text-slate-300 px-6 py-4 flex flex-wrap items-center justify-between gap-4 text-xs mt-8">
             <div class="flex flex-wrap items-center gap-4">
-              <span><i class="fa-solid fa-school text-teal-400 mr-1.5"></i>MI Al-Hikmah Terpadu</span>
+              <span id="footer-school-name"><i class="fa-solid fa-school text-teal-400 mr-1.5"></i>MI Al-Hikmah Terpadu</span>
               <span class="hidden sm:inline text-slate-600">|</span>
               <span><i class="fa-solid fa-check-circle text-teal-400 mr-1.5"></i>PG, Benar/Salah, Isian &amp; Uraian</span>
             </div>
@@ -1407,6 +1685,10 @@
           <i class="fa-solid fa-file-export text-sm mb-0.5"></i>
           <span>Laporan</span>
         </button>
+        <button onclick="navigateMenu('pengaturan')" data-menu="pengaturan" class="mob-nav-item role-admin-only flex flex-col items-center py-1 px-2 rounded-xl text-[10px] font-bold shrink-0">
+          <i class="fa-solid fa-gear text-sm mb-0.5"></i>
+          <span>Pengaturan</span>
+        </button>
       </nav>
 
     </div>
@@ -1443,13 +1725,13 @@
             </div>
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Kunci Jawaban PG Awal (Pisahkan koma)</label>
-            <input type="text" id="new-exam-pg" value="A,B,C,D,A,B,C,D,A,B"
+            <label class="block text-xs font-bold text-slate-700 mb-1">Kunci Jawaban PG Awal (Bisa tanpa koma: <code class="text-teal-700 font-bold">ABBCD...</code> atau pakai koma)</label>
+            <input type="text" id="new-exam-pg" placeholder="Contoh: ABBCDAB atau A,B,C,D..." value="ABCDABCDAB"
                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold answer-token-input" />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Kunci Jawaban Benar/Salah Awal (Pisahkan koma)</label>
-            <input type="text" id="new-exam-bs" value="B,S,B,S,B"
+            <label class="block text-xs font-bold text-slate-700 mb-1">Kunci Jawaban Benar/Salah Awal (Bisa tanpa koma: <code class="text-emerald-700 font-bold">BSBB...</code> atau pakai koma)</label>
+            <input type="text" id="new-exam-bs" placeholder="Contoh: BSBB atau B,S,B,B" value="BSBSB"
                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold answer-token-input" />
           </div>
           <div class="flex justify-end gap-2 pt-3">
@@ -1500,6 +1782,12 @@
     let pesertaAccounts = [];
     let masterSiswaList = [];
     let activeExamId = '';
+    let appSettings = {
+      namaSekolah: 'MI Al-Hikmah Terpadu',
+      subNamaSekolah: 'Kementerian Agama Republik Indonesia',
+      alamatSekolah: 'Jl. Madrasah No. 12, Telp (021) 123456',
+      kepalaSekolah: 'Ust. H. Ahmad Fauzi, M.Pd'
+    };
 
     // Session Persistence Helpers (Agar saat di-refresh tidak kembali ke halaman login)
     function saveSessionState(userObj, menuKey) {
@@ -1599,60 +1887,130 @@
       // Ambil data dari Firestore jika terhubung, dan bersihkan sisa data dummy lama jika ada
       if (isCloudConnected && db) {
         try {
-          // 1. Paket Ujian
-          const examSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'paket_ujian'));
-          const cloudExams = [];
-          for (const d of examSnap.docs) {
-            const data = d.data();
-            // Bersihkan dummy lama
-            if (data.id === 'ujian_pas_pai_6') {
-              try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'paket_ujian', d.id)); } catch (e) {}
-            } else {
-              cloudExams.push(data);
+          // 0. Pengaturan Aplikasi & Identitas Sekolah
+          try {
+            const setSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'app_settings'));
+            let foundSettings = false;
+            setSnap.forEach(d => {
+              if (d.id === 'general') {
+                appSettings = { ...appSettings, ...d.data() };
+                foundSettings = true;
+              }
+            });
+            if (foundSettings) {
+              localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
             }
+          } catch (e) {}
+
+          // 1. Paket Ujian
+          try {
+            const examSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'paket_ujian'));
+            const cloudExams = [];
+            for (const d of examSnap.docs) {
+              const data = d.data();
+              // Bersihkan dummy lama jika masih tersisa
+              if (data.id === 'ujian_pas_pai_6') {
+                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'paket_ujian', d.id)); } catch (e) {}
+              } else {
+                cloudExams.push(data);
+              }
+            }
+            if (cloudExams.length > 0) {
+              const cloudIds = new Set(cloudExams.map(e => e.id));
+              const localOnly = (paketUjianList || []).filter(e => !cloudIds.has(e.id));
+              paketUjianList = [...cloudExams, ...localOnly];
+              localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
+            } else if (paketUjianList && paketUjianList.length > 0) {
+              // Jika di cloud belum ada dokumen namun lokal memiliki data, pertahankan data lokal!
+              Promise.allSettled(
+                paketUjianList.map(e => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'paket_ujian', e.id), e))
+              ).catch(() => {});
+            }
+          } catch (e) {
+            console.warn('Firestore fetch exams warning:', e);
           }
-          paketUjianList = cloudExams;
 
           // 2. Akun Guru & Administrator
-          const accSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users_peserta'));
-          const cloudAccounts = [];
-          for (const d of accSnap.docs) {
-            const data = d.data();
-            // Bersihkan dummy guru lama
-            if (['usr_g1', 'usr_g2', 'usr_g3'].includes(data.id) || ['guru1', 'guru2', 'sitiaminah'].includes((data.username || '').toLowerCase())) {
-              try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', d.id)); } catch (e) {}
+          try {
+            const accSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users_peserta'));
+            const cloudAccounts = [];
+            for (const d of accSnap.docs) {
+              const data = d.data();
+              // Bersihkan dummy guru lama
+              if (['usr_g1', 'usr_g2', 'usr_g3'].includes(data.id) || ['guru1', 'guru2', 'sitiaminah'].includes((data.username || '').toLowerCase())) {
+                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', d.id)); } catch (e) {}
+              } else {
+                cloudAccounts.push(data);
+              }
+            }
+            if (cloudAccounts.length > 0) {
+              const cloudUsernames = new Set(cloudAccounts.map(a => (a.username || '').toLowerCase()));
+              const localOnly = (pesertaAccounts || []).filter(a => a.username && !cloudUsernames.has(a.username.toLowerCase()));
+              pesertaAccounts = [...cloudAccounts, ...localOnly];
+              if (!pesertaAccounts.some(a => a.username && a.username.toLowerCase() === 'admin')) {
+                pesertaAccounts.unshift(seed.seedAccounts[0]);
+              }
+              localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
             } else {
-              cloudAccounts.push(data);
+              // Jika cloud kosong, pertahankan akun guru lokal dari localStorage (jangan timpa ke seed dummy)!
+              if (!pesertaAccounts || pesertaAccounts.length === 0) {
+                pesertaAccounts = seed.seedAccounts;
+                localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
+              } else {
+                Promise.allSettled(
+                  pesertaAccounts.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', a.id), a))
+                ).catch(() => {});
+              }
             }
-          }
-          if (cloudAccounts.length === 0) {
-            for (const ac of seed.seedAccounts) {
-              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', ac.id), ac);
-            }
-            pesertaAccounts = seed.seedAccounts;
-          } else {
-            if (!cloudAccounts.some(a => a.username && a.username.toLowerCase() === 'admin')) {
-              cloudAccounts.unshift(seed.seedAccounts[0]);
-            }
-            pesertaAccounts = cloudAccounts;
+          } catch (e) {
+            console.warn('Firestore fetch accounts warning:', e);
           }
 
           // 3. Master Siswa
-          const siswaSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'master_siswa'));
-          masterSiswaList = siswaSnap.docs.map(d => d.data());
+          try {
+            const siswaSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'master_siswa'));
+            const cloudSiswa = siswaSnap.docs.map(d => d.data());
+            if (cloudSiswa.length > 0) {
+              const cloudIds = new Set(cloudSiswa.map(s => s.id));
+              const localOnly = (masterSiswaList || []).filter(s => !cloudIds.has(s.id));
+              masterSiswaList = [...cloudSiswa, ...localOnly];
+              localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
+            } else if (masterSiswaList && masterSiswaList.length > 0) {
+              // JANGAN TIMPA DENGAN [] KETIKA CLOUD KOSONG! Pertahankan master siswa lokal!
+              Promise.allSettled(
+                masterSiswaList.map(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_siswa', s.id), s))
+              ).catch(() => {});
+            }
+          } catch (e) {
+            console.warn('Firestore fetch siswa warning:', e);
+          }
 
           // 4. Jawaban Siswa
-          const ansSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa'));
-          const cloudAnswers = [];
-          for (const d of ansSnap.docs) {
-            const data = d.data();
-            if (data.ujianId === 'ujian_pas_pai_6' || (data.id && data.id.startsWith('ans_') && Number(data.id.replace('ans_', '')) <= 8)) {
-              try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa', d.id)); } catch (e) {}
-            } else {
-              cloudAnswers.push(data);
+          try {
+            const ansSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa'));
+            const cloudAnswers = [];
+            for (const d of ansSnap.docs) {
+              const data = d.data();
+              if (data.ujianId === 'ujian_pas_pai_6' || (data.id && data.id.startsWith('ans_') && Number(data.id.replace('ans_', '')) <= 8)) {
+                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa', d.id)); } catch (e) {}
+              } else {
+                cloudAnswers.push(data);
+              }
             }
+            if (cloudAnswers.length > 0) {
+              const cloudIds = new Set(cloudAnswers.map(a => a.id));
+              const localOnly = (jawabanSiswaList || []).filter(a => !cloudIds.has(a.id));
+              jawabanSiswaList = [...cloudAnswers, ...localOnly];
+              localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
+            } else if (jawabanSiswaList && jawabanSiswaList.length > 0) {
+              // Pertahankan data jawaban siswa lokal!
+              Promise.allSettled(
+                jawabanSiswaList.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa', a.id), a))
+              ).catch(() => {});
+            }
+          } catch (e) {
+            console.warn('Firestore fetch answers warning:', e);
           }
-          jawabanSiswaList = cloudAnswers;
         } catch (e) {
           console.warn('Firestore fetch error, fallback to local storage:', e);
           loadLocalSeed(seed);
@@ -1674,11 +2032,17 @@
         const storedGuru = localStorage.getItem('smart_anabutir_guru_v2');
         const storedSiswa = localStorage.getItem('smart_anabutir_siswa_v2');
         const storedJawaban = localStorage.getItem('smart_anabutir_jawaban_v2');
+        const storedSettings = localStorage.getItem('smart_anabutir_settings_v2');
 
         paketUjianList = storedExams ? JSON.parse(storedExams) : (seed.seedExams || []);
         pesertaAccounts = storedGuru ? JSON.parse(storedGuru) : (seed.seedAccounts || []);
         masterSiswaList = storedSiswa ? JSON.parse(storedSiswa) : (seed.seedSiswa || []);
         jawabanSiswaList = storedJawaban ? JSON.parse(storedJawaban) : (seed.rawStudentResponses || []);
+        if (storedSettings) {
+          try {
+            appSettings = { ...appSettings, ...JSON.parse(storedSettings) };
+          } catch (e) {}
+        }
       } catch (e) {
         paketUjianList = seed.seedExams || [];
         pesertaAccounts = seed.seedAccounts || [];
@@ -1695,13 +2059,35 @@
     }
 
     async function saveDocToCloud(collectionName, docId, dataObj) {
+      // 1. Selalu simpan ke localStorage secara instan (Offline-First Persistence)
+      try {
+        if (collectionName === 'users_peserta') {
+          localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
+        } else if (collectionName === 'master_siswa') {
+          localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
+        } else if (collectionName === 'paket_ujian') {
+          localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
+        } else if (collectionName === 'jawaban_siswa') {
+          localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
+        } else if (collectionName === 'app_settings') {
+          localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
+        }
+      } catch (e) {
+        console.warn('LocalStorage save error:', e);
+      }
+
+      // 2. Sinkronisasi ke Firebase Firestore jika terhubung
       if (isCloudConnected && db && setDoc && doc) {
         try {
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, docId), dataObj);
         } catch (e) {
-          console.error("Cloud save error:", e);
+          console.warn("Cloud save note (data tersimpan aman di browser/local storage):", e);
         }
       }
+    }
+
+    async function deleteDocFromCloud(collectionName, docId) {
+      // 1. Selalu perbarui localStorage secara instan
       try {
         if (collectionName === 'users_peserta') {
           localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
@@ -1711,29 +2097,21 @@
           localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
         } else if (collectionName === 'jawaban_siswa') {
           localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
+        } else if (collectionName === 'app_settings') {
+          localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
         }
-      } catch (e) {}
-    }
+      } catch (e) {
+        console.warn('LocalStorage delete error:', e);
+      }
 
-    async function deleteDocFromCloud(collectionName, docId) {
+      // 2. Hapus di cloud jika terhubung
       if (isCloudConnected && db && deleteDoc && doc) {
         try {
           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, docId));
         } catch (e) {
-          console.error("Cloud delete error:", e);
+          console.warn("Cloud delete note:", e);
         }
       }
-      try {
-        if (collectionName === 'users_peserta') {
-          localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
-        } else if (collectionName === 'master_siswa') {
-          localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
-        } else if (collectionName === 'paket_ujian') {
-          localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
-        } else if (collectionName === 'jawaban_siswa') {
-          localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
-        }
-      } catch (e) {}
     }
 
     // =========================================================
@@ -1776,7 +2154,7 @@
       const bsSkorMaks = examObj.bsKunci.length * (Number(examObj.bsBobot) || 1);
 
       // 3. Evaluate Isian Singkat (Supports either numeric score or exact keyword match)
-      const studentIsianTokens = parseCommaList(rawRec.isianRaw);
+      const studentIsianTokens = parseCommaList(rawRec.isianRaw, false);
       const isianScores = examObj.isianMaks.map((maks, idx) => {
         const token = studentIsianTokens[idx] !== undefined ? studentIsianTokens[idx] : '0';
         const maxVal = Number(maks) || 0;
@@ -1800,7 +2178,7 @@
       const isianSkorMaks = examObj.isianMaks.reduce((a, b) => a + (Number(b) || 0), 0);
 
       // 4. Evaluate Uraian
-      const studentUraianTokens = parseCommaList(rawRec.uraianRaw);
+      const studentUraianTokens = parseCommaList(rawRec.uraianRaw, false);
       const uraianScores = examObj.uraianMaks.map((maks, idx) => {
         const maxVal = Number(maks) || 0;
         const val = Number(studentUraianTokens[idx]) || 0;
@@ -1836,12 +2214,35 @@
       };
     }
 
-    function parseCommaList(str) {
+    function parseCommaList(str, isContinuousCharAllowed = true) {
       if (!str || typeof str !== 'string') return [];
-      return str
-        .split(',')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+      const trimmed = str.trim();
+      if (!trimmed) return [];
+
+      // 1. Jika ada pemisah koma
+      if (trimmed.includes(',')) {
+        return trimmed.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      }
+
+      // 2. Jika ada pemisah titik koma
+      if (trimmed.includes(';')) {
+        return trimmed.split(';').map(s => s.trim()).filter(s => s.length > 0);
+      }
+
+      // 3. Jika ada pemisah spasi (misal: "A B C D" atau skor "2 3 5 10")
+      if (/\s+/.test(trimmed)) {
+        return trimmed.split(/\s+/).map(s => s.trim()).filter(s => s.length > 0);
+      }
+
+      // 4. Deretan karakter langsung tanpa koma (misal: "ABBCDAB..." atau "BSBB...")
+      if (isContinuousCharAllowed && trimmed.length > 1) {
+        // Jika seluruhnya berupa huruf alfabet (seperti opsi A-Z / B-S)
+        if (/^[a-zA-Z]+$/.test(trimmed)) {
+          return trimmed.split('').filter(s => s.trim().length > 0);
+        }
+      }
+
+      return [trimmed];
     }
 
     // =========================================================
@@ -1934,7 +2335,7 @@
             kelas: foundAccount.kelas || 'Semua Mapel'
           };
           saveSessionState(currentUser, 'dashboard');
-          applyUserSession('dashboard');
+          applyUserSession('dashboard', true);
           showToast(`Selamat datang kembali, ${foundAccount.nama}!`, 'success');
           return;
         }
@@ -1948,7 +2349,7 @@
             kelas: 'Semua Mapel'
           };
           saveSessionState(currentUser, 'dashboard');
-          applyUserSession('dashboard');
+          applyUserSession('dashboard', true);
           showToast('Selamat datang kembali, Administrator!', 'success');
           return;
         }
@@ -1997,7 +2398,7 @@
               }
 
               saveSessionState(currentUser, 'dashboard');
-              applyUserSession('dashboard');
+              applyUserSession('dashboard', true);
               showToast(`Berhasil masuk via Firebase: ${currentUser.nama}`, 'success');
               return;
             } catch (authErr) {
@@ -2034,11 +2435,25 @@
       }
     };
 
-    function applyUserSession(initialMenu = 'dashboard') {
-      // Sembunyikan layar login & tampilkan app-shell
-      document.getElementById('login-screen').classList.add('hidden');
+    function applyUserSession(initialMenu = 'dashboard', animated = false) {
+      const loginScreen = document.getElementById('login-screen');
       const appShell = document.getElementById('app-shell');
-      appShell.classList.remove('hidden');
+
+      if (animated) {
+        loginScreen.classList.add('animate-fade-out-scale');
+        setTimeout(() => {
+          loginScreen.classList.add('hidden');
+          loginScreen.classList.remove('animate-fade-out-scale');
+          appShell.classList.remove('hidden');
+          appShell.classList.add('animate-fade-in-scale');
+          setTimeout(() => {
+            appShell.classList.remove('animate-fade-in-scale');
+          }, 360);
+        }, 220);
+      } else {
+        loginScreen.classList.add('hidden');
+        appShell.classList.remove('hidden');
+      }
 
       document.getElementById('user-display-name').textContent = currentUser.nama;
       
@@ -2058,25 +2473,82 @@
       document.getElementById('user-avatar-badge').textContent = initials || 'GR';
 
       const adminEls = document.querySelectorAll('.role-admin-only');
-      adminEls.forEach(el => el.classList.remove('hidden'));
+      if (currentUser.role === 'admin') {
+        adminEls.forEach(el => el.classList.remove('hidden'));
+      } else {
+        adminEls.forEach(el => el.classList.add('hidden'));
+      }
 
       renderAllViews();
       navigateMenu(initialMenu || 'dashboard');
     }
 
     window.handleLogout = function() {
-      currentUser = null;
-      clearSessionState();
-      document.getElementById('app-shell').classList.add('hidden');
-      document.getElementById('login-screen').classList.remove('hidden');
-      document.getElementById('login-password').value = '';
-      showToast('Anda telah keluar dari sesi aplikasi.', 'info');
+      const appShell = document.getElementById('app-shell');
+      const loginScreen = document.getElementById('login-screen');
+
+      // Animasi transisi logout
+      appShell.classList.add('animate-fade-out-scale');
+      setTimeout(() => {
+        currentUser = null;
+        clearSessionState();
+        appShell.classList.add('hidden');
+        appShell.classList.remove('animate-fade-out-scale');
+
+        loginScreen.classList.remove('hidden');
+        loginScreen.classList.add('animate-fade-in-scale');
+        setTimeout(() => {
+          loginScreen.classList.remove('animate-fade-in-scale');
+        }, 360);
+
+        document.getElementById('login-password').value = '';
+        showToast('Anda telah keluar dari sesi aplikasi.', 'info');
+      }, 220);
     };
+
+    // Reusable Save Button Feedback Animation
+    function animateButtonSaveFeedback(eventOrElement, successText = 'Tersimpan!') {
+      // 1. Animasi pulse ring pada sync status pill di header
+      const syncPill = document.getElementById('sync-status-pill');
+      if (syncPill) {
+        syncPill.classList.remove('animate-sync-ring');
+        void syncPill.offsetWidth; // force reflow
+        syncPill.classList.add('animate-sync-ring');
+      }
+
+      // 2. Animasi tombol simpan
+      let btn = null;
+      if (eventOrElement) {
+        if (eventOrElement.target) {
+          if (eventOrElement.target.tagName === 'FORM') {
+            btn = eventOrElement.target.querySelector('button[type="submit"]');
+          } else if (eventOrElement.target.tagName === 'BUTTON') {
+            btn = eventOrElement.target;
+          }
+        } else if (eventOrElement.tagName === 'BUTTON') {
+          btn = eventOrElement;
+        }
+      }
+
+      if (btn) {
+        const originalHtml = btn.innerHTML;
+        btn.classList.add('animate-save-pulse');
+        btn.innerHTML = `<i class="fa-solid fa-check mr-1.5 text-emerald-300"></i>${successText}`;
+        setTimeout(() => {
+          btn.classList.remove('animate-save-pulse');
+          btn.innerHTML = originalHtml;
+        }, 1100);
+      }
+    }
 
     // =========================================================
     // 5. NAVIGATION & VIEW CONTROLLER
     // =========================================================
     window.navigateMenu = function(menuKey) {
+      if (menuKey === 'pengaturan' && currentUser && currentUser.role !== 'admin') {
+        showToast('Menu Pengaturan hanya dapat diakses oleh Administrator.', 'error');
+        menuKey = 'dashboard';
+      }
       currentMenu = menuKey;
       if (currentUser) {
         saveSessionState(currentUser, menuKey);
@@ -2114,7 +2586,8 @@
         peserta: 'Data Guru & Tenaga Pendidik',
         input: 'Input Jawaban Siswa Cepat (A,B,C,D...)',
         analisis: 'Analisis Tingkat Kesukaran & Daya Pembeda',
-        rekap: 'Rekapitulasi Nilai & Ekspor PDF / Excel'
+        rekap: 'Rekapitulasi Nilai & Ekspor PDF / Excel',
+        pengaturan: 'Pengaturan Sekolah & Akun Administrator'
       };
       document.getElementById('header-page-title').textContent = titles[menuKey] || 'SmartAnabutir';
     };
@@ -2351,6 +2824,7 @@
       renderRekapNilaiView();
       renderPesertaAccountsView();
       renderSiswaView();
+      renderPengaturanView();
     }
 
     function renderDashboardView() {
@@ -2500,9 +2974,9 @@
       const pgBobot = Number(document.getElementById('cfg-pg-bobot').value) || 0;
       const bsArr = parseCommaList(document.getElementById('cfg-bs-kunci').value.toUpperCase());
       const bsBobot = Number(document.getElementById('cfg-bs-bobot').value) || 0;
-      const isianKunci = parseCommaList(document.getElementById('cfg-isian-kunci').value);
-      const isianMaks = parseCommaList(document.getElementById('cfg-isian-maks').value).map(Number);
-      const uraianMaks = parseCommaList(document.getElementById('cfg-uraian-maks').value).map(Number);
+      const isianKunci = parseCommaList(document.getElementById('cfg-isian-kunci').value, false);
+      const isianMaks = parseCommaList(document.getElementById('cfg-isian-maks').value, false).map(Number);
+      const uraianMaks = parseCommaList(document.getElementById('cfg-uraian-maks').value, false).map(Number);
 
       document.getElementById('preview-pg-badges').innerHTML = pgArr
         .map((k, i) => `<span class="px-2 py-0.5 rounded-md bg-white border border-cyan-300 text-[11px] font-mono font-bold text-cyan-900">${i + 1}:${k}</span>`)
@@ -2549,10 +3023,10 @@
       exam.bsBobot = Number(document.getElementById('cfg-bs-bobot').value) || 1;
       exam.bsKunci = parseCommaList(document.getElementById('cfg-bs-kunci').value.toUpperCase());
 
-      exam.isianKunci = parseCommaList(document.getElementById('cfg-isian-kunci').value.toUpperCase());
-      exam.isianMaks = parseCommaList(document.getElementById('cfg-isian-maks').value).map(n => Number(n) || 2);
+      exam.isianKunci = parseCommaList(document.getElementById('cfg-isian-kunci').value.toUpperCase(), false);
+      exam.isianMaks = parseCommaList(document.getElementById('cfg-isian-maks').value, false).map(n => Number(n) || 2);
 
-      exam.uraianMaks = parseCommaList(document.getElementById('cfg-uraian-maks').value).map(n => Number(n) || 10);
+      exam.uraianMaks = parseCommaList(document.getElementById('cfg-uraian-maks').value, false).map(n => Number(n) || 10);
 
       await saveDocToCloud('paket_ujian', exam.id, exam);
 
@@ -2565,6 +3039,7 @@
       }
 
       renderAllViews();
+      animateButtonSaveFeedback(e, 'Kunci Tersimpan!');
       showToast('Kunci jawaban & bobot disimpan! Seluruh nilai siswa telah dihitung ulang.', 'success');
     };
 
@@ -2606,6 +3081,7 @@
       await saveDocToCloud('paket_ujian', newId, newExam);
       window.closeModalCreateExam();
       renderAllViews();
+      animateButtonSaveFeedback(e, 'Paket Dibuat!');
       showToast('Paket ujian baru berhasil dibuat!', 'success');
     };
 
@@ -2783,6 +3259,7 @@
 
       window.resetStudentAnswerForm();
       renderAllViews();
+      animateButtonSaveFeedback(e, 'Jawaban Tersimpan!');
       showToast(`Jawaban & nilai ${namaSiswa} (${evaluated.nilaiAkhir}) berhasil disimpan!`, 'success');
     };
 
@@ -3099,6 +3576,7 @@
       await saveDocToCloud('master_siswa', id, obj);
       window.resetSiswaForm();
       renderSiswaView();
+      animateButtonSaveFeedback(e, 'Siswa Tersimpan!');
       showToast(`Data siswa ${nama} berhasil disimpan!`, 'success');
     };
 
@@ -3191,65 +3669,129 @@
       if (!file) return;
 
       const reader = new FileReader();
+      reader.onerror = function() {
+        showToast('Gagal membaca file Excel dari perangkat.', 'error');
+        event.target.value = '';
+      };
       reader.onload = async function(e) {
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
+          if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+            showToast('File Excel tidak memiliki lembar kerja (sheet).', 'error');
+            event.target.value = '';
+            return;
+          }
           const firstSheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[firstSheetName];
           const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
           if (!rows || rows.length < 2) {
             showToast('File Excel kosong atau format tidak sesuai.', 'error');
+            event.target.value = '';
             return;
           }
 
           let headerIdx = -1;
-          for (let i = 0; i < Math.min(rows.length, 5); i++) {
-            const rowStr = rows[i].map(x => String(x).toLowerCase()).join(' ');
-            if (rowStr.includes('nisn') || rowStr.includes('nama')) {
+          for (let i = 0; i < Math.min(rows.length, 10); i++) {
+            if (!rows[i] || !Array.isArray(rows[i])) continue;
+            const rowStr = rows[i].map(x => String(x || '').toLowerCase()).join(' ');
+            const hasNisn = rowStr.includes('nisn') || rowStr.includes('nis') || rowStr.includes('induk');
+            const hasNama = rowStr.includes('nama');
+            if ((hasNisn && hasNama) || (hasNama && (rowStr.includes('kelas') || rowStr.includes('rombel') || rowStr.includes('jk') || rowStr.includes('kelamin')))) {
               headerIdx = i;
               break;
             }
           }
 
           if (headerIdx === -1) headerIdx = 0;
-          const header = rows[headerIdx].map(x => String(x).toLowerCase().trim());
-          const nisnCol = header.findIndex(h => h.includes('nisn'));
-          const namaCol = header.findIndex(h => h.includes('nama'));
-          const kelasCol = header.findIndex(h => h.includes('kelas') || h.includes('rombel'));
-          const jkCol = header.findIndex(h => h.includes('kelamin') || h.includes('jk') || h.includes('l/p'));
+          const header = (rows[headerIdx] || []).map(x => String(x || '').toLowerCase().trim());
+          let nisnCol = header.findIndex(h => h.includes('nisn') || h.includes('nis') || h.includes('induk'));
+          let namaCol = header.findIndex(h => h.includes('nama') || h.includes('siswa') || h.includes('peserta'));
+          let kelasCol = header.findIndex(h => h.includes('kelas') || h.includes('rombel') || h.includes('tingkat'));
+          let jkCol = header.findIndex(h => h.includes('kelamin') || h.includes('jk') || h.includes('l/p') || h.includes('gender'));
+
+          // Fallbacks jika nama kolom tidak persis sama
+          if (nisnCol === -1 && namaCol === -1) {
+            nisnCol = 0;
+            namaCol = 1;
+            kelasCol = 2;
+            jkCol = 3;
+          } else {
+            if (namaCol === -1) {
+              namaCol = [0, 1, 2, 3].find(c => c !== nisnCol && c !== kelasCol && c !== jkCol) ?? 1;
+            }
+            if (nisnCol === -1) {
+              nisnCol = [0, 1, 2, 3].find(c => c !== namaCol && c !== kelasCol && c !== jkCol) ?? 0;
+            }
+          }
 
           let importedCount = 0;
+          const updatedSiswa = [];
+
           for (let i = headerIdx + 1; i < rows.length; i++) {
             const row = rows[i];
-            const nisn = String(row[nisnCol >= 0 ? nisnCol : 0] || '').trim();
-            const nama = String(row[namaCol >= 0 ? namaCol : 1] || '').trim();
-            const kelas = String(row[kelasCol >= 0 ? kelasCol : 2] || 'Kelas VI').trim();
-            let rawJk = String(row[jkCol >= 0 ? jkCol : 3] || 'L').toUpperCase().trim();
+            if (!row || !Array.isArray(row)) continue;
+
+            let rawNisn = String(nisnCol >= 0 ? (row[nisnCol] ?? '') : '').trim();
+            if (rawNisn.endsWith('.0')) rawNisn = rawNisn.slice(0, -2);
+
+            const nama = String(namaCol >= 0 ? (row[namaCol] ?? '') : '').trim();
+            const kelas = String(kelasCol >= 0 ? (row[kelasCol] ?? 'Kelas VI') : 'Kelas VI').trim() || 'Kelas VI';
+            let rawJk = String(jkCol >= 0 ? (row[jkCol] ?? 'L') : 'L').toUpperCase().trim();
             const jk = rawJk.startsWith('P') ? 'P' : 'L';
 
-            if (!nama && !nisn) continue;
+            if (!nama && !rawNisn) continue;
 
-            const finalNisn = nisn || ('0' + Math.floor(100000000 + Math.random() * 900000000));
+            const finalNisn = rawNisn || ('0' + Math.floor(100000000 + Math.random() * 900000000));
             const existingIdx = masterSiswaList.findIndex(s => s.nisn === finalNisn || (s.nama.toLowerCase() === nama.toLowerCase() && s.kelas === kelas));
             const id = existingIdx >= 0 ? masterSiswaList[existingIdx].id : 'sis_' + Date.now() + '_' + i;
-            const obj = { id, nisn: finalNisn, nama: nama || 'Siswa ' + i, kelas, jk };
+            const obj = { id, nisn: finalNisn, nama: nama || ('Siswa ' + i), kelas, jk };
 
             if (existingIdx >= 0) {
               masterSiswaList[existingIdx] = obj;
             } else {
               masterSiswaList.push(obj);
             }
-            await saveDocToCloud('master_siswa', id, obj);
+            updatedSiswa.push(obj);
             importedCount++;
           }
 
-          event.target.value = '';
+          if (importedCount === 0) {
+            showToast('Tidak ada data siswa yang valid dalam file Excel.', 'warning');
+            event.target.value = '';
+            return;
+          }
+
+          // 1. Simpan langsung ke LocalStorage secara instan
+          localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
+
+          // 2. Reset filter dan pencarian agar semua data langsung terlihat
+          const filterKelas = document.getElementById('filter-siswa-kelas');
+          if (filterKelas) filterKelas.value = 'ALL';
+          const searchInput = document.getElementById('search-siswa');
+          if (searchInput) searchInput.value = '';
+
+          // 3. Render tampilan seketika
           renderSiswaView();
+          renderStudentInputView(); // Refresh datalist dropdown di form ujian
+
+          // 4. Reset input file
+          event.target.value = '';
+
+          // 5. Berikan notifikasi sukses
           showToast(`Berhasil mengimpor ${importedCount} data siswa dari Excel!`, 'success');
+
+          // 6. Sinkronisasi latar belakang ke Cloud tanpa memblokir UI
+          if (isCloudConnected && db && setDoc && doc) {
+            Promise.allSettled(
+              updatedSiswa.map(item => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_siswa', item.id), item))
+            ).catch(cErr => console.warn('Cloud sync error for siswa:', cErr));
+          }
         } catch (err) {
+          console.error('Import siswa error:', err);
           showToast('Gagal mengimpor file: ' + err.message, 'error');
+          event.target.value = '';
         }
       };
       reader.readAsArrayBuffer(file);
@@ -3358,6 +3900,7 @@
       await saveDocToCloud('users_peserta', id, obj);
       window.resetPesertaForm();
       renderAllViews();
+      animateButtonSaveFeedback(e, 'Guru Tersimpan!');
       showToast(`Data guru ${nama} berhasil disimpan!`, 'success');
     };
 
@@ -3456,44 +3999,76 @@
       if (!file) return;
 
       const reader = new FileReader();
+      reader.onerror = function() {
+        showToast('Gagal membaca file Excel dari perangkat.', 'error');
+        event.target.value = '';
+      };
       reader.onload = async function(e) {
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
+          if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+            showToast('File Excel tidak memiliki lembar kerja (sheet).', 'error');
+            event.target.value = '';
+            return;
+          }
           const firstSheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[firstSheetName];
           const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
           if (!rows || rows.length < 2) {
             showToast('File Excel kosong atau format tidak sesuai.', 'error');
+            event.target.value = '';
             return;
           }
 
           let headerIdx = -1;
-          for (let i = 0; i < Math.min(rows.length, 5); i++) {
-            const rowStr = rows[i].map(x => String(x).toLowerCase()).join(' ');
-            if (rowStr.includes('user') || rowStr.includes('nama')) {
+          for (let i = 0; i < Math.min(rows.length, 10); i++) {
+            if (!rows[i] || !Array.isArray(rows[i])) continue;
+            const rowStr = rows[i].map(x => String(x || '').toLowerCase()).join(' ');
+            const hasUser = rowStr.includes('user') || rowStr.includes('nip') || rowStr.includes('akun');
+            const hasNama = rowStr.includes('nama') || rowStr.includes('guru');
+            if ((hasUser && hasNama) || (hasNama && (rowStr.includes('peran') || rowStr.includes('role') || rowStr.includes('mapel') || rowStr.includes('kelas') || rowStr.includes('pass')))) {
               headerIdx = i;
               break;
             }
           }
 
           if (headerIdx === -1) headerIdx = 0;
-          const header = rows[headerIdx].map(x => String(x).toLowerCase().trim());
-          const userCol = header.findIndex(h => h.includes('user'));
-          const namaCol = header.findIndex(h => h.includes('nama'));
-          const roleCol = header.findIndex(h => h.includes('peran') || h.includes('role') || h.includes('jabatan'));
-          const kelasCol = header.findIndex(h => h.includes('mapel') || h.includes('kelas') || h.includes('tugas'));
-          const passCol = header.findIndex(h => h.includes('pass') || h.includes('sandi'));
+          const header = (rows[headerIdx] || []).map(x => String(x || '').toLowerCase().trim());
+          let userCol = header.findIndex(h => h.includes('user') || h.includes('nip') || h.includes('akun') || h.includes('id'));
+          let namaCol = header.findIndex(h => h.includes('nama') || h.includes('guru') || h.includes('lengkap'));
+          let roleCol = header.findIndex(h => h.includes('peran') || h.includes('role') || h.includes('jabatan') || h.includes('tugas'));
+          let kelasCol = header.findIndex(h => h.includes('mapel') || h.includes('kelas') || h.includes('mata pelajaran'));
+          let passCol = header.findIndex(h => h.includes('pass') || h.includes('sandi') || h.includes('password'));
+
+          if (userCol === -1 && namaCol === -1) {
+            userCol = 0;
+            namaCol = 1;
+            roleCol = 2;
+            kelasCol = 3;
+            passCol = 4;
+          } else {
+            if (namaCol === -1) {
+              namaCol = [0, 1, 2, 3, 4].find(c => c !== userCol && c !== roleCol && c !== kelasCol && c !== passCol) ?? 1;
+            }
+            if (userCol === -1) {
+              userCol = [0, 1, 2, 3, 4].find(c => c !== namaCol && c !== roleCol && c !== kelasCol && c !== passCol) ?? 0;
+            }
+          }
 
           let importedCount = 0;
+          const updatedGuru = [];
+
           for (let i = headerIdx + 1; i < rows.length; i++) {
             const row = rows[i];
-            const username = String(row[userCol >= 0 ? userCol : 0] || '').trim();
-            const nama = String(row[namaCol >= 0 ? namaCol : 1] || '').trim();
-            const rawRole = String(row[roleCol >= 0 ? roleCol : 2] || '').toLowerCase().trim();
-            const kelas = String(row[kelasCol >= 0 ? kelasCol : 3] || 'Guru Mapel').trim();
-            const password = String(row[passCol >= 0 ? passCol : 4] || 'guru123').trim() || 'guru123';
+            if (!row || !Array.isArray(row)) continue;
+
+            const username = String(userCol >= 0 ? (row[userCol] ?? '') : '').trim();
+            const nama = String(namaCol >= 0 ? (row[namaCol] ?? '') : '').trim();
+            const rawRole = String(roleCol >= 0 ? (row[roleCol] ?? '') : '').toLowerCase().trim();
+            const kelas = String(kelasCol >= 0 ? (row[kelasCol] ?? 'Guru Mapel') : 'Guru Mapel').trim() || 'Guru Mapel';
+            const password = String(passCol >= 0 ? (row[passCol] ?? 'guru123') : 'guru123').trim() || 'guru123';
 
             if (!username && !nama) continue;
 
@@ -3506,8 +4081,8 @@
               role = 'guru_mapel';
             }
 
-            const finalUsername = username || ('guru_' + i);
-            const existingIdx = pesertaAccounts.findIndex(a => a.username.toLowerCase() === finalUsername.toLowerCase());
+            const finalUsername = (username || ('guru_' + i)).toLowerCase();
+            const existingIdx = pesertaAccounts.findIndex(a => (a.username || '').toLowerCase() === finalUsername);
             const id = existingIdx >= 0 ? pesertaAccounts[existingIdx].id : 'usr_' + Date.now() + '_' + i;
             const obj = { id, username: finalUsername, nama: nama || finalUsername, kelas, role, password };
 
@@ -3516,22 +4091,235 @@
             } else {
               pesertaAccounts.push(obj);
             }
-            await saveDocToCloud('users_peserta', id, obj);
+            updatedGuru.push(obj);
             importedCount++;
           }
 
+          if (importedCount === 0) {
+            showToast('Tidak ada data guru yang valid dalam file Excel.', 'warning');
+            event.target.value = '';
+            return;
+          }
+
+          // Pastikan akun admin tidak pernah hilang
+          if (!pesertaAccounts.some(a => a.username && a.username.toLowerCase() === 'admin')) {
+            pesertaAccounts.unshift({ id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' });
+          }
+
+          // 1. Simpan langsung ke LocalStorage
+          localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
+
+          // 2. Reset filter dan pencarian
+          const searchGuru = document.getElementById('search-guru');
+          if (searchGuru) searchGuru.value = '';
+          const filterRole = document.getElementById('filter-guru-role');
+          if (filterRole) filterRole.value = 'ALL';
+
+          // 3. Render tabel langsung
+          renderPesertaAccountsTable();
+
+          // 4. Reset input file
           event.target.value = '';
-          renderAllViews();
+
+          // 5. Notifikasi sukses
           showToast(`Berhasil mengimpor ${importedCount} data guru dari Excel!`, 'success');
+
+          // 6. Sinkronisasi latar belakang ke Cloud tanpa memblokir UI
+          if (isCloudConnected && db && setDoc && doc) {
+            Promise.allSettled(
+              updatedGuru.map(item => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', item.id), item))
+            ).catch(cErr => console.warn('Cloud sync error for guru:', cErr));
+          }
         } catch (err) {
+          console.error('Import guru error:', err);
           showToast('Gagal mengimpor file: ' + err.message, 'error');
+          event.target.value = '';
         }
       };
       reader.readAsArrayBuffer(file);
     };
 
     // =========================================================
-    // 11. EXPORT MULTI-SHEET & MULTI-COLUMN EXCEL (.XLSX)
+    // 11. PENGATURAN SEKOLAH & AKUN ADMINISTRATOR
+    // =========================================================
+    function applyAppSettingsUI() {
+      // 1. Login Banner School Name
+      const bSchool = document.getElementById('banner-school-name');
+      if (bSchool) bSchool.textContent = appSettings.namaSekolah || 'Madrasah Ibtidaiyah Terpadu';
+
+      // 2. Footer School Name
+      const fSchool = document.getElementById('footer-school-name');
+      if (fSchool) fSchool.innerHTML = `<i class="fa-solid fa-school text-teal-400 mr-1.5"></i>${appSettings.namaSekolah || 'Madrasah Ibtidaiyah Terpadu'}`;
+
+      // 3. Sidebar Subtitle
+      const sSub = document.getElementById('sidebar-school-sub');
+      if (sSub) sSub.textContent = appSettings.namaSekolah || 'Analisis Soal & Nilai Terpadu';
+
+      // 4. Input Fields di Form Pengaturan Sekolah
+      const inpNama = document.getElementById('setting-nama-sekolah');
+      if (inpNama && !inpNama.matches(':focus')) inpNama.value = appSettings.namaSekolah || '';
+      const inpSub = document.getElementById('setting-sub-sekolah');
+      if (inpSub && !inpSub.matches(':focus')) inpSub.value = appSettings.subNamaSekolah || '';
+      const inpAlamat = document.getElementById('setting-alamat-sekolah');
+      if (inpAlamat && !inpAlamat.matches(':focus')) inpAlamat.value = appSettings.alamatSekolah || '';
+      const inpKamad = document.getElementById('setting-kamad');
+      if (inpKamad && !inpKamad.matches(':focus')) inpKamad.value = appSettings.kepalaSekolah || '';
+
+      // 5. Input Fields di Form User Admin
+      const adminAcc = (pesertaAccounts || []).find(a => a.role === 'admin') || (pesertaAccounts || [])[0];
+      if (adminAcc) {
+        const inpAdminUser = document.getElementById('setting-admin-username');
+        if (inpAdminUser && !inpAdminUser.matches(':focus')) inpAdminUser.value = adminAcc.username || 'admin';
+        const inpAdminNama = document.getElementById('setting-admin-nama');
+        if (inpAdminNama && !inpAdminNama.matches(':focus')) inpAdminNama.value = adminAcc.nama || 'Administrator Utama';
+      }
+    }
+
+    function renderPengaturanView() {
+      applyAppSettingsUI();
+    }
+
+    window.handleSaveSchoolSettings = async function(e) {
+      if (e) e.preventDefault();
+      const nama = (document.getElementById('setting-nama-sekolah')?.value || '').trim();
+      const sub = (document.getElementById('setting-sub-sekolah')?.value || '').trim();
+      const alamat = (document.getElementById('setting-alamat-sekolah')?.value || '').trim();
+      const kamad = (document.getElementById('setting-kamad')?.value || '').trim();
+
+      if (!nama) {
+        showToast('Nama madrasah/sekolah tidak boleh kosong.', 'error');
+        return;
+      }
+
+      appSettings.namaSekolah = nama;
+      appSettings.subNamaSekolah = sub;
+      appSettings.alamatSekolah = alamat;
+      appSettings.kepalaSekolah = kamad;
+
+      await saveDocToCloud('app_settings', 'general', appSettings);
+      applyAppSettingsUI();
+      animateButtonSaveFeedback(e, 'Sekolah Tersimpan!');
+      showToast('Identitas madrasah/sekolah berhasil disimpan!', 'success');
+    };
+
+    window.handleSaveAdminUser = async function(e) {
+      if (e) e.preventDefault();
+      const newUsername = (document.getElementById('setting-admin-username')?.value || '').trim();
+      const newNama = (document.getElementById('setting-admin-nama')?.value || '').trim();
+
+      if (!newUsername || !newNama) {
+        showToast('Nama Lengkap dan Username Administrator tidak boleh kosong.', 'error');
+        return;
+      }
+
+      let adminAcc = (pesertaAccounts || []).find(a => a.role === 'admin');
+      if (!adminAcc) {
+        adminAcc = {
+          id: 'usr_admin',
+          username: 'admin',
+          password: 'admin123',
+          nama: 'Administrator Utama',
+          kelas: 'Semua Mapel',
+          role: 'admin'
+        };
+        pesertaAccounts.unshift(adminAcc);
+      }
+
+      // Pastikan username baru tidak bentrok dengan akun guru lain
+      const conflict = (pesertaAccounts || []).find(a => a.id !== adminAcc.id && a.username && a.username.toLowerCase() === newUsername.toLowerCase());
+      if (conflict) {
+        showToast(`Username '${newUsername}' sudah digunakan oleh pengguna lain.`, 'error');
+        return;
+      }
+
+      adminAcc.username = newUsername;
+      adminAcc.nama = newNama;
+
+      // Update sesi aktif jika login sebagai admin
+      if (currentUser && currentUser.role === 'admin') {
+        currentUser.nama = newNama;
+        currentUser.username = newUsername;
+        saveSessionState(currentUser, currentMenu);
+        const nameEl = document.getElementById('user-display-name');
+        if (nameEl) nameEl.textContent = newNama;
+        const initials = newNama.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        const badgeEl = document.getElementById('user-avatar-badge');
+        if (badgeEl) badgeEl.textContent = initials || 'AD';
+      }
+
+      await saveDocToCloud('users_peserta', adminAcc.id, adminAcc);
+      renderPesertaAccountsTable();
+      applyAppSettingsUI();
+      animateButtonSaveFeedback(e, 'Admin Diperbarui!');
+      showToast('Profil Administrator (Username & Nama) berhasil diperbarui!', 'success');
+    };
+
+    window.handleSaveAdminPassword = async function(e) {
+      if (e) e.preventDefault();
+      const curPass = (document.getElementById('setting-admin-cur-pass')?.value || '').trim();
+      const newPass = (document.getElementById('setting-admin-new-pass')?.value || '').trim();
+      const confirmPass = (document.getElementById('setting-admin-confirm-pass')?.value || '').trim();
+
+      if (!curPass || !newPass || !confirmPass) {
+        showToast('Mohon lengkapi kata sandi lama, baru, dan konfirmasi.', 'error');
+        return;
+      }
+
+      let adminAcc = (pesertaAccounts || []).find(a => a.role === 'admin');
+      if (!adminAcc) {
+        adminAcc = {
+          id: 'usr_admin',
+          username: 'admin',
+          password: 'admin123',
+          nama: 'Administrator Utama',
+          kelas: 'Semua Mapel',
+          role: 'admin'
+        };
+        pesertaAccounts.unshift(adminAcc);
+      }
+
+      if (curPass !== adminAcc.password) {
+        showToast('Kata sandi saat ini tidak cocok. Silakan periksa kembali.', 'error');
+        return;
+      }
+
+      if (newPass.length < 4) {
+        showToast('Kata sandi baru minimal 4 karakter.', 'error');
+        return;
+      }
+
+      if (newPass !== confirmPass) {
+        showToast('Konfirmasi kata sandi baru tidak cocok.', 'error');
+        return;
+      }
+
+      adminAcc.password = newPass;
+
+      // Sinkronkan ke Firebase Auth jika pengguna login dengan akun Firebase
+      if (auth && auth.currentUser) {
+        try {
+          const fbAuth = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+          if (fbAuth.updatePassword) {
+            await fbAuth.updatePassword(auth.currentUser, newPass);
+          }
+        } catch (fbErr) {
+          console.info('Catatan sinkronisasi kata sandi Firebase:', fbErr.message);
+        }
+      }
+
+      await saveDocToCloud('users_peserta', adminAcc.id, adminAcc);
+      renderPesertaAccountsTable();
+
+      document.getElementById('setting-admin-cur-pass').value = '';
+      document.getElementById('setting-admin-new-pass').value = '';
+      document.getElementById('setting-admin-confirm-pass').value = '';
+
+      animateButtonSaveFeedback(e, 'Sandi Diubah!');
+      showToast('Kata sandi Administrator berhasil diubah! Gunakan kata sandi baru untuk login berikutnya.', 'success');
+    };
+
+    // =========================================================
+    // 12. EXPORT MULTI-SHEET & MULTI-COLUMN EXCEL (.XLSX)
     // =========================================================
     window.exportFullExcel = function() {
       try {
@@ -3546,10 +4334,11 @@
         const wb = XLSX.utils.book_new();
 
         // SHEET 1: REKAP NILAI SISWA (Multi-Column)
+        const schoolTitle = (appSettings && appSettings.namaSekolah ? appSettings.namaSekolah : 'MADRASAH IBTIDAIYAH').toUpperCase();
         const sheet1Data = [
-          ['LAPORAN REKAPITULASI NILAI & ANALISIS EVALUASI AKADEMIK'],
+          [`LAPORAN REKAPITULASI NILAI & EVALUASI AKADEMIK - ${schoolTitle}`],
           ['Judul Ujian', exam.judulUjian, '', 'Guru Mata Pelajaran', exam.guruMapel],
-          ['Mata Pelajaran', exam.mapel, '', 'Wali Kelas / Kamad', exam.waliKelas],
+          ['Mata Pelajaran', exam.mapel, '', 'Kepala Madrasah / Kamad', appSettings.kepalaSekolah || exam.waliKelas],
           ['Kelas / Semester', exam.kelas, '', 'KKM Ketuntasan', exam.kkm],
           [],
           ['Peringkat', 'NISN', 'Nama Lengkap Siswa', 'Kelas', 'Jawaban PG Siswa', 'Benar PG', 'Skor PG', 'Jawaban B/S Siswa', 'Benar B/S', 'Skor B/S', 'Skor Isian', 'Skor Uraian', 'Total Skor', 'Skor Maksimal', 'Nilai Akhir', 'Status Ketuntasan']
@@ -3651,7 +4440,7 @@
     };
 
     // =========================================================
-    // 12. EXPORT OFFICIAL PDF REPORT (jsPDF + AutoTable)
+    // 13. EXPORT OFFICIAL PDF REPORT (jsPDF + AutoTable)
     // =========================================================
     window.exportOfficialPDF = function() {
       try {
@@ -3665,7 +4454,8 @@
         docPdf.setFont('helvetica', 'bold');
         docPdf.setFontSize(14);
         docPdf.setTextColor(13, 148, 136);
-        docPdf.text('MADRASAH IBTIDAIYAH (MI) AL-HIKMAH TERPADU', 148.5, 14, { align: 'center' });
+        const kopSchool = (appSettings && appSettings.namaSekolah ? appSettings.namaSekolah : 'MADRASAH IBTIDAIYAH TERPADU').toUpperCase();
+        docPdf.text(kopSchool, 148.5, 14, { align: 'center' });
 
         docPdf.setFontSize(11);
         docPdf.setTextColor(15, 23, 42);
@@ -3756,9 +4546,9 @@
         docPdf.setFont('helvetica', 'normal');
         docPdf.setFontSize(9);
         docPdf.text('Mengetahui,', 35, signY);
-        docPdf.text('Kepala Madrasah / Wali Kelas', 35, signY + 5);
+        docPdf.text('Kepala Madrasah / Kamad', 35, signY + 5);
         docPdf.setFont('helvetica', 'bold');
-        docPdf.text(exam.waliKelas, 35, signY + 24);
+        docPdf.text(appSettings.kepalaSekolah || exam.waliKelas || '...........................................', 35, signY + 24);
 
         docPdf.setFont('helvetica', 'normal');
         docPdf.text(`Dicetak tanggal: ${exam.tanggal}`, 215, signY);
@@ -3791,7 +4581,7 @@
         info: 'fa-circle-info text-teal-400'
       };
 
-      toast.className = `pointer-events-auto p-4 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-semibold transform transition-all duration-300 ${colors[type] || colors.info}`;
+      toast.className = `pointer-events-auto p-4 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-semibold animate-fade-in-scale ${colors[type] || colors.info}`;
       toast.innerHTML = `
         <i class="fa-solid ${icons[type] || icons.info} text-base shrink-0"></i>
         <span class="leading-snug">${message}</span>
@@ -3799,9 +4589,9 @@
       container.appendChild(toast);
 
       setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-8px)';
-        setTimeout(() => toast.remove(), 300);
+        toast.classList.remove('animate-fade-in-scale');
+        toast.classList.add('animate-fade-out-scale');
+        setTimeout(() => toast.remove(), 280);
       }, 3200);
     }
 
