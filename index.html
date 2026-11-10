@@ -1313,51 +1313,150 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <!-- Form Add/Edit Account -->
-              <div class="lg:col-span-4 gyan-card rounded-3xl p-6 space-y-4 h-fit">
+              <div class="lg:col-span-5 gyan-card rounded-3xl p-6 space-y-4 h-fit">
                 <div class="border-b border-slate-100 pb-3">
                   <span class="text-[10px] font-extrabold uppercase tracking-widest text-teal-600">FORM AKUN PENDIDIK</span>
-                  <h4 class="text-base font-extrabold text-slate-900 mt-0.5" id="peserta-form-title">Tambah Guru / Admin</h4>
-                  <p class="text-[11px] text-slate-500">Kelola akun untuk Guru Mapel, Wali Kelas, dan Administrator.</p>
+                  <h4 class="text-base font-extrabold text-slate-900 mt-0.5" id="peserta-form-title">Tambah Guru / Tenaga Pendidik</h4>
+                  <p class="text-[11px] text-slate-500">Kelola identitas pendidik, peran akses, jabatan, dan mata pelajaran yang diampu.</p>
                 </div>
 
                 <form id="form-peserta-account" onsubmit="handleSavePesertaAccount(event)" class="space-y-3.5">
                   <input type="hidden" id="acc-edit-id" value="" />
-                  <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Username Login</label>
-                    <input type="text" id="acc-username" required placeholder="Masukkan username unik (contoh: ridwan)"
-                           class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none" />
-                  </div>
+                  <input type="hidden" id="acc-username" value="" />
+
+                  <!-- 1. Nama Lengkap & Gelar -->
                   <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap &amp; Gelar</label>
-                    <input type="text" id="acc-nama" required placeholder="Contoh: Ust. H. M. Ridwan, S.Pd.I"
-                           class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none" />
+                    <input type="text" id="acc-nama" required placeholder="Cth: ACHMAD FADILLAH, S.Sos"
+                           class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none placeholder:text-slate-400" />
                   </div>
-                  <div class="grid grid-cols-2 gap-3">
-                    <div>
-                      <label class="block text-xs font-bold text-slate-700 mb-1">Peran Akses</label>
-                      <select id="acc-role" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:border-teal-600 focus:outline-none">
-                        <option value="guru_mapel">Guru Mapel</option>
-                        <option value="wali_kelas">Wali Kelas</option>
-                        <option value="admin">Administrator</option>
+
+                  <!-- 2. Jenis ID & Nomor Identitas -->
+                  <div class="grid grid-cols-12 gap-2.5">
+                    <div class="col-span-4 sm:col-span-4">
+                      <label class="block text-xs font-bold text-slate-700 mb-1">Jenis ID</label>
+                      <select id="acc-jenis-id" class="w-full px-2.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:border-teal-600 focus:outline-none">
+                        <option value="NIP">NIP</option>
+                        <option value="NUPTK">NUPTK</option>
+                        <option value="PegID">PegID</option>
+                        <option value="NIK">NIK</option>
+                        <option value="Lainnya">Lainnya</option>
                       </select>
                     </div>
-                    <div>
-                      <label class="block text-xs font-bold text-slate-700 mb-1">Mapel / Kelas</label>
-                      <input type="text" id="acc-kelas" required placeholder="Contoh: Matematika"
-                             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none" />
+                    <div class="col-span-8 sm:col-span-8">
+                      <label class="block text-xs font-bold text-slate-700 mb-1">Nomor Identitas</label>
+                      <input type="text" id="acc-nomor-id" placeholder="Hanya Angka"
+                             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none placeholder:text-slate-400" />
                     </div>
                   </div>
+
+                  <!-- 3. Status Guru -->
                   <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Password Login</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Status Guru</label>
+                    <select id="acc-status-guru" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:border-teal-600 focus:outline-none">
+                      <option value="Belum Sertifikasi" selected>Belum Sertifikasi</option>
+                      <option value="Sudah Sertifikasi">Sudah Sertifikasi</option>
+                      <option value="PNS">PNS</option>
+                      <option value="PPPK">PPPK</option>
+                      <option value="GTT / Guru Honorer">GTT / Guru Honorer</option>
+                      <option value="Guru Tetap Yayasan (GTY)">Guru Tetap Yayasan (GTY)</option>
+                    </select>
+                  </div>
+
+                  <!-- 4. Jabatan / Tugas -->
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Jabatan / Tugas</label>
+                    <input type="text" id="acc-jabatan" placeholder="Cth: Wali Kelas 1 / Guru Mapel"
+                           class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none placeholder:text-slate-400" />
+                  </div>
+
+                  <!-- 5. Sandi Portal Guru -->
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Sandi Portal Guru</label>
                     <div class="relative">
-                      <input type="password" id="acc-password" required value="guru123"
-                             class="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none" />
+                      <input type="password" id="acc-password" required value="user123" placeholder="user123"
+                             class="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none placeholder:text-slate-400" />
                       <button type="button" onclick="togglePasswordVisibility('acc-password', 'acc-pass-eye')"
                               class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-teal-600">
                         <i id="acc-pass-eye" class="fa-solid fa-eye text-xs"></i>
                       </button>
                     </div>
                   </div>
+
+                  <!-- 6. Hak Akses / Peran -->
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Hak Akses / Peran</label>
+                    <select id="acc-role" onchange="handleGuruRoleChange()" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:border-teal-600 focus:outline-none">
+                      <option value="guru_mapel" selected>Guru (User Biasa)</option>
+                      <option value="wali_kelas">Wali Kelas</option>
+                      <option value="admin">Administrator</option>
+                    </select>
+                  </div>
+
+                  <!-- 7. Mapel yang Diampu (Khusus Guru Mapel) -->
+                  <div id="section-mapel-diampu" class="p-3.5 rounded-2xl border border-purple-200 bg-purple-50/30 space-y-2.5">
+                    <div class="flex items-start gap-2">
+                      <i class="fa-solid fa-book-open text-purple-600 text-sm mt-0.5"></i>
+                      <div>
+                        <h5 class="text-xs font-bold text-purple-900 leading-tight">Mapel yang Diampu (Khusus Guru Mapel)</h5>
+                        <p class="text-[11px] text-slate-500 leading-tight mt-0.5">
+                          Centang mata pelajaran yang diajarkan oleh guru ini. Pada jurnal kelas, hanya mapel yang dicentang yang akan muncul untuk guru tersebut.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="max-h-52 overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-2" id="container-mapel-checkboxes">
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="Al Qur'an Hadis" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">Al Qur'an Hadis</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="Akidah Akhlak" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">Akidah Akhlak</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="Fikih" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">Fikih</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="SKI" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">SKI</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="Bahasa Arab" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">Bahasa Arab</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="Pend. Pancasila" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">Pend. Pancasila</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="Bahasa Indonesia" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">Bahasa Indonesia</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="Matematika" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">Matematika</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="IPAS" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">IPAS</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="PJOK" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">PJOK</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="Seni Budaya" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">Seni Budaya</span>
+                      </label>
+                      <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/60 transition cursor-pointer text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="acc-mapel" value="Bahasa Inggris" class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500" />
+                        <span class="truncate">Bahasa Inggris</span>
+                      </label>
+                    </div>
+                  </div>
+
                   <div class="flex gap-2 pt-2">
                     <button type="submit" class="flex-1 py-2.5 px-4 rounded-full bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md transition flex items-center justify-center gap-1.5">
                       <i class="fa-solid fa-save"></i>
@@ -1371,7 +1470,7 @@
               </div>
 
               <!-- Table List of Accounts -->
-              <div class="lg:col-span-8 gyan-card rounded-3xl p-6 space-y-4">
+              <div class="lg:col-span-7 gyan-card rounded-3xl p-6 space-y-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h4 class="text-base font-extrabold text-slate-900">Daftar Guru &amp; Tenaga Pendidik</h4>
@@ -1386,7 +1485,7 @@
                     </select>
                     <div class="relative w-48 sm:w-56">
                       <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                      <input type="text" id="search-guru" oninput="renderPesertaAccountsTable()" placeholder="Cari nama, user, mapel..."
+                      <input type="text" id="search-guru" oninput="renderPesertaAccountsTable()" placeholder="Cari nama, NIP, mapel..."
                              class="w-full pl-9 pr-3.5 py-1.5 rounded-full border border-slate-200 text-xs font-medium focus:border-teal-600 focus:outline-none" />
                     </div>
                   </div>
@@ -1397,11 +1496,11 @@
                     <thead>
                       <tr class="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
                         <th class="py-3 px-3">No</th>
-                        <th class="py-3 px-3">Username</th>
-                        <th class="py-3 px-3">Nama Lengkap &amp; Gelar</th>
-                        <th class="py-3 px-3">Peran</th>
-                        <th class="py-3 px-3">Mapel / Kelas</th>
-                        <th class="py-3 px-3">Password</th>
+                        <th class="py-3 px-3">Nama &amp; Identitas</th>
+                        <th class="py-3 px-3">Hak Akses</th>
+                        <th class="py-3 px-3">Status</th>
+                        <th class="py-3 px-3">Jabatan &amp; Mapel</th>
+                        <th class="py-3 px-3">Sandi</th>
                         <th class="py-3 px-3 text-center">Aksi</th>
                       </tr>
                     </thead>
@@ -2323,7 +2422,8 @@
         // 1. Cek kecocokan pada daftar akun lokal/Firestore (users_peserta)
         const foundAccount = (pesertaAccounts || []).find(
           u => ((u.username && u.username.toLowerCase() === rawIdentifier.toLowerCase()) ||
-                (u.email && u.email.toLowerCase() === rawIdentifier.toLowerCase())) &&
+                (u.email && u.email.toLowerCase() === rawIdentifier.toLowerCase()) ||
+                (u.nomorId && String(u.nomorId).trim() === rawIdentifier.trim())) &&
                u.password === pass
         );
 
@@ -3812,9 +3912,12 @@
       const filterRole = document.getElementById('filter-guru-role')?.value || 'ALL';
 
       const filtered = (pesertaAccounts || []).filter(acc => {
+        const mapelStr = Array.isArray(acc.mapelDiampu) ? acc.mapelDiampu.join(' ').toLowerCase() : (acc.mapelDiampu || '').toLowerCase();
         const matchKey = (acc.nama || '').toLowerCase().includes(keyword) ||
                          (acc.username || '').toLowerCase().includes(keyword) ||
-                         (acc.kelas || '').toLowerCase().includes(keyword);
+                         (acc.nomorId || '').toLowerCase().includes(keyword) ||
+                         (acc.jabatan || acc.kelas || '').toLowerCase().includes(keyword) ||
+                         mapelStr.includes(keyword);
         const matchRole = filterRole === 'ALL' || acc.role === filterRole;
         return matchKey && matchRole;
       });
@@ -3824,46 +3927,74 @@
       const countAdmin = (pesertaAccounts || []).filter(p => p.role === 'admin').length;
       const guruStats = document.getElementById('guru-stats-info');
       if (guruStats) {
-        guruStats.textContent = `Total: ${pesertaAccounts.length} Pendidik (Guru Mapel: ${countGuruMapel}, Wali Kelas: ${countWali}, Admin: ${countAdmin})`;
+        guruStats.textContent = `Total: ${pesertaAccounts.length} Pendidik (Guru: ${countGuruMapel}, Wali Kelas: ${countWali}, Admin: ${countAdmin})`;
       }
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400 font-semibold">Belum ada data guru / tenaga pendidik.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400 font-semibold">Belum ada data guru / tenaga pendidik yang cocok.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = filtered.map((acc, idx) => {
         let roleBadge = 'bg-cyan-100 text-cyan-800';
-        let roleLabel = 'Guru Mapel';
+        let roleLabel = 'Guru';
         if (acc.role === 'admin') {
           roleBadge = 'bg-violet-100 text-violet-700';
           roleLabel = 'Administrator';
         } else if (acc.role === 'wali_kelas') {
           roleBadge = 'bg-emerald-100 text-emerald-800';
           roleLabel = 'Wali Kelas';
-        } else if (acc.role === 'guru_mapel') {
+        } else if (acc.role === 'guru_mapel' || acc.role === 'guru') {
           roleBadge = 'bg-cyan-100 text-cyan-800';
           roleLabel = 'Guru Mapel';
+        }
+
+        const mapels = Array.isArray(acc.mapelDiampu) ? acc.mapelDiampu : (acc.mapelDiampu ? String(acc.mapelDiampu).split(',').map(s => s.trim()) : []);
+        const mapelPills = mapels.length > 0
+          ? `<div class="flex flex-wrap gap-1 mt-1">${mapels.map(m => `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">${m}</span>`).join('')}</div>`
+          : '';
+
+        let statusBadge = 'bg-slate-100 text-slate-700';
+        const st = (acc.statusGuru || 'Belum Sertifikasi').toLowerCase();
+        if (st.includes('sudah')) {
+          statusBadge = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+        } else if (st.includes('pns') || st.includes('pppk')) {
+          statusBadge = 'bg-blue-100 text-blue-800 border border-blue-200';
+        } else {
+          statusBadge = 'bg-amber-50 text-amber-800 border border-amber-200';
         }
 
         return `
           <tr class="hover:bg-slate-50 transition">
             <td class="py-3 px-3 font-bold text-slate-500">${idx + 1}</td>
-            <td class="py-3 px-3 font-mono font-bold text-slate-800">${acc.username}</td>
-            <td class="py-3 px-3 font-extrabold text-slate-900">${acc.nama}</td>
+            <td class="py-3 px-3">
+              <div class="font-extrabold text-slate-900">${acc.nama}</div>
+              <div class="text-[11px] text-slate-500 font-mono flex flex-wrap items-center gap-1.5 mt-0.5">
+                <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[10px]">${acc.jenisId || 'ID'}: ${acc.nomorId || '-'}</span>
+                <span>User: <strong class="text-slate-700">${acc.username}</strong></span>
+              </div>
+            </td>
             <td class="py-3 px-3">
               <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${roleBadge}">
                 ${roleLabel}
               </span>
             </td>
-            <td class="py-3 px-3 text-slate-600">${acc.kelas || '-'}</td>
+            <td class="py-3 px-3">
+              <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${statusBadge}">
+                ${acc.statusGuru || 'Belum Sertifikasi'}
+              </span>
+            </td>
+            <td class="py-3 px-3">
+              <div class="font-semibold text-slate-800">${acc.jabatan || acc.kelas || '-'}</div>
+              ${mapelPills}
+            </td>
             <td class="py-3 px-3 font-mono text-slate-500">${acc.password}</td>
             <td class="py-3 px-3 text-center">
               <div class="flex items-center justify-center gap-1.5">
-                <button onclick="editPesertaAccount('${acc.id}')" class="w-7 h-7 rounded-lg bg-teal-50 hover:bg-teal-600 text-teal-600 hover:text-white flex items-center justify-center transition" title="Edit">
+                <button onclick="editPesertaAccount('${acc.id}')" class="w-7 h-7 rounded-lg bg-teal-50 hover:bg-teal-600 text-teal-600 hover:text-white flex items-center justify-center transition" title="Edit Data Guru">
                   <i class="fa-solid fa-pen text-[11px]"></i>
                 </button>
-                <button onclick="deletePesertaAccount('${acc.id}')" class="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white flex items-center justify-center transition" title="Hapus">
+                <button onclick="deletePesertaAccount('${acc.id}')" class="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white flex items-center justify-center transition" title="Hapus Data Guru">
                   <i class="fa-solid fa-trash text-[11px]"></i>
                 </button>
               </div>
@@ -3873,24 +4004,65 @@
       }).join('');
     };
 
+    window.handleGuruRoleChange = function() {
+      const role = document.getElementById('acc-role')?.value;
+      const secMapel = document.getElementById('section-mapel-diampu');
+      if (!secMapel) return;
+      if (role === 'admin') {
+        secMapel.classList.add('opacity-50');
+      } else {
+        secMapel.classList.remove('opacity-50');
+      }
+    };
+
     window.handleSavePesertaAccount = async function(e) {
       e.preventDefault();
       const editId = document.getElementById('acc-edit-id').value;
-      const username = document.getElementById('acc-username').value.trim();
       const nama = document.getElementById('acc-nama').value.trim();
-      const kelas = document.getElementById('acc-kelas').value.trim();
+      const jenisId = document.getElementById('acc-jenis-id').value;
+      let rawNomorId = document.getElementById('acc-nomor-id').value.trim();
+      if (rawNomorId.endsWith('.0')) rawNomorId = rawNomorId.slice(0, -2);
+      const nomorId = rawNomorId;
+      const statusGuru = document.getElementById('acc-status-guru').value;
+      const jabatan = document.getElementById('acc-jabatan').value.trim();
       const role = document.getElementById('acc-role').value;
-      const password = document.getElementById('acc-password').value.trim();
+      const password = document.getElementById('acc-password').value.trim() || 'user123';
 
-      if (!username || !nama || !password) {
-        showToast('Mohon lengkapi Username, Nama, dan Password.', 'error');
+      const checkedMapel = Array.from(document.querySelectorAll('input[name="acc-mapel"]:checked')).map(cb => cb.value);
+
+      if (!nama) {
+        showToast('Mohon lengkapi Nama Lengkap & Gelar guru.', 'error');
         return;
+      }
+
+      // Tentukan username login unik
+      let username = document.getElementById('acc-username').value.trim();
+      if (!username) {
+        if (nomorId) {
+          username = nomorId;
+        } else {
+          username = nama.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').substring(0, 16);
+          if (!username) username = 'guru_' + Date.now().toString().slice(-4);
+        }
       }
 
       const existingIdx = pesertaAccounts.findIndex(a => a.id === editId || a.username.toLowerCase() === username.toLowerCase());
       const id = existingIdx >= 0 ? pesertaAccounts[existingIdx].id : 'usr_' + Date.now();
 
-      const obj = { id, username, nama, kelas, role, password };
+      const obj = {
+        id,
+        username,
+        nama,
+        jenisId,
+        nomorId,
+        statusGuru,
+        jabatan: jabatan || (checkedMapel.length > 0 ? checkedMapel.join(', ') : 'Guru Mapel'),
+        kelas: jabatan || (checkedMapel.length > 0 ? checkedMapel.join(', ') : 'Guru Mapel'),
+        role,
+        password,
+        mapelDiampu: checkedMapel
+      };
+
       if (existingIdx >= 0) {
         pesertaAccounts[existingIdx] = obj;
       } else {
@@ -3908,11 +4080,22 @@
       const acc = pesertaAccounts.find(a => a.id === id);
       if (!acc) return;
       document.getElementById('acc-edit-id').value = acc.id;
-      document.getElementById('acc-username').value = acc.username;
-      document.getElementById('acc-nama').value = acc.nama;
-      document.getElementById('acc-kelas').value = acc.kelas;
-      document.getElementById('acc-role').value = acc.role;
-      document.getElementById('acc-password').value = acc.password;
+      document.getElementById('acc-username').value = acc.username || '';
+      document.getElementById('acc-nama').value = acc.nama || '';
+      document.getElementById('acc-jenis-id').value = acc.jenisId || 'NIP';
+      document.getElementById('acc-nomor-id').value = acc.nomorId || '';
+      document.getElementById('acc-status-guru').value = acc.statusGuru || 'Belum Sertifikasi';
+      document.getElementById('acc-jabatan').value = acc.jabatan || acc.kelas || '';
+      document.getElementById('acc-password').value = acc.password || 'user123';
+      document.getElementById('acc-role').value = acc.role || 'guru_mapel';
+
+      const mapels = Array.isArray(acc.mapelDiampu) ? acc.mapelDiampu : (acc.mapelDiampu ? String(acc.mapelDiampu).split(',').map(s => s.trim()) : []);
+      document.querySelectorAll('input[name="acc-mapel"]').forEach(cb => {
+        cb.checked = mapels.includes(cb.value);
+      });
+
+      handleGuruRoleChange();
+
       document.getElementById('peserta-form-title').textContent = `Edit Guru: ${acc.nama}`;
       document.getElementById('btn-save-guru-label').textContent = 'Perbarui Data Guru';
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3922,10 +4105,20 @@
       document.getElementById('acc-edit-id').value = '';
       document.getElementById('acc-username').value = '';
       document.getElementById('acc-nama').value = '';
-      document.getElementById('acc-kelas').value = '';
+      document.getElementById('acc-jenis-id').value = 'NIP';
+      document.getElementById('acc-nomor-id').value = '';
+      document.getElementById('acc-status-guru').value = 'Belum Sertifikasi';
+      document.getElementById('acc-jabatan').value = '';
+      document.getElementById('acc-password').value = 'user123';
       document.getElementById('acc-role').value = 'guru_mapel';
-      document.getElementById('acc-password').value = 'guru123';
-      document.getElementById('peserta-form-title').textContent = 'Tambah Guru / Admin';
+
+      document.querySelectorAll('input[name="acc-mapel"]').forEach(cb => {
+        cb.checked = false;
+      });
+
+      handleGuruRoleChange();
+
+      document.getElementById('peserta-form-title').textContent = 'Tambah Guru / Tenaga Pendidik';
       document.getElementById('btn-save-guru-label').textContent = 'Simpan Data Guru';
     };
 
@@ -3946,14 +4139,59 @@
 
     // TEMPLATE GURU EXCEL
     window.exportGuruTemplate = function() {
-      const header = ['Username', 'Nama Lengkap & Gelar', 'Peran (guru_mapel / wali_kelas / admin)', 'Mata Pelajaran atau Kelas', 'Password'];
+      const header = [
+        'Nama Lengkap & Gelar',
+        'Jenis ID (NIP/NUPTK/PegID/NIK/Lainnya)',
+        'Nomor Identitas',
+        'Status Guru (Belum Sertifikasi/Sudah Sertifikasi/PNS/PPPK/GTT)',
+        'Jabatan / Tugas',
+        'Sandi Portal Guru',
+        'Hak Akses (guru_mapel / wali_kelas / admin)',
+        'Mapel yang Diampu (pisahkan koma)'
+      ];
       const sample = [
-        ['ridwan', 'Ust. H. M. Ridwan, S.Pd.I', 'guru_mapel', 'Al-Qur\'an Hadis', 'guru123'],
-        ['aminah', 'Hj. Siti Aminah, M.Pd', 'wali_kelas', 'Kelas VI-A', 'guru123'],
-        ['budi', 'Budi Santoso, S.Pd', 'guru_mapel', 'Matematika', 'guru123']
+        [
+          'Ust. H. ACHMAD FADILLAH, S.Sos',
+          'NIP',
+          '198501012010011001',
+          'Belum Sertifikasi',
+          'Guru Mapel PAI',
+          'user123',
+          'guru_mapel',
+          'Al Qur\'an Hadis, Akidah Akhlak, Fikih'
+        ],
+        [
+          'Hj. Siti Aminah, M.Pd',
+          'NUPTK',
+          '4539760662200002',
+          'Sudah Sertifikasi',
+          'Wali Kelas VI-A',
+          'user123',
+          'wali_kelas',
+          'Pend. Pancasila, Bahasa Indonesia'
+        ],
+        [
+          'Budi Santoso, S.Pd',
+          'PegID',
+          '3201020304050001',
+          'Belum Sertifikasi',
+          'Guru Mapel',
+          'user123',
+          'guru_mapel',
+          'Matematika, IPAS, PJOK'
+        ]
       ];
       const ws = XLSX.utils.aoa_to_sheet([header, ...sample]);
-      ws['!cols'] = [{ wch: 16 }, { wch: 30 }, { wch: 34 }, { wch: 24 }, { wch: 16 }];
+      ws['!cols'] = [
+        { wch: 32 },
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 24 },
+        { wch: 24 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 40 }
+      ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Template Guru');
       XLSX.writeFile(wb, 'Template_Data_Guru.xlsx');
@@ -3970,23 +4208,52 @@
         ['DATA TENAGA PENDIDIK & GURU MADRASAH'],
         ['Tanggal Unduh', new Date().toLocaleDateString('id-ID'), 'Total Guru', pesertaAccounts.length],
         [],
-        ['No', 'Username', 'Nama Lengkap & Gelar', 'Peran', 'Mapel / Kelas', 'Password']
+        [
+          'No',
+          'Nama Lengkap & Gelar',
+          'Jenis ID',
+          'Nomor Identitas',
+          'Username Login',
+          'Status Guru',
+          'Jabatan / Tugas',
+          'Hak Akses / Peran',
+          'Mapel yang Diampu',
+          'Sandi Portal'
+        ]
       ];
       pesertaAccounts.forEach((acc, idx) => {
-        let rName = 'Guru Mapel';
+        let rName = 'Guru (User Biasa)';
         if (acc.role === 'admin') rName = 'Administrator';
         else if (acc.role === 'wali_kelas') rName = 'Wali Kelas';
+
+        const mapelStr = Array.isArray(acc.mapelDiampu) ? acc.mapelDiampu.join(', ') : (acc.mapelDiampu || '-');
+
         data.push([
           idx + 1,
-          acc.username,
           acc.nama,
+          acc.jenisId || 'NIP',
+          acc.nomorId || '-',
+          acc.username,
+          acc.statusGuru || 'Belum Sertifikasi',
+          acc.jabatan || acc.kelas || '-',
           rName,
-          acc.kelas || '-',
+          mapelStr,
           acc.password
         ]);
       });
       const ws = XLSX.utils.aoa_to_sheet(data);
-      ws['!cols'] = [{ wch: 8 }, { wch: 16 }, { wch: 30 }, { wch: 20 }, { wch: 22 }, { wch: 16 }];
+      ws['!cols'] = [
+        { wch: 8 },
+        { wch: 32 },
+        { wch: 12 },
+        { wch: 22 },
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 24 },
+        { wch: 20 },
+        { wch: 36 },
+        { wch: 16 }
+      ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Data Guru');
       XLSX.writeFile(wb, 'Data_Guru_Madrasah.xlsx');
@@ -4026,9 +4293,9 @@
           for (let i = 0; i < Math.min(rows.length, 10); i++) {
             if (!rows[i] || !Array.isArray(rows[i])) continue;
             const rowStr = rows[i].map(x => String(x || '').toLowerCase()).join(' ');
-            const hasUser = rowStr.includes('user') || rowStr.includes('nip') || rowStr.includes('akun');
+            const hasUser = rowStr.includes('user') || rowStr.includes('nip') || rowStr.includes('akun') || rowStr.includes('identitas');
             const hasNama = rowStr.includes('nama') || rowStr.includes('guru');
-            if ((hasUser && hasNama) || (hasNama && (rowStr.includes('peran') || rowStr.includes('role') || rowStr.includes('mapel') || rowStr.includes('kelas') || rowStr.includes('pass')))) {
+            if ((hasUser && hasNama) || (hasNama && (rowStr.includes('peran') || rowStr.includes('role') || rowStr.includes('mapel') || rowStr.includes('kelas') || rowStr.includes('pass') || rowStr.includes('sandi')))) {
               headerIdx = i;
               break;
             }
@@ -4036,25 +4303,21 @@
 
           if (headerIdx === -1) headerIdx = 0;
           const header = (rows[headerIdx] || []).map(x => String(x || '').toLowerCase().trim());
-          let userCol = header.findIndex(h => h.includes('user') || h.includes('nip') || h.includes('akun') || h.includes('id'));
-          let namaCol = header.findIndex(h => h.includes('nama') || h.includes('guru') || h.includes('lengkap'));
-          let roleCol = header.findIndex(h => h.includes('peran') || h.includes('role') || h.includes('jabatan') || h.includes('tugas'));
-          let kelasCol = header.findIndex(h => h.includes('mapel') || h.includes('kelas') || h.includes('mata pelajaran'));
-          let passCol = header.findIndex(h => h.includes('pass') || h.includes('sandi') || h.includes('password'));
+          
+          let namaCol = header.findIndex(h => h.includes('nama'));
+          let jenisIdCol = header.findIndex(h => h.includes('jenis'));
+          let nomorIdCol = header.findIndex(h => h.includes('nomor') || h.includes('identitas') || h.includes('nip') || h.includes('nuptk'));
+          let statusCol = header.findIndex(h => h.includes('status') || h.includes('sertifikasi'));
+          let jabatanCol = header.findIndex(h => h.includes('jabatan') || h.includes('tugas') || h.includes('mapel atau') || h.includes('mata pelajaran'));
+          let passCol = header.findIndex(h => h.includes('pass') || h.includes('sandi'));
+          let roleCol = header.findIndex(h => h.includes('peran') || h.includes('role') || h.includes('hak akses'));
+          let mapelDiampuCol = header.findIndex(h => h.includes('diampu') || h.includes('mata pelajaran'));
+          let userCol = header.findIndex(h => h.includes('username') || h.includes('user login'));
 
-          if (userCol === -1 && namaCol === -1) {
-            userCol = 0;
-            namaCol = 1;
-            roleCol = 2;
-            kelasCol = 3;
-            passCol = 4;
-          } else {
-            if (namaCol === -1) {
-              namaCol = [0, 1, 2, 3, 4].find(c => c !== userCol && c !== roleCol && c !== kelasCol && c !== passCol) ?? 1;
-            }
-            if (userCol === -1) {
-              userCol = [0, 1, 2, 3, 4].find(c => c !== namaCol && c !== roleCol && c !== kelasCol && c !== passCol) ?? 0;
-            }
+          // Fallbacks jika nama kolom format lama
+          if (namaCol === -1) namaCol = 0;
+          if (userCol === -1 && nomorIdCol === -1) {
+            userCol = [0, 1, 2, 3].find(c => c !== namaCol && c !== passCol && c !== roleCol) ?? -1;
           }
 
           let importedCount = 0;
@@ -4064,27 +4327,53 @@
             const row = rows[i];
             if (!row || !Array.isArray(row)) continue;
 
-            const username = String(userCol >= 0 ? (row[userCol] ?? '') : '').trim();
             const nama = String(namaCol >= 0 ? (row[namaCol] ?? '') : '').trim();
-            const rawRole = String(roleCol >= 0 ? (row[roleCol] ?? '') : '').toLowerCase().trim();
-            const kelas = String(kelasCol >= 0 ? (row[kelasCol] ?? 'Guru Mapel') : 'Guru Mapel').trim() || 'Guru Mapel';
-            const password = String(passCol >= 0 ? (row[passCol] ?? 'guru123') : 'guru123').trim() || 'guru123';
+            const jenisId = String(jenisIdCol >= 0 ? (row[jenisIdCol] ?? 'NIP') : 'NIP').trim() || 'NIP';
+            
+            let rawNomorId = String(nomorIdCol >= 0 ? (row[nomorIdCol] ?? '') : '').trim();
+            if (rawNomorId.endsWith('.0')) rawNomorId = rawNomorId.slice(0, -2);
+            const nomorId = rawNomorId;
 
-            if (!username && !nama) continue;
+            const statusGuru = String(statusCol >= 0 ? (row[statusCol] ?? 'Belum Sertifikasi') : 'Belum Sertifikasi').trim() || 'Belum Sertifikasi';
+            const jabatan = String(jabatanCol >= 0 ? (row[jabatanCol] ?? 'Guru Mapel') : 'Guru Mapel').trim() || 'Guru Mapel';
+            const password = String(passCol >= 0 ? (row[passCol] ?? 'user123') : 'user123').trim() || 'user123';
+            const rawRole = String(roleCol >= 0 ? (row[roleCol] ?? '') : '').toLowerCase().trim();
+            
+            let rawMapelDiampu = String(mapelDiampuCol >= 0 ? (row[mapelDiampuCol] ?? '') : '').trim();
+            const mapelDiampu = rawMapelDiampu ? rawMapelDiampu.split(',').map(m => m.trim()).filter(Boolean) : [];
+
+            let rawUser = String(userCol >= 0 ? (row[userCol] ?? '') : '').trim();
+            if (!nama && !rawUser && !nomorId) continue;
 
             let role = 'guru_mapel';
             if (rawRole.includes('admin')) {
               role = 'admin';
             } else if (rawRole.includes('wali')) {
               role = 'wali_kelas';
-            } else if (rawRole.includes('mapel') || rawRole.includes('guru')) {
+            } else if (rawRole.includes('mapel') || rawRole.includes('guru') || rawRole.includes('biasa')) {
               role = 'guru_mapel';
             }
 
-            const finalUsername = (username || ('guru_' + i)).toLowerCase();
-            const existingIdx = pesertaAccounts.findIndex(a => (a.username || '').toLowerCase() === finalUsername);
+            const finalUsername = (rawUser || nomorId || (nama ? nama.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 16) : '') || ('guru_' + i)).toLowerCase();
+            const existingIdx = pesertaAccounts.findIndex(a => 
+              (a.username && a.username.toLowerCase() === finalUsername) || 
+              (nomorId && a.nomorId && String(a.nomorId).trim() === nomorId)
+            );
             const id = existingIdx >= 0 ? pesertaAccounts[existingIdx].id : 'usr_' + Date.now() + '_' + i;
-            const obj = { id, username: finalUsername, nama: nama || finalUsername, kelas, role, password };
+            
+            const obj = {
+              id,
+              username: finalUsername,
+              nama: nama || finalUsername,
+              jenisId,
+              nomorId,
+              statusGuru,
+              jabatan: jabatan || (mapelDiampu.length > 0 ? mapelDiampu.join(', ') : 'Guru Mapel'),
+              kelas: jabatan || (mapelDiampu.length > 0 ? mapelDiampu.join(', ') : 'Guru Mapel'),
+              role,
+              password,
+              mapelDiampu
+            };
 
             if (existingIdx >= 0) {
               pesertaAccounts[existingIdx] = obj;
