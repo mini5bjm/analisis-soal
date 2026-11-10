@@ -741,28 +741,98 @@
           <section id="view-paket" class="view-section hidden space-y-6">
             <div class="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <span class="text-xs font-extrabold uppercase tracking-[0.2em] text-teal-600">KONFIGURASI INSTRUMEN</span>
+                <span class="text-xs font-extrabold uppercase tracking-[0.2em] text-teal-600">KONFIGURASI INSTRUMEN SOAL</span>
                 <h3 class="text-xl font-extrabold text-slate-900">Master Paket Ujian &amp; Kunci Jawaban</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Kelola paket penilaian (SAS, SAT, Ujian Madrasah) untuk 13 mata pelajaran kurikulum madrasah.</p>
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <button type="button" onclick="openModalGenerate13Mapel()" class="px-4 py-2.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold shadow-md flex items-center gap-2 transition" title="Buat otomatis 13 mapel sekaligus">
-                  <i class="fa-solid fa-bolt"></i>
-                  <span>Generate Otomatis 13 Mapel</span>
-                </button>
-                <button type="button" onclick="openModalCreateExam()" class="px-4 py-2.5 rounded-full bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md flex items-center gap-2 transition">
-                  <i class="fa-solid fa-plus"></i>
-                  <span>Buat Paket Ujian Baru</span>
-                </button>
-                <button type="button" onclick="confirmClearAllExams()" class="px-3.5 py-2.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 flex items-center gap-1.5 transition" title="Hapus Semua Paket">
-                  <i class="fa-solid fa-trash-can"></i>
-                  <span>Bersihkan Semua</span>
-                </button>
+                <p class="text-xs text-slate-500 mt-0.5">Pilih jenis asesmen dan ceklist mata pelajaran yang diampu untuk mengaktifkan kunci soal.</p>
               </div>
             </div>
 
-            <!-- List of Exam Packages -->
-            <div id="exam-packages-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            <!-- PILIH DROPDOWN & CEKLIST MAPEL YANG DIAMPU -->
+            <div class="gyan-card rounded-3xl p-5 sm:p-7 space-y-5 bg-gradient-to-r from-teal-50/80 via-emerald-50/50 to-cyan-50/80 border border-teal-200/90 shadow-sm">
+              <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center text-xs shadow-sm">
+                      <i class="fa-solid fa-list-check"></i>
+                    </span>
+                    <div>
+                      <span class="text-[10px] font-extrabold uppercase tracking-widest text-teal-700">PILIHAN INSTRUMEN SOAL</span>
+                      <h4 class="text-base font-extrabold text-slate-900" id="paket-picker-heading">Pilih Dropdown atau Ceklist Mapel</h4>
+                    </div>
+                  </div>
+                  <p class="text-xs text-slate-600 mt-1 max-w-xl" id="paket-picker-sub">
+                    Pilih jenis asesmen dan ceklist mata pelajaran yang diampu. Paket soal akan langsung aktif dan kunci siap diedit tanpa perlu mengetik manual.
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                  <!-- Pilihan Jenis Asesmen (SAS, SAT, UM, PH, ATS) -->
+                  <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1">
+                      <i class="fa-solid fa-calendar-check text-teal-600 mr-1"></i>Jenis Asesmen:
+                    </label>
+                    <select id="paket-filter-jenis" onchange="handlePaketFilterChange()"
+                            class="px-3.5 py-2.5 rounded-xl border border-teal-300 text-xs font-extrabold bg-white text-slate-800 focus:outline-none focus:border-teal-600 shadow-sm cursor-pointer">
+                      <option value="Sumatif Akhir Semester (SAS)" selected>Sumatif Akhir Semester (SAS)</option>
+                      <option value="Sumatif Akhir Tahun (SAT)">Sumatif Akhir Tahun (SAT)</option>
+                      <option value="Ujian Madrasah (UM)">Ujian Madrasah (UM)</option>
+                      <option value="Penilaian Harian (PH)">Penilaian Harian (PH)</option>
+                      <option value="Asesmen Tengah Semester (ATS)">Asesmen Tengah Semester (ATS)</option>
+                    </select>
+                  </div>
+
+                  <!-- Pilihan Tingkat Kelas -->
+                  <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1">
+                      <i class="fa-solid fa-school text-teal-600 mr-1"></i>Tingkat Kelas:
+                    </label>
+                    <select id="paket-filter-kelas" onchange="handlePaketFilterChange()"
+                            class="px-3.5 py-2.5 rounded-xl border border-teal-300 text-xs font-extrabold bg-white text-slate-800 focus:outline-none focus:border-teal-600 shadow-sm cursor-pointer">
+                      <option value="Kelas 1">Kelas 1</option>
+                      <option value="Kelas 2">Kelas 2</option>
+                      <option value="Kelas 3">Kelas 3</option>
+                      <option value="Kelas 4">Kelas 4</option>
+                      <option value="Kelas 5">Kelas 5</option>
+                      <option value="Kelas 6" selected>Kelas 6</option>
+                    </select>
+                  </div>
+
+                  <!-- Dropdown Pemilihan Paket Ujian Cepat -->
+                  <div class="min-w-[240px]">
+                    <label class="block text-[11px] font-extrabold text-slate-700 mb-1">
+                      <i class="fa-solid fa-folder-open text-teal-600 mr-1"></i>Pilih via Dropdown:
+                    </label>
+                    <select id="paket-select-dropdown" onchange="handleSelectExamFromDropdown(this.value)"
+                            class="w-full px-3.5 py-2.5 rounded-xl border border-teal-300 text-xs font-extrabold bg-white text-teal-900 focus:outline-none focus:border-teal-600 shadow-sm cursor-pointer truncate">
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bagian Ceklist Mapel yang Diampu -->
+              <div class="border-t border-teal-200/70 pt-3 space-y-2.5">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <span class="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                    <i class="fa-solid fa-square-check text-teal-600"></i>
+                    <span id="label-checklist-mapel">Ceklist Mapel yang Diampu:</span>
+                  </span>
+                  <div id="admin-mapel-batch-actions" class="hidden items-center gap-2">
+                    <button type="button" onclick="batchCheckAll13Mapel(true)" class="px-3 py-1.5 rounded-xl bg-teal-100 hover:bg-teal-200 text-teal-800 text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                      <i class="fa-solid fa-check-double"></i>
+                      <span>Centang Semua 13 Mapel</span>
+                    </button>
+                    <button type="button" onclick="batchCheckAll13Mapel(false)" class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition flex items-center gap-1.5 border border-rose-200">
+                      <i class="fa-solid fa-trash-can"></i>
+                      <span>Hapus Semua Paket</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Grid of Interactive Checklist Mapel Pills -->
+                <div id="container-mapel-pills" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 pt-1">
+                </div>
+              </div>
+            </div>
 
             <!-- Active Exam Key Editor Form -->
             <div class="gyan-card rounded-3xl p-6 sm:p-8 space-y-6">
@@ -975,20 +1045,26 @@
                     <div id="ans-info-score-status"></div>
                   </div>
 
-                  <!-- Dropdown Pilihan Paket Ujian Aktif (Cukup Pilih Tanpa Ketik Manual) -->
-                  <div class="p-3 rounded-xl bg-white/90 border border-teal-200/90 flex flex-wrap items-center justify-between gap-2.5">
-                    <div class="flex items-center gap-2 flex-1 min-w-[260px]">
-                      <label for="input-select-exam" class="text-xs font-extrabold text-slate-800 whitespace-nowrap flex items-center gap-1.5">
-                        <i class="fa-solid fa-folder-open text-teal-600"></i>
-                        <span>Paket Ujian:</span>
-                      </label>
-                      <select id="input-select-exam" onchange="handleChangeActiveExam(this.value)"
-                              class="w-full px-3 py-2 rounded-xl border border-teal-300 text-xs font-extrabold bg-teal-50/50 text-teal-900 focus:outline-none focus:border-teal-600 shadow-sm cursor-pointer truncate">
-                      </select>
+                  <!-- Dropdown & Quick Mapel Pills Pilihan Paket Ujian (Mapel yang Diampu) -->
+                  <div class="p-3.5 rounded-2xl bg-white/95 border border-teal-200/90 space-y-2.5 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-2.5">
+                      <div class="flex items-center gap-2">
+                        <span class="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center text-xs shadow">
+                          <i class="fa-solid fa-folder-open"></i>
+                        </span>
+                        <div>
+                          <h5 class="text-xs font-extrabold text-slate-900">Pilih Paket Ujian (Mapel yang Diampu)</h5>
+                          <p class="text-[11px] text-slate-500">Pilih dari dropdown atau klik tombol mapel di bawah ini</p>
+                        </div>
+                      </div>
+                      <div class="w-full sm:w-auto">
+                        <select id="input-select-exam" onchange="handleSelectExamFromDropdown(this.value)"
+                                class="w-full sm:w-80 px-3.5 py-2 rounded-xl border border-teal-300 text-xs font-extrabold bg-teal-50/60 text-teal-950 focus:outline-none focus:border-teal-600 shadow-sm cursor-pointer truncate">
+                        </select>
+                      </div>
                     </div>
-                    <span class="text-[11px] font-semibold text-slate-500 hidden sm:inline">
-                      Guru cukup memilih paket di atas tanpa mengetik manual
-                    </span>
+                    <!-- Quick Mapel Pills -->
+                    <div id="input-mapel-quick-pills" class="flex flex-wrap gap-2 pt-1"></div>
                   </div>
 
                   <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
@@ -3646,63 +3722,344 @@
         `Hasil Analisis: ${baikCount} Diterima, ${revisi} Perlu Direvisi, dan ${buang} Dibuang/Diganti.`;
     }
 
-    function renderExamConfigView() {
-      const exam = getActiveExam();
-      const grid = document.getElementById('exam-packages-grid');
-      const formCard = document.getElementById('form-key-editor')?.closest('.gyan-card');
-      const userExams = getUserExams();
+    // =========================================================
+    // 7A. DAFTAR 13 MAPEL MADRASAH & SELEKSI CEKLIST GURU
+    // =========================================================
+    const DAFTAR_MAPEL_MADRASAH = [
+      "Al Qur'an Hadis",
+      "Baca Tulis Al Qur'an",
+      "Akidah Akhlak",
+      "Fikih",
+      "SKI",
+      "Bahasa Arab",
+      "Pend. Pancasila",
+      "Bahasa Indonesia",
+      "Matematika",
+      "IPAS",
+      "PJOK",
+      "Seni Budaya",
+      "Bahasa Inggris"
+    ];
 
-      if (!userExams || userExams.length === 0) {
-        if (grid) {
-          grid.innerHTML = `
-            <div class="col-span-full p-8 text-center bg-white rounded-3xl border border-dashed border-slate-300">
-              <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center mx-auto mb-3 text-xl">
-                <i class="fa-solid fa-folder-open"></i>
-              </div>
-              <h4 class="text-base font-extrabold text-slate-800">Belum Ada Paket Ujian untuk Akun Anda</h4>
-              <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">Klik tombol <strong>"Buat Paket Ujian Baru"</strong> di atas untuk membuat instrumen soal pilihan ganda, benar/salah, isian, atau uraian.</p>
-            </div>
-          `;
-        }
-        if (formCard) formCard.classList.add('hidden');
+    function getTeacherAllowedMapels() {
+      if (!currentUser || currentUser.role === 'admin') {
+        return DAFTAR_MAPEL_MADRASAH;
+      }
+      const mapels = Array.isArray(currentUser.mapelDiampu)
+        ? currentUser.mapelDiampu
+        : (currentUser.mapelDiampu ? String(currentUser.mapelDiampu).split(',').map(s => s.trim()) : []);
+
+      const cleaned = mapels.map(m => m.trim()).filter(Boolean);
+      if (cleaned.length > 0) return cleaned;
+
+      // Fallback jika belum dicentang: cek jabatan guru
+      const jabatan = (currentUser.jabatan || currentUser.kelas || '').toLowerCase();
+      const matched = DAFTAR_MAPEL_MADRASAH.filter(m => jabatan.includes(m.toLowerCase()));
+      if (matched.length > 0) return matched;
+
+      // Jika wali kelas, default ke 13 mapel
+      if (currentUser.role === 'wali_kelas') {
+        return DAFTAR_MAPEL_MADRASAH;
+      }
+      return DAFTAR_MAPEL_MADRASAH;
+    }
+
+    function getOrCreateExamForMapel(mapelName, jenisAsesmen, tingkatKelas) {
+      const jenis = jenisAsesmen || document.getElementById('paket-filter-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
+      const kelas = tingkatKelas || document.getElementById('paket-filter-kelas')?.value || (currentUser?.kelas || 'Kelas 6');
+      const jenisKey = (jenis.match(/\(([^)]+)\)/)?.[1] || jenis).toLowerCase();
+
+      let exam = (paketUjianList || []).find(p => {
+        const matchMapel = (p.mapel || '').toLowerCase().trim() === mapelName.toLowerCase().trim();
+        const matchKelas = (p.kelas || '').toLowerCase().trim() === kelas.toLowerCase().trim();
+        const titleLower = (p.judulUjian || '').toLowerCase();
+        const matchJenis = titleLower.includes(jenisKey) || titleLower.includes(jenis.toLowerCase());
+        return matchMapel && matchKelas && matchJenis;
+      });
+
+      if (!exam) {
+        const newId = `ujian_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        exam = {
+          id: newId,
+          judulUjian: `${mapelName} - ${jenis}`,
+          mapel: mapelName,
+          kelas: kelas,
+          tahunAjaran: '2026/2027',
+          kkm: 75,
+          guruMapel: currentUser?.role === 'guru_mapel' ? currentUser.nama : (currentUser?.nama || 'Guru Mapel'),
+          waliKelas: currentUser?.role === 'wali_kelas' ? currentUser.nama : 'Wali Kelas',
+          tanggal: new Date().toISOString().split('T')[0],
+          pgKunci: [],
+          pgBobot: '',
+          bsKunci: [],
+          bsBobot: '',
+          isianKunci: [],
+          isianMaks: [],
+          uraianMaks: []
+        };
+        paketUjianList.push(exam);
+        saveDocToCloud('paket_ujian', newId, exam);
+      }
+      return exam;
+    }
+
+    window.handlePaketFilterChange = function() {
+      const jenis = document.getElementById('paket-filter-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
+      const kelas = document.getElementById('paket-filter-kelas')?.value || 'Kelas 6';
+      const jenisKey = (jenis.match(/\(([^)]+)\)/)?.[1] || jenis).toLowerCase();
+      // Sinkronkan activeExamId jika ada yang cocok dengan filter baru
+      const allowed = getTeacherAllowedMapels();
+      const matched = (paketUjianList || []).find(p =>
+        allowed.some(m => m.toLowerCase() === (p.mapel || '').toLowerCase()) &&
+        (p.kelas || '').toLowerCase() === kelas.toLowerCase() &&
+        ((p.judulUjian || '').toLowerCase().includes(jenisKey) || (p.judulUjian || '').toLowerCase().includes(jenis.toLowerCase()))
+      );
+      if (matched) {
+        activeExamId = matched.id;
+      }
+      renderExamConfigView();
+      renderAllViews();
+    };
+
+    window.handleSelectExamFromDropdown = function(val) {
+      if (!val) return;
+      if (val.startsWith('create:')) {
+        const m = val.replace('create:', '');
+        const ex = getOrCreateExamForMapel(m);
+        activeExamId = ex.id;
+      } else {
+        activeExamId = val;
+      }
+      renderAllViews();
+      showToast('Paket ujian terpilih dibuka.', 'info');
+    };
+
+    window.handleToggleMapelPill = function(mapelName, existingId) {
+      if (existingId) {
+        activeExamId = existingId;
+        renderAllViews();
+      } else {
+        const ex = getOrCreateExamForMapel(mapelName);
+        activeExamId = ex.id;
+        renderAllViews();
+        showToast(`Paket ${mapelName} diaktifkan!`, 'success');
+      }
+    };
+
+    window.handleToggleMapelCheckbox = function(event, mapelName, existingId) {
+      if (existingId) {
+        if (event && event.target) event.target.checked = true;
+        confirmDeleteExam(existingId);
+      } else {
+        const ex = getOrCreateExamForMapel(mapelName);
+        activeExamId = ex.id;
+        renderAllViews();
+        showToast(`Paket ${mapelName} dicentang & diaktifkan!`, 'success');
+      }
+    };
+
+    window.batchCheckAll13Mapel = async function(checkAll) {
+      const jenis = document.getElementById('paket-filter-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
+      const kelas = document.getElementById('paket-filter-kelas')?.value || 'Kelas 6';
+
+      if (!checkAll) {
+        showConfirmModal(
+          'Hapus Semua Paket Ujian?',
+          `Hapus seluruh paket ujian untuk ${kelas}?`,
+          async () => {
+            const toRemove = (paketUjianList || []).filter(p => (p.kelas || '').toLowerCase() === kelas.toLowerCase());
+            for (const ex of toRemove) {
+              await deleteDocFromCloud('paket_ujian', ex.id);
+              const ansRem = (jawabanSiswaList || []).filter(j => j.ujianId === ex.id);
+              for (const a of ansRem) {
+                await deleteDocFromCloud('jawaban_siswa', a.id);
+              }
+            }
+            paketUjianList = (paketUjianList || []).filter(p => (p.kelas || '').toLowerCase() !== kelas.toLowerCase());
+            jawabanSiswaList = (jawabanSiswaList || []).filter(j => !toRemove.some(ex => ex.id === j.ujianId));
+            activeExamId = paketUjianList[0]?.id || '';
+            renderAllViews();
+            showToast('Seluruh paket ujian kelas ini telah dibersihkan.', 'info');
+          }
+        );
         return;
       }
 
-      if (formCard) formCard.classList.remove('hidden');
+      // Centang & aktifkan semua 13 mapel
+      for (const m of DAFTAR_MAPEL_MADRASAH) {
+        getOrCreateExamForMapel(m, jenis, kelas);
+      }
+      renderAllViews();
+      showToast(`Semua 13 mapel untuk ${jenis} (${kelas}) berhasil dicentang & diaktifkan!`, 'success');
+    };
 
-      if (grid) {
-        grid.innerHTML = userExams.map(p => {
-          const isActive = p.id === activeExamId;
-          const countSiswa = (jawabanSiswaList || []).filter(j => j.ujianId === p.id).length;
+    window.handleSelectExamForInput = function(mapelName) {
+      const ex = getOrCreateExamForMapel(mapelName);
+      if (ex) {
+        handleChangeActiveExam(ex.id);
+      }
+    };
+
+    function renderExamConfigView() {
+      const formCard = document.getElementById('form-key-editor')?.closest('.gyan-card');
+      const containerPills = document.getElementById('container-mapel-pills');
+      const dropdownSelect = document.getElementById('paket-select-dropdown');
+      const adminActions = document.getElementById('admin-mapel-batch-actions');
+      const labelChecklist = document.getElementById('label-checklist-mapel');
+
+      const currentJenis = document.getElementById('paket-filter-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
+      let currentKelas = document.getElementById('paket-filter-kelas')?.value;
+      if (!currentKelas) {
+        currentKelas = currentUser?.kelas && currentUser.kelas.includes('Kelas') ? currentUser.kelas : 'Kelas 6';
+        const selK = document.getElementById('paket-filter-kelas');
+        if (selK) selK.value = currentKelas;
+      }
+
+      // Pre-fill filter kelas sesuai wali kelas
+      if (currentUser && currentUser.role === 'wali_kelas' && currentUser.kelas) {
+        const selK = document.getElementById('paket-filter-kelas');
+        if (selK && [...selK.options].some(o => o.value === currentUser.kelas)) {
+          selK.value = currentUser.kelas;
+          currentKelas = currentUser.kelas;
+        }
+      }
+
+      const allowedMapels = getTeacherAllowedMapels();
+      const isAdmin = !currentUser || currentUser.role === 'admin';
+
+      // Tampilkan tombol batch untuk admin
+      if (adminActions) {
+        if (isAdmin) {
+          adminActions.classList.remove('hidden');
+          adminActions.classList.add('flex');
+        } else {
+          adminActions.classList.add('hidden');
+          adminActions.classList.remove('flex');
+        }
+      }
+
+      if (labelChecklist) {
+        labelChecklist.textContent = isAdmin
+          ? `Ceklist 13 Mapel Madrasah (${currentKelas}):`
+          : `Ceklist Mapel yang Diampu (${currentUser.nama}):`;
+      }
+
+      const jenisKey = (currentJenis.match(/\(([^)]+)\)/)?.[1] || currentJenis).toLowerCase();
+      const findExamByFilter = (m) => (paketUjianList || []).find(p => {
+        const matchMapel = (p.mapel || '').toLowerCase().trim() === m.toLowerCase().trim();
+        const matchKelas = (p.kelas || '').toLowerCase().trim() === currentKelas.toLowerCase().trim();
+        const titleLower = (p.judulUjian || '').toLowerCase();
+        const matchJenis = titleLower.includes(jenisKey) || titleLower.includes(currentJenis.toLowerCase());
+        return matchMapel && matchKelas && matchJenis;
+      });
+
+      // Pastikan ada exam aktif dari allowedMapels jika belum ada (hanya auto-aktifkan untuk user Guru)
+      let exam = getActiveExam();
+      if (!exam && allowedMapels.length > 0) {
+        const found = allowedMapels.map(m => findExamByFilter(m)).find(Boolean);
+        if (found) {
+          activeExamId = found.id;
+          exam = found;
+        } else if (!isAdmin) {
+          const autoEx = getOrCreateExamForMapel(allowedMapels[0], currentJenis, currentKelas);
+          activeExamId = autoEx.id;
+          exam = autoEx;
+        }
+      }
+
+      // Render Ceklist Mapel Pills
+      if (containerPills) {
+        containerPills.innerHTML = allowedMapels.map(m => {
+          const ex = findExamByFilter(m);
+          const isCreated = Boolean(ex);
+          const isSelected = ex && ex.id === activeExamId;
+          const countSiswa = ex ? (jawabanSiswaList || []).filter(j => j.ujianId === ex.id).length : 0;
+
           return `
-            <div class="gyan-card rounded-2xl p-5 border ${isActive ? 'border-teal-600 ring-2 ring-teal-500/20' : 'border-slate-200'} flex flex-col justify-between gap-3">
-              <div>
-                <div class="flex items-center justify-between gap-2">
-                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${isActive ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600'}">
-                    ${isActive ? 'PAKET AKTIF' : p.kelas}
-                  </span>
-                  <span class="text-[11px] font-bold text-slate-400">${countSiswa} Siswa</span>
+            <div onclick="handleToggleMapelPill('${m}', ${isCreated ? `'${ex.id}'` : 'null'})"
+                 class="p-3 rounded-2xl border-2 transition cursor-pointer flex items-center justify-between gap-2.5 ${isSelected ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-600/20' : (isCreated ? 'bg-white text-slate-800 border-teal-300 hover:border-teal-500 hover:bg-teal-50/40' : 'bg-slate-50 text-slate-500 border-dashed border-slate-300 hover:border-slate-400 hover:bg-white')}">
+              <div class="flex items-center gap-2.5 overflow-hidden">
+                <input type="checkbox" ${isCreated ? 'checked' : ''} onclick="event.stopPropagation(); handleToggleMapelCheckbox(event, '${m}', ${isCreated ? `'${ex.id}'` : 'null'})"
+                       class="w-4 h-4 rounded text-teal-600 border-slate-300 focus:ring-teal-500 cursor-pointer" />
+                <div class="truncate">
+                  <div class="font-extrabold text-xs truncate ${isSelected ? 'text-white' : 'text-slate-900'}">${m}</div>
+                  <div class="text-[10px] ${isSelected ? 'text-teal-100' : 'text-slate-500'}">${currentJenis.split('(')[1]?.replace(')', '') || 'SAS'} • ${currentKelas}</div>
                 </div>
-                <h5 class="text-sm font-extrabold text-slate-900 mt-2">${p.mapel}</h5>
-                <p class="text-xs text-slate-500">${p.judulUjian}</p>
               </div>
-              <div class="flex items-center justify-between pt-3 border-t border-slate-100">
-                <button onclick="handleChangeActiveExam('${p.id}')" class="text-xs font-extrabold text-teal-600 hover:text-teal-800">
-                  ${isActive ? '<i class="fa-solid fa-circle-check mr-1"></i>Sedang Dibuka' : 'Pilih Paket Ini &rarr;'}
-                </button>
-                <button onclick="confirmDeleteExam('${p.id}')" class="text-xs text-rose-500 hover:text-rose-700 p-1" title="Hapus Paket">
-                  <i class="fa-solid fa-trash-can"></i>
-                </button>
+              <div class="flex items-center gap-1 shrink-0">
+                ${isCreated ? `
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold ${isSelected ? 'bg-white/20 text-white' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
+                    ${countSiswa} Siswa
+                  </span>
+                  <button type="button" onclick="event.stopPropagation(); confirmDeleteExam('${ex.id}')"
+                          class="w-6 h-6 rounded-lg ${isSelected ? 'hover:bg-white/20 text-teal-100 hover:text-white' : 'hover:bg-rose-50 text-slate-400 hover:text-rose-600'} flex items-center justify-center transition" title="Hapus Paket">
+                    <i class="fa-solid fa-trash text-[10px]"></i>
+                  </button>
+                ` : `
+                  <span class="text-[10px] font-bold text-slate-400">Klik Ceklist</span>
+                `}
               </div>
             </div>
           `;
         }).join('');
       }
 
-      if (!exam) return;
+      // Populate Quick Dropdown in Master Paket
+      if (dropdownSelect) {
+        let optHtml = '';
+        allowedMapels.forEach(m => {
+          const ex = findExamByFilter(m);
+          const val = ex ? ex.id : `create:${m}`;
+          const isSel = ex && ex.id === activeExamId;
+          optHtml += `<option value="${val}" ${isSel ? 'selected' : ''}>${m} (${ex ? 'Aktif' : 'Ceklist untuk Aktif'})</option>`;
+        });
+        dropdownSelect.innerHTML = optHtml;
+      }
+
+      // Populate Input Jawaban Siswa Dropdown & Quick Mapel Pills
+      const iSelect = document.getElementById('input-select-exam');
+      if (iSelect) {
+        const userExList = getUserExams();
+        let iOptHtml = '';
+        userExList.forEach(p => {
+          const cleanTitle = (p.judulUjian || '').includes(p.mapel) ? p.judulUjian : `${p.mapel} - ${p.judulUjian}`;
+          const label = p.kelas ? `${cleanTitle} (${p.kelas})` : cleanTitle;
+          iOptHtml += `<option value="${p.id}" ${p.id === activeExamId ? 'selected' : ''}>${label}</option>`;
+        });
+        allowedMapels.forEach(m => {
+          const hasEx = findExamByFilter(m);
+          if (!hasEx) {
+            iOptHtml += `<option value="create:${m}">${m} - ${currentJenis} (${currentKelas})</option>`;
+          }
+        });
+        iSelect.innerHTML = iOptHtml;
+      }
+
+      const inputQuickPills = document.getElementById('input-mapel-quick-pills');
+      if (inputQuickPills) {
+        inputQuickPills.innerHTML = allowedMapels.map(m => {
+          const ex = findExamByFilter(m);
+          const isSel = ex && ex.id === activeExamId;
+          return `
+            <button type="button" onclick="handleSelectExamForInput('${m}')"
+                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${isSel ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/20' : 'bg-white hover:bg-teal-50 text-slate-700 hover:text-teal-700 border border-slate-200'}">
+              <i class="fa-solid ${isSel ? 'fa-circle-check text-emerald-300' : 'fa-book-open text-teal-600'} text-[11px]"></i>
+              <span>${m}</span>
+            </button>
+          `;
+        }).join('');
+      }
 
       // Fill Editor Form
-      document.getElementById('editor-exam-heading').textContent = `Edit Kunci Jawaban: ${exam.mapel}`;
+      if (!exam) {
+        if (formCard) formCard.classList.add('hidden');
+        return;
+      }
+
+      if (formCard) formCard.classList.remove('hidden');
+
+      // Fill Editor Form
+      document.getElementById('editor-exam-heading').textContent = `Edit Kunci Jawaban: ${exam.mapel} (${exam.kelas})`;
       document.getElementById('cfg-judul').value = exam.judulUjian || '';
       document.getElementById('cfg-mapel').value = exam.mapel || '';
       document.getElementById('cfg-kelas').value = exam.kelas || '';
@@ -3809,25 +4166,6 @@
       animateButtonSaveFeedback(e, 'Kunci Tersimpan!');
       showToast('Kunci jawaban & bobot disimpan! Seluruh nilai siswa telah dihitung ulang.', 'success');
     };
-
-    // =========================================================
-    // 7A. MASTER PAKET UJIAN & GENERATOR 13 MAPEL (SAS, SAT, UM)
-    // =========================================================
-    const DAFTAR_MAPEL_MADRASAH = [
-      "Al Qur'an Hadis",
-      "Baca Tulis Al Qur'an",
-      "Akidah Akhlak",
-      "Fikih",
-      "SKI",
-      "Bahasa Arab",
-      "Pend. Pancasila",
-      "Bahasa Indonesia",
-      "Matematika",
-      "IPAS",
-      "PJOK",
-      "Seni Budaya",
-      "Bahasa Inggris"
-    ];
 
     window.syncNewExamTitle = function() {
       const jenis = document.getElementById('new-exam-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
