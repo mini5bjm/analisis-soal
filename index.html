@@ -265,10 +265,10 @@
             </div>
 
             <div id="field-guru-username" class="hidden">
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Username Guru / Wali Kelas</label>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Username / Email Guru / Wali Kelas</label>
               <div class="relative">
                 <i class="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                <input type="text" id="login-username" placeholder="Masukkan username Anda"
+                <input type="text" id="login-username" placeholder="Masukkan username atau email Anda"
                        class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition" />
               </div>
             </div>
@@ -1569,18 +1569,28 @@
           getDocs = fbFirestore.getDocs;
           signInWithEmailAndPassword = fbAuth.signInWithEmailAndPassword;
 
-          const app = fbApp.initializeApp(firebaseConfig);
+          const app = fbApp.getApps().length === 0 ? fbApp.initializeApp(firebaseConfig) : fbApp.getApps()[0];
           db = fbFirestore.getFirestore(app);
           auth = fbAuth.getAuth(app);
           
           if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await fbAuth.signInWithCustomToken(auth, __initial_auth_token);
+            try {
+              await fbAuth.signInWithCustomToken(auth, __initial_auth_token);
+            } catch (tErr) {
+              console.warn('Initial token error:', tErr);
+            }
           } else {
-            await fbAuth.signInAnonymously(auth);
+            try {
+              await fbAuth.signInAnonymously(auth);
+            } catch (anonErr) {
+              console.info('Firebase anonymous auth tidak aktif (normal):', anonErr.message);
+            }
           }
           isCloudConnected = true;
-          document.getElementById('login-mode-badge').textContent = "Terhubung ke Firebase (Live)";
-          document.getElementById('sync-status-pill').innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i>Cloud Terhubung';
+          const badgeEl = document.getElementById('login-mode-badge');
+          if (badgeEl) badgeEl.textContent = "Terhubung ke Firebase (Live)";
+          const pillEl = document.getElementById('sync-status-pill');
+          if (pillEl) pillEl.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i>Cloud Terhubung';
         }
       } catch (err) {
         console.warn('Firebase init fallback to local memory:', err);
@@ -1881,46 +1891,60 @@
 
     window.handleLoginSubmit = async function(e) {
       e.preventDefault();
-      const pass = document.getElementById('login-password').value.trim();
-      const rawIdentifier = currentLoginTab === 'admin'
-        ? document.getElementById('login-email').value.trim()
-        : document.getElementById('login-username').value.trim();
+      const pass = (document.getElementById('login-password')?.value || '').trim();
+      let rawIdentifier = currentLoginTab === 'admin'
+        ? (document.getElementById('login-email')?.value || '').trim()
+        : (document.getElementById('login-username')?.value || '').trim();
+
+      // Fallback jika pengguna mengisi tab sebelah lalu berganti tab
+      if (!rawIdentifier) {
+        rawIdentifier = (document.getElementById('login-email')?.value || document.getElementById('login-username')?.value || '').trim();
+      }
 
       if (!rawIdentifier || !pass) {
         showToast('Mohon lengkapi Username/Email dan Password.', 'error');
         return;
       }
 
-      // Pastikan daftar akun minimal terisi dari seed jika belum termuat
+      // Pastikan daftar akun lokal terisi dari seed jika belum termuat
       if (!pesertaAccounts || pesertaAccounts.length === 0) {
         loadLocalSeed(getInitialSeedData());
       }
 
-      // 1. Cek kecocokan pada daftar akun (users_peserta) baik Admin maupun Guru
-      const foundAccount = pesertaAccounts.find(
-        u => u.username && u.username.toLowerCase() === rawIdentifier.toLowerCase() && u.password === pass
-      );
-
-      if (foundAccount) {
-        currentUser = {
-          role: foundAccount.role === 'admin' ? 'admin' : 'guru',
-          nama: foundAccount.nama,
-          username: foundAccount.username,
-          kelas: foundAccount.kelas
-        };
-        saveSessionState(currentUser, 'dashboard');
-        applyUserSession('dashboard');
-        showToast(`Selamat datang, ${foundAccount.nama}!`, 'success');
-        return;
+      const submitBtn = document.getElementById('btn-submit-login');
+      const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Memverifikasi Akun...';
       }
 
-      // 2. Jika pada tab Admin: dukung login default admin123 atau Firebase Auth
-      if (currentLoginTab === 'admin') {
-        if (pass === 'admin123') {
+      try {
+        // 1. Cek kecocokan pada daftar akun lokal/Firestore (users_peserta)
+        const foundAccount = (pesertaAccounts || []).find(
+          u => ((u.username && u.username.toLowerCase() === rawIdentifier.toLowerCase()) ||
+                (u.email && u.email.toLowerCase() === rawIdentifier.toLowerCase())) &&
+               u.password === pass
+        );
+
+        if (foundAccount) {
+          currentUser = {
+            role: foundAccount.role === 'admin' ? 'admin' : (foundAccount.role === 'wali_kelas' ? 'wali_kelas' : 'guru_mapel'),
+            nama: foundAccount.nama,
+            username: foundAccount.username,
+            kelas: foundAccount.kelas || 'Semua Mapel'
+          };
+          saveSessionState(currentUser, 'dashboard');
+          applyUserSession('dashboard');
+          showToast(`Selamat datang kembali, ${foundAccount.nama}!`, 'success');
+          return;
+        }
+
+        // 2. Cek akun Administrator bawaan darurat (admin / admin123)
+        if (rawIdentifier.toLowerCase() === 'admin' && pass === 'admin123') {
           currentUser = {
             role: 'admin',
             nama: 'Administrator Utama',
-            username: rawIdentifier,
+            username: 'admin',
             kelas: 'Semua Mapel'
           };
           saveSessionState(currentUser, 'dashboard');
@@ -1929,26 +1953,85 @@
           return;
         }
 
-        if (!IS_PREVIEW && auth && firebaseConfig.apiKey !== "API_KEY_ANDA" && rawIdentifier.includes('@')) {
-          try {
-            await signInWithEmailAndPassword(auth, rawIdentifier, pass);
-            currentUser = {
-              role: 'admin',
-              nama: 'Administrator Utama',
-              username: rawIdentifier,
-              kelas: 'Semua Mapel'
-            };
-            saveSessionState(currentUser, 'dashboard');
-            applyUserSession('dashboard');
-            showToast('Selamat datang kembali, Administrator!', 'success');
-            return;
-          } catch (authErr) {
-            // Lanjut ke pesan gagal di bawah
+        // 3. Autentikasi langsung via Firebase Authentication (jika format email / terhubung)
+        if (rawIdentifier.includes('@')) {
+          // Pastikan Firebase Auth modul termuat
+          if (!auth || !signInWithEmailAndPassword) {
+            try {
+              const fbApp = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+              const fbAuth = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+              const app = fbApp.getApps().length === 0 ? fbApp.initializeApp(firebaseConfig) : fbApp.getApps()[0];
+              auth = fbAuth.getAuth(app);
+              signInWithEmailAndPassword = fbAuth.signInWithEmailAndPassword;
+            } catch (err) {
+              console.warn('Gagal memuat Firebase Auth SDK:', err);
+            }
+          }
+
+          if (auth && signInWithEmailAndPassword) {
+            try {
+              const userCredential = await signInWithEmailAndPassword(auth, rawIdentifier, pass);
+              const fbUser = userCredential.user;
+
+              // Cari apakah ada profil tersimpan di users_peserta
+              const matchedPeserta = (pesertaAccounts || []).find(
+                p => (p.username && p.username.toLowerCase() === rawIdentifier.toLowerCase()) ||
+                     (p.email && p.email.toLowerCase() === rawIdentifier.toLowerCase())
+              );
+
+              if (matchedPeserta) {
+                currentUser = {
+                  role: matchedPeserta.role || (currentLoginTab === 'admin' ? 'admin' : 'guru_mapel'),
+                  nama: matchedPeserta.nama || fbUser.displayName || rawIdentifier.split('@')[0],
+                  username: matchedPeserta.username || rawIdentifier,
+                  kelas: matchedPeserta.kelas || 'Semua Mapel'
+                };
+              } else {
+                const isAdmin = currentLoginTab === 'admin' || rawIdentifier.toLowerCase().includes('admin');
+                currentUser = {
+                  role: isAdmin ? 'admin' : 'guru_mapel',
+                  nama: fbUser.displayName || (rawIdentifier.split('@')[0].toUpperCase()),
+                  username: rawIdentifier,
+                  kelas: isAdmin ? 'Semua Mapel' : 'Guru Mapel'
+                };
+              }
+
+              saveSessionState(currentUser, 'dashboard');
+              applyUserSession('dashboard');
+              showToast(`Berhasil masuk via Firebase: ${currentUser.nama}`, 'success');
+              return;
+            } catch (authErr) {
+              console.warn('Firebase signInWithEmailAndPassword gagal:', authErr);
+              let errMsg = 'Gagal masuk dengan Firebase Authentication.';
+              if (authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password' || authErr.code === 'auth/user-not-found') {
+                errMsg = 'Email atau Kata Sandi Firebase tidak sesuai. Silakan periksa kembali.';
+              } else if (authErr.code === 'auth/invalid-email') {
+                errMsg = 'Format email tidak valid (contoh: admin@sekolah.sch.id).';
+              } else if (authErr.code === 'auth/too-many-requests') {
+                errMsg = 'Terlalu banyak percobaan gagal. Silakan tunggu beberapa saat lagi.';
+              } else if (authErr.code === 'auth/operation-not-allowed') {
+                errMsg = 'Metode Email/Password belum diaktifkan di Firebase Console > Authentication > Sign-in method.';
+              } else if (authErr.message) {
+                errMsg = `Firebase Auth: ${authErr.message}`;
+              }
+              showToast(errMsg, 'error');
+              return;
+            }
           }
         }
-      }
 
-      showToast('Username atau Password tidak cocok.', 'error');
+        // 4. Jika tidak cocok dan bukan format email
+        if (!rawIdentifier.includes('@')) {
+          showToast('Username atau Kata Sandi tidak cocok. Jika Anda mendaftar melalui Firebase Authentication, pastikan memasukkan alamat Email lengkap yang terdaftar.', 'error');
+        } else {
+          showToast('Email atau Kata Sandi tidak cocok.', 'error');
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalBtnHtml;
+        }
+      }
     };
 
     function applyUserSession(initialMenu = 'dashboard') {
@@ -3457,6 +3540,115 @@
           showToast('Belum ada paket ujian aktif untuk diekspor.', 'error');
           return;
         }
+        const students = [...getActiveExamStudents()].sort((a, b) => b.nilaiAkhir - a.nilaiAkhir);
+        const items = computeFullItemAnalysis();
+
+        const wb = XLSX.utils.book_new();
+
+        // SHEET 1: REKAP NILAI SISWA (Multi-Column)
+        const sheet1Data = [
+          ['LAPORAN REKAPITULASI NILAI & ANALISIS EVALUASI AKADEMIK'],
+          ['Judul Ujian', exam.judulUjian, '', 'Guru Mata Pelajaran', exam.guruMapel],
+          ['Mata Pelajaran', exam.mapel, '', 'Wali Kelas / Kamad', exam.waliKelas],
+          ['Kelas / Semester', exam.kelas, '', 'KKM Ketuntasan', exam.kkm],
+          [],
+          ['Peringkat', 'NISN', 'Nama Lengkap Siswa', 'Kelas', 'Jawaban PG Siswa', 'Benar PG', 'Skor PG', 'Jawaban B/S Siswa', 'Benar B/S', 'Skor B/S', 'Skor Isian', 'Skor Uraian', 'Total Skor', 'Skor Maksimal', 'Nilai Akhir', 'Status Ketuntasan']
+        ];
+
+        students.forEach((s, idx) => {
+          sheet1Data.push([
+            idx + 1,
+            s.nisn,
+            s.namaSiswa,
+            s.kelas,
+            s.pgRaw,
+            s.pgTotalBenar,
+            s.pgSkorPerolehan,
+            s.bsRaw,
+            s.bsTotalBenar,
+            s.bsSkorPerolehan,
+            s.isianSkorPerolehan,
+            s.uraianSkorPerolehan,
+            s.totalSkorPerolehan,
+            s.skorMaksimal,
+            s.nilaiAkhir,
+            s.statusKetuntasan
+          ]);
+        });
+
+        const wsRekap = XLSX.utils.aoa_to_sheet(sheet1Data);
+        wsRekap['!cols'] = [
+          { wch: 10 }, { wch: 14 }, { wch: 28 }, { wch: 16 },
+          { wch: 24 }, { wch: 10 }, { wch: 10 }, { wch: 18 },
+          { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+          { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 18 }
+        ];
+        XLSX.utils.book_append_sheet(wb, wsRekap, 'Rekap Nilai Siswa');
+
+        // SHEET 2: ANALISIS BUTIR SOAL (Multi-Column)
+        const sheet2Data = [
+          ['TABEL ANALISIS KUALITAS BUTIR SOAL (TINGKAT KESUKARAN, DAYA PEMBEDA & PENGECOH)'],
+          ['Mata Pelajaran', exam.mapel, 'Kelas', exam.kelas, 'Jumlah Peserta', students.length],
+          [],
+          ['Kode Butir', 'Tipe Soal', 'Kunci / Skor Maks', 'Rata-rata / Proporsi Benar', 'Indeks Kesukaran (P)', 'Kategori Kesukaran', 'Indeks Daya Pembeda (D)', 'Kualitas Daya Pembeda', 'Distribusi Jawaban / Pengecoh', 'Kesimpulan Butir Soal']
+        ];
+
+        items.forEach(i => {
+          sheet2Data.push([
+            i.kodeSoal,
+            i.tipe,
+            i.kunciLabel,
+            i.rataLabel,
+            i.P,
+            i.katP,
+            i.D,
+            i.katD,
+            i.sebaranText,
+            i.rekomendasi
+          ]);
+        });
+
+        const wsAnalisis = XLSX.utils.aoa_to_sheet(sheet2Data);
+        wsAnalisis['!cols'] = [
+          { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 22 },
+          { wch: 20 }, { wch: 18 }, { wch: 22 }, { wch: 20 },
+          { wch: 34 }, { wch: 22 }
+        ];
+        XLSX.utils.book_append_sheet(wb, wsAnalisis, 'Analisis Butir Soal');
+
+        // SHEET 3: MATRIKS SKOR PER BUTIR SOAL
+        const headerMatrix = ['No', 'NISN', 'Nama Siswa'];
+        (exam.pgKunci || []).forEach((_, i) => headerMatrix.push(`PG-${i + 1}`));
+        (exam.bsKunci || []).forEach((_, i) => headerMatrix.push(`BS-${i + 1}`));
+        (exam.isianMaks || []).forEach((_, i) => headerMatrix.push(`IS-${i + 1}`));
+        (exam.uraianMaks || []).forEach((_, i) => headerMatrix.push(`UR-${i + 1}`));
+        headerMatrix.push('Total Skor', 'Nilai Akhir');
+
+        const sheet3Data = [
+          ['MATRIKS SKOR PER BUTIR SOAL SELURUH SISWA'],
+          headerMatrix
+        ];
+
+        students.forEach((s, idx) => {
+          const row = [idx + 1, s.nisn, s.namaSiswa];
+          (s.pgScores || []).forEach(v => row.push(v));
+          (s.bsScores || []).forEach(v => row.push(v));
+          (s.isianScores || []).forEach(v => row.push(v));
+          (s.uraianScores || []).forEach(v => row.push(v));
+          row.push(s.totalSkorPerolehan, s.nilaiAkhir);
+          sheet3Data.push(row);
+        });
+
+        const wsMatrix = XLSX.utils.aoa_to_sheet(sheet3Data);
+        XLSX.utils.book_append_sheet(wb, wsMatrix, 'Matriks Butir Soal');
+
+        const safeFileName = `Analisis_Soal_${(exam.mapel || 'Ujian').replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+        XLSX.writeFile(wb, safeFileName);
+        showToast('File Excel (.xlsx) Multi-Sheet berhasil diunduh!', 'success');
+      } catch (err) {
+        showToast('Gagal mengekspor Excel: ' + err.message, 'error');
+      }
+    };
 
     // =========================================================
     // 12. EXPORT OFFICIAL PDF REPORT (jsPDF + AutoTable)
