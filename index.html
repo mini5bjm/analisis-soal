@@ -1254,12 +1254,12 @@
                     <p class="text-xs text-slate-500" id="siswa-stats-info">Total: 0 Siswa</p>
                   </div>
                   <div class="flex flex-wrap items-center gap-2">
-                    <select id="filter-siswa-kelas" onchange="renderSiswaTable()" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:outline-none">
+                    <select id="filter-siswa-kelas" onchange="currentSiswaPage = 1; renderSiswaTable()" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:outline-none">
                       <option value="ALL">Semua Kelas</option>
                     </select>
                     <div class="relative w-48 sm:w-56">
                       <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                      <input type="text" id="search-siswa" oninput="renderSiswaTable()" placeholder="Cari nama atau NISN..."
+                      <input type="text" id="search-siswa" oninput="currentSiswaPage = 1; renderSiswaTable()" placeholder="Cari nama atau NISN..."
                              class="w-full pl-9 pr-3.5 py-1.5 rounded-full border border-slate-200 text-xs font-medium focus:border-teal-600 focus:outline-none" />
                     </div>
                   </div>
@@ -1280,6 +1280,9 @@
                     <tbody id="tbody-siswa-table" class="divide-y divide-slate-200 text-xs bg-white"></tbody>
                   </table>
                 </div>
+
+                <!-- Kontrol Paginasi Siswa (1, 2, 3, 4, ... Selanjutnya) -->
+                <div id="siswa-pagination-container" class="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs"></div>
               </div>
             </div>
           </section>
@@ -1481,7 +1484,6 @@
                       <option value="ALL">Semua Peran</option>
                       <option value="guru_mapel">Guru Mapel</option>
                       <option value="wali_kelas">Wali Kelas</option>
-                      <option value="admin">Administrator</option>
                     </select>
                     <div class="relative w-48 sm:w-56">
                       <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
@@ -1888,6 +1890,50 @@
       kepalaSekolah: 'Ust. H. Ahmad Fauzi, M.Pd'
     };
 
+    // =========================================================
+    // AKUN ADMINISTRATOR APLIKASI (TERPISAH DARI DAFTAR GURU)
+    // =========================================================
+    function getAdminCredentials() {
+      try {
+        const stored = localStorage.getItem('smart_anabutir_admin_v2');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.username && parsed.password) return parsed;
+        }
+      } catch (e) {}
+      if (appSettings && appSettings.adminUser && appSettings.adminUser.username) {
+        return appSettings.adminUser;
+      }
+      return {
+        id: 'usr_admin',
+        username: 'admin',
+        password: 'admin123',
+        nama: 'Administrator Utama',
+        role: 'admin'
+      };
+    }
+
+    function saveAdminCredentials(adminObj) {
+      const obj = {
+        id: 'usr_admin',
+        role: 'admin',
+        username: (adminObj.username || 'admin').trim(),
+        password: (adminObj.password || 'admin123').trim(),
+        nama: (adminObj.nama || 'Administrator Utama').trim(),
+        updatedAt: Date.now()
+      };
+      try {
+        localStorage.setItem('smart_anabutir_admin_v2', JSON.stringify(obj));
+      } catch (e) {}
+      if (!appSettings) appSettings = {};
+      appSettings.adminUser = obj;
+      try {
+        localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
+      } catch (e) {}
+      saveDocToCloud('app_settings', 'admin_account', obj);
+      return obj;
+    }
+
     // Session Persistence Helpers (Agar saat di-refresh tidak kembali ke halaman login)
     function saveSessionState(userObj, menuKey) {
       try {
@@ -2028,14 +2074,27 @@
             console.warn('Firestore fetch exams warning:', e);
           }
 
-          // 2. Akun Guru & Administrator
+          // 2. Akun Guru (Murni Tenaga Pendidik, Admin dikelola terpisah)
           try {
+            // Ambil akun admin tersimpan di cloud jika ada
+            try {
+              const adminSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'app_settings'));
+              const adminDoc = adminSnap.docs.find(d => d.id === 'admin_account');
+              if (adminDoc && adminDoc.data()) {
+                const cloudAdmin = adminDoc.data();
+                const curLocalAdmin = getAdminCredentials();
+                if (!curLocalAdmin.updatedAt || (cloudAdmin.updatedAt && cloudAdmin.updatedAt >= curLocalAdmin.updatedAt)) {
+                  saveAdminCredentials(cloudAdmin);
+                }
+              }
+            } catch (aErr) {}
+
             const accSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users_peserta'));
             const cloudAccounts = [];
             for (const d of accSnap.docs) {
               const data = d.data();
-              // Bersihkan dummy guru lama
-              if (['usr_g1', 'usr_g2', 'usr_g3'].includes(data.id) || ['guru1', 'guru2', 'sitiaminah'].includes((data.username || '').toLowerCase())) {
+              // Bersihkan dummy guru lama dan admin dari koleksi guru
+              if (['usr_g1', 'usr_g2', 'usr_g3', 'usr_admin'].includes(data.id) || ['guru1', 'guru2', 'sitiaminah'].includes((data.username || '').toLowerCase()) || data.role === 'admin') {
                 try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', d.id)); } catch (e) {}
               } else {
                 cloudAccounts.push(data);
@@ -2046,11 +2105,6 @@
               const mergedAccounts = cloudAccounts.map(c => {
                 const l = localMap.get(c.id);
                 if (!l) return c;
-                // Jika akun admin di lokal sudah pernah diubah (bukan bawaan 'admin'/'admin123'), prioritaskan lokal
-                if (l.role === 'admin' && (l.username !== 'admin' || l.password !== 'admin123')) {
-                  try { setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', l.id), l); } catch(e){}
-                  return l;
-                }
                 if (l.updatedAt && c.updatedAt) {
                   return l.updatedAt >= c.updatedAt ? l : c;
                 }
@@ -2058,24 +2112,11 @@
               });
               const cloudIds = new Set(cloudAccounts.map(a => a.id));
               const localOnly = (pesertaAccounts || []).filter(a => a.id && !cloudIds.has(a.id));
-              pesertaAccounts = [...mergedAccounts, ...localOnly];
-              if (!pesertaAccounts.some(a => a.role === 'admin')) {
-                pesertaAccounts.unshift(seed.seedAccounts[0]);
-              }
+              pesertaAccounts = [...mergedAccounts, ...localOnly].filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
               localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
             } else {
-              // Jika cloud kosong, pertahankan akun guru lokal dari localStorage (jangan timpa ke seed dummy)!
-              if (!pesertaAccounts || pesertaAccounts.length === 0) {
-                pesertaAccounts = seed.seedAccounts;
-                localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
-              } else if (!pesertaAccounts.some(a => a.role === 'admin')) {
-                pesertaAccounts.unshift(seed.seedAccounts[0]);
-                localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
-              } else {
-                Promise.allSettled(
-                  pesertaAccounts.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', a.id), a))
-                ).catch(() => {});
-              }
+              pesertaAccounts = (pesertaAccounts || []).filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
+              localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
             }
           } catch (e) {
             console.warn('Firestore fetch accounts warning:', e);
@@ -2165,16 +2206,9 @@
         jawabanSiswaList = seed.rawStudentResponses || [];
       }
 
-      // Pastikan ada akun admin jika belum ada sama sekali
-      if (!pesertaAccounts || pesertaAccounts.length === 0) {
-        pesertaAccounts = [
-          { id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' }
-        ];
-      } else if (!pesertaAccounts.some(a => a.role === 'admin')) {
-        pesertaAccounts.unshift(
-          { id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' }
-        );
-      }
+      // Bersihkan akun admin agar tidak tercampur di daftar guru
+      pesertaAccounts = (pesertaAccounts || []).filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
+      localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
     }
 
     async function saveDocToCloud(collectionName, docId, dataObj) {
@@ -2239,9 +2273,7 @@
     function getInitialSeedData() {
       // Tidak ada data dummy evaluasi atau respon siswa
       const seedExams = [];
-      const seedAccounts = [
-        { id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' }
-      ];
+      const seedAccounts = [];
       const rawStudentResponses = [];
       const seedSiswa = [];
 
@@ -2445,42 +2477,16 @@
         // AKSES MASUK VIA FIREBASE UNTUK USER ADMIN TELAH DIHILANGKAN
         // =========================================================
         if (currentLoginTab === 'admin') {
-          const adminAcc = (pesertaAccounts || []).find(a => a.role === 'admin');
-          let isMatch = false;
-          let matchedAdmin = null;
+          const adminCreds = getAdminCredentials();
+          const matchUser = (adminCreds.username || 'admin').trim().toLowerCase() === rawIdentifier.toLowerCase();
+          const matchPass = (adminCreds.password || 'admin123').trim() === pass;
 
-          if (adminAcc) {
-            // Cocokkan HANYA dengan username & password admin yang disimpan di aplikasi
-            const matchUser = (adminAcc.username || '').trim().toLowerCase() === rawIdentifier.toLowerCase();
-            const matchPass = (adminAcc.password || '').trim() === pass;
-            if (matchUser && matchPass) {
-              isMatch = true;
-              matchedAdmin = adminAcc;
-            }
-          } else if (rawIdentifier.toLowerCase() === 'admin' && pass === 'admin123') {
-            // Inisialisasi bawaan awal hanya jika belum pernah ada akun admin di database
-            isMatch = true;
-            matchedAdmin = {
-              id: 'usr_admin',
-              role: 'admin',
-              nama: 'Administrator Utama',
-              username: 'admin',
-              password: 'admin123',
-              kelas: 'Semua Mapel'
-            };
-            if (!pesertaAccounts) pesertaAccounts = [];
-            pesertaAccounts.unshift(matchedAdmin);
-            try {
-              localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
-            } catch (err) {}
-          }
-
-          if (isMatch && matchedAdmin) {
+          if (matchUser && matchPass) {
             currentUser = {
               role: 'admin',
-              nama: matchedAdmin.nama || 'Administrator Utama',
-              username: matchedAdmin.username,
-              kelas: matchedAdmin.kelas || 'Semua Mapel'
+              nama: adminCreds.nama || 'Administrator Utama',
+              username: adminCreds.username || 'admin',
+              kelas: 'Semua Mapel'
             };
             saveSessionState(currentUser, 'dashboard');
             applyUserSession('dashboard', true);
@@ -3591,8 +3597,19 @@
         distinctClasses.map(c => `<option value="${c}" ${c === curVal ? 'selected' : ''}>${c}</option>`).join('');
     }
 
+    let currentSiswaPage = 1;
+    const SISWA_PAGE_SIZE = 10;
+
+    window.changeSiswaPage = function(page) {
+      currentSiswaPage = page;
+      renderSiswaTable();
+      const tbl = document.getElementById('tbody-siswa-table');
+      if (tbl) tbl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
     window.renderSiswaTable = function() {
       const tbody = document.getElementById('tbody-siswa-table');
+      const pagContainer = document.getElementById('siswa-pagination-container');
       if (!tbody) return;
 
       const keyword = (document.getElementById('search-siswa')?.value || '').toLowerCase();
@@ -3613,12 +3630,95 @@
 
       if (filtered.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-400 font-semibold">Belum ada data siswa. Silakan tambah manual atau impor dari Excel (.xlsx).</td></tr>`;
+        if (pagContainer) pagContainer.innerHTML = '';
         return;
       }
 
-      tbody.innerHTML = filtered.map((s, idx) => `
+      let itemsToDisplay = filtered;
+      let startIndex = 0;
+
+      // Jika filter Semua Kelas ('ALL'): batasi sampai 10 nama siswa per halaman dengan paginasi 1, 2, 3, 4, ... Selanjutnya
+      if (filterKelas === 'ALL') {
+        const totalPages = Math.max(1, Math.ceil(filtered.length / SISWA_PAGE_SIZE));
+        if (currentSiswaPage > totalPages) currentSiswaPage = totalPages;
+        if (currentSiswaPage < 1) currentSiswaPage = 1;
+
+        startIndex = (currentSiswaPage - 1) * SISWA_PAGE_SIZE;
+        const endIndex = Math.min(startIndex + SISWA_PAGE_SIZE, filtered.length);
+        itemsToDisplay = filtered.slice(startIndex, endIndex);
+
+        // Render Pagination Controls
+        if (pagContainer) {
+          let pageButtonsHtml = '';
+          let startP = Math.max(1, currentSiswaPage - 2);
+          let endP = Math.min(totalPages, currentSiswaPage + 2);
+
+          if (startP > 1) {
+            pageButtonsHtml += `<button type="button" onclick="changeSiswaPage(1)" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition">1</button>`;
+            if (startP > 2) {
+              pageButtonsHtml += `<span class="px-1 text-slate-400 font-bold">...</span>`;
+            }
+          }
+
+          for (let p = startP; p <= endP; p++) {
+            const isActive = p === currentSiswaPage;
+            pageButtonsHtml += `
+              <button type="button" onclick="changeSiswaPage(${p})"
+                      class="px-3 py-1.5 rounded-xl text-xs font-bold transition ${isActive ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/20' : 'border border-slate-200 bg-white hover:bg-slate-50 text-slate-700'}">
+                ${p}
+              </button>
+            `;
+          }
+
+          if (endP < totalPages) {
+            if (endP < totalPages - 1) {
+              pageButtonsHtml += `<span class="px-1 text-slate-400 font-bold">...</span>`;
+            }
+            pageButtonsHtml += `<button type="button" onclick="changeSiswaPage(${totalPages})" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition">${totalPages}</button>`;
+          }
+
+          const isFirst = currentSiswaPage <= 1;
+          const isLast = currentSiswaPage >= totalPages;
+
+          pagContainer.innerHTML = `
+            <div class="text-xs font-medium text-slate-500">
+              Menampilkan <span class="font-bold text-slate-800">${startIndex + 1} - ${endIndex}</span> dari <span class="font-bold text-slate-800">${filtered.length}</span> siswa
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="changeSiswaPage(${currentSiswaPage - 1})"
+                      ${isFirst ? 'disabled class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-400 cursor-not-allowed text-xs font-semibold"' : 'class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-700 font-semibold text-xs transition flex items-center gap-1"'}>
+                <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                <span>Sebelumnya</span>
+              </button>
+              <div class="flex items-center gap-1">
+                ${pageButtonsHtml}
+              </div>
+              <button type="button" onclick="changeSiswaPage(${currentSiswaPage + 1})"
+                      ${isLast ? 'disabled class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-400 cursor-not-allowed text-xs font-semibold"' : 'class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-700 font-semibold text-xs transition flex items-center gap-1"'}>
+                <span>Selanjutnya</span>
+                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+              </button>
+            </div>
+          `;
+        }
+      } else {
+        // Filter kelas tertentu: tampilkan seluruh siswa di kelas tersebut (1, 2, 3, ...)
+        startIndex = 0;
+        if (pagContainer) {
+          pagContainer.innerHTML = `
+            <div class="text-xs font-medium text-slate-500">
+              Menampilkan seluruh <span class="font-bold text-teal-700">${filtered.length} siswa</span> di kelas <span class="font-bold text-slate-800">${filterKelas}</span>
+            </div>
+            <div class="text-xs text-slate-400 italic">
+              (Paginasi 10 siswa aktif saat filter Semua Kelas dipilih)
+            </div>
+          `;
+        }
+      }
+
+      tbody.innerHTML = itemsToDisplay.map((s, idx) => `
         <tr class="hover:bg-slate-50 transition">
-          <td class="py-3 px-3 font-bold text-slate-500">${idx + 1}</td>
+          <td class="py-3 px-3 font-bold text-slate-500">${startIndex + idx + 1}</td>
           <td class="py-3 px-3 font-mono font-bold text-slate-800">${s.nisn}</td>
           <td class="py-3 px-3 font-extrabold text-slate-900">${s.nama}</td>
           <td class="py-3 px-3 text-slate-600">${s.kelas}</td>
@@ -3902,7 +4002,10 @@
       const keyword = (document.getElementById('search-guru')?.value || '').toLowerCase();
       const filterRole = document.getElementById('filter-guru-role')?.value || 'ALL';
 
-      const filtered = (pesertaAccounts || []).filter(acc => {
+      // Daftar guru hanya menampilkan Tenaga Pendidik (Guru Mapel & Wali Kelas). Admin dikelola di Pengaturan.
+      const guruList = (pesertaAccounts || []).filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
+
+      const filtered = guruList.filter(acc => {
         const mapelStr = Array.isArray(acc.mapelDiampu) ? acc.mapelDiampu.join(' ').toLowerCase() : (acc.mapelDiampu || '').toLowerCase();
         const matchKey = (acc.nama || '').toLowerCase().includes(keyword) ||
                          (acc.username || '').toLowerCase().includes(keyword) ||
@@ -3913,12 +4016,11 @@
         return matchKey && matchRole;
       });
 
-      const countGuruMapel = (pesertaAccounts || []).filter(p => p.role === 'guru_mapel' || p.role === 'guru').length;
-      const countWali = (pesertaAccounts || []).filter(p => p.role === 'wali_kelas').length;
-      const countAdmin = (pesertaAccounts || []).filter(p => p.role === 'admin').length;
+      const countGuruMapel = guruList.filter(p => p.role === 'guru_mapel' || p.role === 'guru').length;
+      const countWali = guruList.filter(p => p.role === 'wali_kelas').length;
       const guruStats = document.getElementById('guru-stats-info');
       if (guruStats) {
-        guruStats.textContent = `Total: ${pesertaAccounts.length} Pendidik (Guru: ${countGuruMapel}, Wali Kelas: ${countWali}, Admin: ${countAdmin})`;
+        guruStats.textContent = `Total: ${guruList.length} Pendidik (Guru Mapel: ${countGuruMapel}, Wali Kelas: ${countWali})`;
       }
 
       if (filtered.length === 0) {
@@ -4116,18 +4218,14 @@
     window.deletePesertaAccount = function(id) {
       const acc = pesertaAccounts.find(a => a.id === id);
       if (!acc) return;
-      if (acc.role === 'admin') {
-        showToast('Akun Administrator utama tidak dapat dihapus demi keamanan sistem.', 'warning');
-        return;
-      }
       showConfirmModal(
         'Hapus Akun Guru?',
         `Apakah Anda yakin ingin menghapus data akun ${acc.nama} (${acc.username})?`,
         async () => {
           pesertaAccounts = pesertaAccounts.filter(a => a.id !== id);
           await deleteDocFromCloud('users_peserta', id);
-          renderAllViews();
-          showToast('Data guru berhasil dihapus.', 'info');
+          renderPesertaAccountsTable();
+          showToast(`Data guru ${acc.nama} berhasil dihapus.`, 'info');
         }
       );
     };
@@ -4141,39 +4239,29 @@
         'Status Guru (Belum Sertifikasi/Sudah Sertifikasi/PNS/PPPK/GTT)',
         'Jabatan / Tugas',
         'Sandi Portal Guru',
-        'Hak Akses (guru_mapel / wali_kelas / admin)',
+        'Hak Akses (guru_mapel / wali_kelas)',
         'Mapel yang Diampu (pisahkan koma)'
       ];
       const sample = [
         [
-          'Ust. H. ACHMAD FADILLAH, S.Sos',
-          'NIP',
-          '198501012010011001',
-          'Belum Sertifikasi',
-          'Guru Mapel PAI',
-          'user123',
-          'guru_mapel',
-          'Al Qur\'an Hadis, Akidah Akhlak, Fikih'
-        ],
-        [
-          'Hj. Siti Aminah, M.Pd',
+          'KODAR BULDANI',
           'NUPTK',
-          '4539760662200002',
-          'Sudah Sertifikasi',
-          'Wali Kelas VI-A',
-          'user123',
-          'wali_kelas',
-          'Pend. Pancasila, Bahasa Indonesia'
-        ],
-        [
-          'Budi Santoso, S.Pd',
-          'PegID',
-          '3201020304050001',
+          '1510197300000001',
           'Belum Sertifikasi',
           'Guru Mapel',
-          'user123',
+          '15101973',
           'guru_mapel',
-          'Matematika, IPAS, PJOK'
+          'Bahasa Arab, Baca Tulis Al Qur\'an, PJOK'
+        ],
+        [
+          'ABDURRAHMAN, S.Pd',
+          'PegID',
+          '2709199500000002',
+          'Belum Sertifikasi',
+          'Wali Kelas 6',
+          '27091995',
+          'wali_kelas',
+          'Pend. Pancasila, Bahasa Indonesia, IPAS, SBDP'
         ]
       ];
       const ws = XLSX.utils.aoa_to_sheet([header, ...sample]);
@@ -4195,13 +4283,14 @@
 
     // EKSPOR GURU EXCEL
     window.exportGuruExcel = function() {
-      if (pesertaAccounts.length === 0) {
+      const list = (pesertaAccounts || []).filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
+      if (list.length === 0) {
         showToast('Belum ada data guru untuk diekspor.', 'error');
         return;
       }
       const data = [
         ['DATA TENAGA PENDIDIK & GURU MADRASAH'],
-        ['Tanggal Unduh', new Date().toLocaleDateString('id-ID'), 'Total Guru', pesertaAccounts.length],
+        ['Tanggal Unduh', new Date().toLocaleDateString('id-ID'), 'Total Guru', list.length],
         [],
         [
           'No',
@@ -4216,10 +4305,9 @@
           'Sandi Portal'
         ]
       ];
-      pesertaAccounts.forEach((acc, idx) => {
+      list.forEach((acc, idx) => {
         let rName = 'Guru (User Biasa)';
-        if (acc.role === 'admin') rName = 'Administrator';
-        else if (acc.role === 'wali_kelas') rName = 'Wali Kelas';
+        if (acc.role === 'wali_kelas') rName = 'Wali Kelas';
 
         const mapelStr = Array.isArray(acc.mapelDiampu) ? acc.mapelDiampu.join(', ') : (acc.mapelDiampu || '-');
 
@@ -4301,19 +4389,32 @@
           
           let namaCol = header.findIndex(h => h.includes('nama'));
           let jenisIdCol = header.findIndex(h => h.includes('jenis'));
-          let nomorIdCol = header.findIndex(h => h.includes('nomor') || h.includes('identitas') || h.includes('nip') || h.includes('nuptk'));
+          
+          // PENTING: nomorIdCol TIDAK BOLEH jenisIdCol!
+          let nomorIdCol = header.findIndex((h, idx) => idx !== jenisIdCol && (h.includes('nomor') || (h.includes('identitas') && !h.includes('jenis'))));
+          if (nomorIdCol === -1) {
+            nomorIdCol = header.findIndex((h, idx) => idx !== jenisIdCol && (h === 'nip' || h === 'nuptk' || h === 'pegid' || h === 'nik' || h.includes('no.')));
+          }
+          if (nomorIdCol === -1 && header.length >= 3 && jenisIdCol === 1) {
+            nomorIdCol = 2;
+          }
+
           let statusCol = header.findIndex(h => h.includes('status') || h.includes('sertifikasi'));
-          let jabatanCol = header.findIndex(h => h.includes('jabatan') || h.includes('tugas') || h.includes('mapel atau') || h.includes('mata pelajaran'));
+          let jabatanCol = header.findIndex(h => h.includes('jabatan') || h.includes('tugas'));
           let passCol = header.findIndex(h => h.includes('pass') || h.includes('sandi'));
           let roleCol = header.findIndex(h => h.includes('peran') || h.includes('role') || h.includes('hak akses'));
-          let mapelDiampuCol = header.findIndex(h => h.includes('diampu') || h.includes('mata pelajaran'));
+          let mapelDiampuCol = header.findIndex((h, idx) => idx !== jabatanCol && (h.includes('diampu') || (h.includes('mapel') && !h.includes('jabatan')) || h.includes('mata pelajaran')));
           let userCol = header.findIndex(h => h.includes('username') || h.includes('user login'));
 
-          // Fallbacks jika nama kolom format lama
+          // Positional fallbacks jika header tidak cocok sama sekali
           if (namaCol === -1) namaCol = 0;
-          if (userCol === -1 && nomorIdCol === -1) {
-            userCol = [0, 1, 2, 3].find(c => c !== namaCol && c !== passCol && c !== roleCol) ?? -1;
-          }
+          if (jenisIdCol === -1 && header.length > 1) jenisIdCol = 1;
+          if (nomorIdCol === -1 && header.length > 2) nomorIdCol = 2;
+          if (statusCol === -1 && header.length > 3) statusCol = 3;
+          if (jabatanCol === -1 && header.length > 4) jabatanCol = 4;
+          if (passCol === -1 && header.length > 5) passCol = 5;
+          if (roleCol === -1 && header.length > 6) roleCol = 6;
+          if (mapelDiampuCol === -1 && header.length > 7) mapelDiampuCol = 7;
 
           let importedCount = 0;
           const updatedGuru = [];
@@ -4323,11 +4424,17 @@
             if (!row || !Array.isArray(row)) continue;
 
             const nama = String(namaCol >= 0 ? (row[namaCol] ?? '') : '').trim();
-            const jenisId = String(jenisIdCol >= 0 ? (row[jenisIdCol] ?? 'NIP') : 'NIP').trim() || 'NIP';
+            if (!nama) continue;
+
+            let jenisId = String(jenisIdCol >= 0 ? (row[jenisIdCol] ?? 'NIP') : 'NIP').trim() || 'NIP';
             
             let rawNomorId = String(nomorIdCol >= 0 ? (row[nomorIdCol] ?? '') : '').trim();
             if (rawNomorId.endsWith('.0')) rawNomorId = rawNomorId.slice(0, -2);
-            const nomorId = rawNomorId;
+            let nomorId = rawNomorId;
+            // Cegah nomorId berisi label jenis id seperti 'NIP', 'NUPTK', 'PegID'
+            if (['nip', 'nuptk', 'pegid', 'nik', 'lainnya', '-'].includes(nomorId.toLowerCase())) {
+              nomorId = '';
+            }
 
             const statusGuru = String(statusCol >= 0 ? (row[statusCol] ?? 'Belum Sertifikasi') : 'Belum Sertifikasi').trim() || 'Belum Sertifikasi';
             const jabatan = String(jabatanCol >= 0 ? (row[jabatanCol] ?? 'Guru Mapel') : 'Guru Mapel').trim() || 'Guru Mapel';
@@ -4337,34 +4444,55 @@
             let rawMapelDiampu = String(mapelDiampuCol >= 0 ? (row[mapelDiampuCol] ?? '') : '').trim();
             const mapelDiampu = rawMapelDiampu ? rawMapelDiampu.split(',').map(m => m.trim()).filter(Boolean) : [];
 
-            let rawUser = String(userCol >= 0 ? (row[userCol] ?? '') : '').trim();
-            if (!nama && !rawUser && !nomorId) continue;
-
             let role = 'guru_mapel';
-            if (rawRole.includes('admin')) {
-              role = 'admin';
-            } else if (rawRole.includes('wali')) {
+            if (rawRole.includes('wali')) {
               role = 'wali_kelas';
-            } else if (rawRole.includes('mapel') || rawRole.includes('guru') || rawRole.includes('biasa')) {
+            } else {
               role = 'guru_mapel';
             }
 
-            const finalUsername = (rawUser || nomorId || (nama ? nama.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 16) : '') || ('guru_' + i)).toLowerCase();
-            const existingIdx = pesertaAccounts.findIndex(a => 
-              (a.username && a.username.toLowerCase() === finalUsername) || 
-              (nomorId && a.nomorId && String(a.nomorId).trim() === nomorId)
-            );
+            // Tentukan kandidat username unik
+            let userCandidate = String(userCol >= 0 ? (row[userCol] ?? '') : '').trim().toLowerCase();
+            if (!userCandidate || userCandidate === 'user123') {
+              if (nomorId) {
+                userCandidate = nomorId.toLowerCase();
+              } else {
+                userCandidate = nama.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').substring(0, 16);
+                if (!userCandidate || userCandidate === '_') userCandidate = 'guru';
+              }
+            }
+
+            // Jamin username tidak bentrok dengan guru lain yang baru diimpor atau yang sudah ada
+            let finalUsername = userCandidate;
+            let counter = 1;
+            while (
+              updatedGuru.some(u => u.username.toLowerCase() === finalUsername) ||
+              pesertaAccounts.some(a => a.username && a.username.toLowerCase() === finalUsername && (!nomorId || a.nomorId !== nomorId))
+            ) {
+              counter++;
+              finalUsername = `${userCandidate}_${counter}`;
+            }
+
+            // Cari apakah guru ini sudah ada sebelumnya (berdasarkan nomorId atau nama lengkap & role)
+            let existingIdx = -1;
+            if (nomorId) {
+              existingIdx = pesertaAccounts.findIndex(a => a.nomorId && String(a.nomorId).trim() === nomorId);
+            }
+            if (existingIdx === -1) {
+              existingIdx = pesertaAccounts.findIndex(a => a.nama.toLowerCase() === nama.toLowerCase() && a.role === role);
+            }
+
             const id = existingIdx >= 0 ? pesertaAccounts[existingIdx].id : 'usr_' + Date.now() + '_' + i;
-            
+
             const obj = {
               id,
               username: finalUsername,
-              nama: nama || finalUsername,
+              nama,
               jenisId,
               nomorId,
               statusGuru,
-              jabatan: jabatan || (mapelDiampu.length > 0 ? mapelDiampu.join(', ') : 'Guru Mapel'),
-              kelas: jabatan || (mapelDiampu.length > 0 ? mapelDiampu.join(', ') : 'Guru Mapel'),
+              jabatan: jabatan || (mapelDiampu.length > 0 ? mapelDiampu.join(', ') : (role === 'wali_kelas' ? 'Wali Kelas' : 'Guru Mapel')),
+              kelas: jabatan || (mapelDiampu.length > 0 ? mapelDiampu.join(', ') : (role === 'wali_kelas' ? 'Wali Kelas' : 'Guru Mapel')),
               role,
               password,
               mapelDiampu
@@ -4385,10 +4513,8 @@
             return;
           }
 
-          // Pastikan akun admin tidak pernah hilang
-          if (!pesertaAccounts.some(a => a.role === 'admin')) {
-            pesertaAccounts.unshift({ id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' });
-          }
+          // Bersihkan jika ada admin tercampur
+          pesertaAccounts = (pesertaAccounts || []).filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
 
           // 1. Simpan langsung ke LocalStorage
           localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
@@ -4450,15 +4576,11 @@
       if (inpKamad && !inpKamad.matches(':focus')) inpKamad.value = appSettings.kepalaSekolah || '';
 
       // 5. Input Fields di Form User Admin
-      let adminAcc = (pesertaAccounts || []).find(a => a.role === 'admin');
-      if (!adminAcc) {
-        adminAcc = { id: 'usr_admin', username: 'admin', password: 'admin123', nama: 'Administrator Utama', kelas: 'Semua Mapel', role: 'admin' };
-        pesertaAccounts.unshift(adminAcc);
-      }
+      const adminCreds = getAdminCredentials();
       const inpAdminUser = document.getElementById('setting-admin-username');
-      if (inpAdminUser && !inpAdminUser.matches(':focus')) inpAdminUser.value = adminAcc.username || 'admin';
+      if (inpAdminUser && !inpAdminUser.matches(':focus')) inpAdminUser.value = adminCreds.username || 'admin';
       const inpAdminNama = document.getElementById('setting-admin-nama');
-      if (inpAdminNama && !inpAdminNama.matches(':focus')) inpAdminNama.value = adminAcc.nama || 'Administrator Utama';
+      if (inpAdminNama && !inpAdminNama.matches(':focus')) inpAdminNama.value = adminCreds.nama || 'Administrator Utama';
     }
 
     function renderPengaturanView() {
@@ -4498,29 +4620,17 @@
         return;
       }
 
-      let adminAcc = (pesertaAccounts || []).find(a => a.role === 'admin');
-      if (!adminAcc) {
-        adminAcc = {
-          id: 'usr_admin',
-          username: 'admin',
-          password: 'admin123',
-          nama: 'Administrator Utama',
-          kelas: 'Semua Mapel',
-          role: 'admin'
-        };
-        pesertaAccounts.unshift(adminAcc);
-      }
-
       // Pastikan username baru tidak bentrok dengan akun guru lain
-      const conflict = (pesertaAccounts || []).find(a => a.id !== adminAcc.id && a.username && a.username.toLowerCase() === newUsername.toLowerCase());
+      const conflict = (pesertaAccounts || []).find(a => a.username && a.username.toLowerCase() === newUsername.toLowerCase());
       if (conflict) {
-        showToast(`Username '${newUsername}' sudah digunakan oleh pengguna lain.`, 'error');
+        showToast(`Username '${newUsername}' sudah digunakan oleh akun guru lain.`, 'error');
         return;
       }
 
-      adminAcc.username = newUsername;
-      adminAcc.nama = newNama;
-      adminAcc.updatedAt = Date.now();
+      const adminCreds = getAdminCredentials();
+      adminCreds.username = newUsername;
+      adminCreds.nama = newNama;
+      saveAdminCredentials(adminCreds);
 
       // Update sesi aktif jika login sebagai admin
       if (currentUser && currentUser.role === 'admin') {
@@ -4534,8 +4644,6 @@
         if (badgeEl) badgeEl.textContent = initials || 'AD';
       }
 
-      await saveDocToCloud('users_peserta', adminAcc.id, adminAcc);
-      renderPesertaAccountsTable();
       applyAppSettingsUI();
       animateButtonSaveFeedback(e, 'Admin Diperbarui!');
       showToast('Profil Administrator (Username & Nama) berhasil diperbarui!', 'success');
@@ -4552,20 +4660,9 @@
         return;
       }
 
-      let adminAcc = (pesertaAccounts || []).find(a => a.role === 'admin');
-      if (!adminAcc) {
-        adminAcc = {
-          id: 'usr_admin',
-          username: 'admin',
-          password: 'admin123',
-          nama: 'Administrator Utama',
-          kelas: 'Semua Mapel',
-          role: 'admin'
-        };
-        pesertaAccounts.unshift(adminAcc);
-      }
+      const adminCreds = getAdminCredentials();
 
-      if (curPass !== adminAcc.password) {
+      if (curPass !== adminCreds.password) {
         showToast('Kata sandi saat ini tidak cocok. Silakan periksa kembali.', 'error');
         return;
       }
@@ -4580,11 +4677,8 @@
         return;
       }
 
-      adminAcc.password = newPass;
-      adminAcc.updatedAt = Date.now();
-
-      await saveDocToCloud('users_peserta', adminAcc.id, adminAcc);
-      renderPesertaAccountsTable();
+      adminCreds.password = newPass;
+      saveAdminCredentials(adminCreds);
 
       document.getElementById('setting-admin-cur-pass').value = '';
       document.getElementById('setting-admin-new-pass').value = '';
