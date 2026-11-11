@@ -145,6 +145,129 @@
       }
     }
 
+    /* Login, Logout, Simpan & View Transition Animations */
+    @keyframes floworaFadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.985);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes floworaFadeOutDown {
+      from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      to {
+        opacity: 0;
+        transform: translateY(10px) scale(0.985);
+      }
+    }
+
+    @keyframes floworaPopIn {
+      0% {
+        opacity: 0;
+        transform: scale(0.86);
+      }
+
+      70% {
+        opacity: 1;
+        transform: scale(1.03);
+      }
+
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    @keyframes floworaShake {
+      0%, 100% {
+        transform: translateX(0);
+      }
+
+      20%, 60% {
+        transform: translateX(-7px);
+      }
+
+      40%, 80% {
+        transform: translateX(7px);
+      }
+    }
+
+    @keyframes floworaPulseRing {
+      0% {
+        transform: scale(0.92);
+        opacity: 0.7;
+      }
+
+      75% {
+        transform: scale(1.42);
+        opacity: 0;
+      }
+
+      100% {
+        transform: scale(1.42);
+        opacity: 0;
+      }
+    }
+
+    @keyframes floworaCheckDraw {
+      from {
+        stroke-dashoffset: 38;
+      }
+
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    @keyframes floworaProgressSweep {
+      0% {
+        transform: translateX(-120%);
+      }
+
+      100% {
+        transform: translateX(280%);
+      }
+    }
+
+    .animate-view-in {
+      animation: floworaFadeUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .animate-view-out {
+      animation: floworaFadeOutDown 0.24s cubic-bezier(0.4, 0, 1, 1) both;
+    }
+
+    .animate-pop-in {
+      animation: floworaPopIn 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .animate-shake {
+      animation: floworaShake 0.4s ease-in-out;
+    }
+
+    .animate-pulse-ring {
+      animation: floworaPulseRing 1.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    }
+
+    .animate-check-stroke {
+      stroke-dasharray: 38;
+      stroke-dashoffset: 38;
+      animation: floworaCheckDraw 0.42s ease-out 0.08s forwards;
+    }
+
+    .animate-progress-sweep {
+      animation: floworaProgressSweep 1.1s ease-in-out infinite;
+    }
+
     /* Print Styling for Official Exam Analysis Report */
     @media print {
       #flowora-app-root {
@@ -178,8 +301,8 @@
 
     <!-- ==================== VIEW 1: LOGIN SCREEN ==================== -->
     <div id="auth-view" class="w-full h-full overflow-y-auto custom-scroll flex items-center justify-center p-4 md:p-8">
-      <div
-        class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 glass-surface rounded-3xl overflow-hidden shadow-2xl border border-white/80">
+      <div id="auth-card"
+        class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 glass-surface rounded-3xl overflow-hidden shadow-2xl border border-white/80 animate-view-in">
 
         <!-- Left Hero Showcase (Flowora Style) -->
         <div
@@ -318,7 +441,7 @@
               <div id="user-display-sub" class="text-[11px] text-slate-500 truncate">Matematika Wajib</div>
             </div>
           </div>
-          <button type="button" onclick="window.handleLogout()"
+          <button type="button" id="btn-logout-desktop" onclick="window.handleLogout()"
             class="w-full py-2 px-3 rounded-full bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-bold transition flex items-center justify-center gap-1.5">
             <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Keluar Sesi
           </button>
@@ -346,6 +469,13 @@
 
           <!-- Global Exam Filter & Quick Actions -->
           <div class="flex items-center gap-2.5 md:gap-4">
+            <button type="button" id="sync-status-badge" onclick="window.manualSyncSupabase()"
+              title="Klik untuk sinkronisasi manual ke Supabase"
+              class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-bold transition hover:bg-emerald-100/80 shrink-0">
+              <i data-lucide="cloud-check" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline" id="sync-status-text">Tersinkron</span>
+            </button>
+
             <div
               class="hidden md:flex items-center gap-2 bg-slate-100/90 border border-slate-200/80 px-3.5 py-2 rounded-full">
               <i data-lucide="book-open-check" class="w-4 h-4 text-indigo-600"></i>
@@ -362,8 +492,8 @@
               <span class="hidden sm:inline">Input Nilai Siswa</span>
             </button>
 
-            <button type="button" onclick="window.handleLogout()"
-              class="lg:hidden p-2.5 rounded-full bg-slate-100 text-slate-600 hover:text-rose-600" title="Keluar">
+            <button type="button" id="btn-logout-mobile" onclick="window.handleLogout()"
+              class="lg:hidden p-2.5 rounded-full bg-slate-100 text-slate-600 hover:text-rose-600 transition" title="Keluar">
               <i data-lucide="log-out" class="w-4 h-4"></i>
             </button>
           </div>
@@ -422,6 +552,29 @@
       </div>
     </div>
 
+    <!-- ==================== GLOBAL ACTION ANIMATION OVERLAY (LOGIN / LOGOUT / SIMPAN) ==================== -->
+    <div id="action-anim-overlay"
+      class="hidden fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-md flex items-center justify-center p-4 transition-opacity duration-300">
+      <div id="action-anim-card"
+        class="w-full max-w-sm glass-surface bg-white/95 rounded-3xl p-7 shadow-2xl border border-white/90 text-center space-y-4 animate-pop-in">
+        <div class="relative w-16 h-16 mx-auto flex items-center justify-center">
+          <span id="action-anim-ring"
+            class="absolute inset-0 rounded-full bg-indigo-500/25 animate-pulse-ring"></span>
+          <div id="action-anim-icon-wrap"
+            class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 transition-all duration-300">
+          </div>
+        </div>
+        <div class="space-y-1">
+          <h3 id="action-anim-title" class="text-lg font-extrabold text-slate-900">Memproses...</h3>
+          <p id="action-anim-subtitle" class="text-xs font-medium text-slate-500">Menyinkronkan data dengan Supabase</p>
+        </div>
+        <div id="action-anim-progress-track" class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div id="action-anim-progress-bar"
+            class="h-full w-2/5 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 animate-progress-sweep"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- ==================== GLOBAL TOAST NOTIFICATION ==================== -->
     <div id="toast-container" class="fixed top-5 right-5 z-50 space-y-2.5 pointer-events-none"></div>
 
@@ -470,11 +623,20 @@
     }
 
     // ==================== STATE MANAGEMENT & INITIAL DUMMY DATA ====================
+    const STORAGE_KEYS = {
+      SESSION: 'flowora_session_v1',
+      CACHE: 'flowora_state_cache_v1',
+      PENDING_SYNC: 'flowora_pending_sync_v1'
+    };
+
     const state = {
       authRoleTab: 'guru', // 'guru' | 'admin'
       currentUser: null,   // { id, role, full_name, username, subject, class_assigned }
       activeMenu: 'dashboard',
       activeExamId: null,
+      supabaseAccessToken: null,
+      isSyncing: false,
+      lastSyncedAt: null,
       teachers: [],
       classes: [],
       exams: [],
@@ -569,19 +731,465 @@
       ]
     };
 
+    // ==================== LOCAL STORAGE, SYNC ENGINE & ANIMATION HELPERS ====================
+    const SVG_ICONS = {
+      spinner: '<svg class="w-7 h-7 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path></svg>',
+      spinnerSm: '<svg class="w-4 h-4 animate-spin shrink-0" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path></svg>',
+      check: '<svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path class="animate-check-stroke" d="M5 13l4 4L19 7"/></svg>',
+      logout: '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'
+    };
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    function saveSessionToStorage() {
+      try {
+        if (!state.currentUser) {
+          localStorage.removeItem(STORAGE_KEYS.SESSION);
+          return;
+        }
+        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
+          currentUser: state.currentUser,
+          activeMenu: state.activeMenu,
+          activeExamId: state.activeExamId,
+          savedAt: Date.now()
+        }));
+      } catch (e) { }
+    }
+
+    function loadSessionFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.SESSION);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function clearSessionFromStorage() {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.SESSION);
+      } catch (e) { }
+    }
+
+    function saveCacheToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.CACHE, JSON.stringify({
+          teachers: state.teachers,
+          classes: state.classes,
+          exams: state.exams,
+          examResults: state.examResults,
+          activeExamId: state.activeExamId
+        }));
+      } catch (e) { }
+    }
+
+    function loadCacheFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.CACHE);
+        if (!raw) return false;
+        const cached = JSON.parse(raw);
+        if (Array.isArray(cached.teachers)) state.teachers = cached.teachers;
+        if (Array.isArray(cached.classes)) state.classes = cached.classes;
+        if (Array.isArray(cached.exams)) state.exams = cached.exams;
+        if (Array.isArray(cached.examResults)) state.examResults = cached.examResults;
+        if (cached.activeExamId) state.activeExamId = cached.activeExamId;
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function getPendingSyncQueue() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.PENDING_SYNC);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function savePendingSyncQueue(queue) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.PENDING_SYNC, JSON.stringify(queue));
+      } catch (e) { }
+    }
+
+    function enqueuePendingSync(op) {
+      const queue = getPendingSyncQueue();
+      queue.push({ ...op, id: op.id || crypto.randomUUID(), timestamp: Date.now() });
+      savePendingSyncQueue(queue);
+    }
+
+    function updateSyncBadge(status, customLabel = null) {
+      const badge = document.getElementById('sync-status-badge');
+      if (!badge) return;
+      const pendingCount = getPendingSyncQueue().length;
+
+      if (status === 'syncing') {
+        badge.className = 'flex items-center gap-1.5 px-3 py-2 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-[11px] font-bold transition shrink-0';
+        badge.innerHTML = `${SVG_ICONS.spinnerSm}<span class="hidden sm:inline">${customLabel || 'Menyinkronkan...'}</span>`;
+        return;
+      }
+
+      if (status === 'pending' || pendingCount > 0) {
+        badge.className = 'flex items-center gap-1.5 px-3 py-2 rounded-full bg-amber-50 border border-amber-200/80 text-amber-700 text-[11px] font-bold transition hover:bg-amber-100/80 shrink-0';
+        badge.innerHTML = `<i data-lucide="cloud-off" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">${customLabel || `Antrean (${pendingCount})`}</span>`;
+        lucide.createIcons({ nodes: [badge] });
+        return;
+      }
+
+      const timeStr = state.lastSyncedAt
+        ? state.lastSyncedAt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+        : '';
+      badge.className = 'flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-bold transition hover:bg-emerald-100/80 shrink-0 animate-pop-in';
+      badge.innerHTML = `<i data-lucide="cloud-check" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">${customLabel || (timeStr ? `Tersinkron ${timeStr}` : 'Tersinkron')}</span>`;
+      lucide.createIcons({ nodes: [badge] });
+    }
+
+    function setButtonLoading(btn, isLoading, loadingText = 'Memproses...') {
+      if (!btn) return;
+      if (isLoading) {
+        if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.classList.add('opacity-80', 'cursor-not-allowed');
+        btn.innerHTML = `${SVG_ICONS.spinnerSm}<span>${loadingText}</span>`;
+      } else {
+        btn.disabled = false;
+        btn.classList.remove('opacity-80', 'cursor-not-allowed');
+        if (btn.dataset.originalHtml) {
+          btn.innerHTML = btn.dataset.originalHtml;
+          delete btn.dataset.originalHtml;
+          lucide.createIcons({ nodes: [btn] });
+        }
+      }
+    }
+
+    function showActionOverlay({ stateType = 'loading', title = 'Memproses...', subtitle = 'Menyinkronkan dengan Supabase' }) {
+      const overlay = document.getElementById('action-anim-overlay');
+      const card = document.getElementById('action-anim-card');
+      const ring = document.getElementById('action-anim-ring');
+      const iconWrap = document.getElementById('action-anim-icon-wrap');
+      const titleEl = document.getElementById('action-anim-title');
+      const subEl = document.getElementById('action-anim-subtitle');
+      const progressBar = document.getElementById('action-anim-progress-bar');
+      if (!overlay) return;
+
+      titleEl.textContent = title;
+      subEl.textContent = subtitle;
+
+      if (stateType === 'success') {
+        ring.className = 'absolute inset-0 rounded-full bg-emerald-500/25 animate-pulse-ring';
+        iconWrap.className = 'relative w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 transition-all duration-300 scale-105';
+        iconWrap.innerHTML = SVG_ICONS.check;
+        progressBar.className = 'h-full w-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-300';
+      } else if (stateType === 'logout-done') {
+        ring.className = 'absolute inset-0 rounded-full bg-indigo-500/20 animate-pulse-ring';
+        iconWrap.className = 'relative w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 transition-all duration-300 scale-105';
+        iconWrap.innerHTML = SVG_ICONS.logout;
+        progressBar.className = 'h-full w-full rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 transition-all duration-300';
+      } else {
+        ring.className = 'absolute inset-0 rounded-full bg-indigo-500/25 animate-pulse-ring';
+        iconWrap.className = 'relative w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 transition-all duration-300';
+        iconWrap.innerHTML = SVG_ICONS.spinner;
+        progressBar.className = 'h-full w-2/5 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 animate-progress-sweep';
+      }
+
+      if (overlay.classList.contains('hidden')) {
+        overlay.classList.remove('hidden', 'opacity-0');
+        card.classList.remove('animate-pop-in');
+        void card.offsetWidth;
+        card.classList.add('animate-pop-in');
+      }
+    }
+
+    async function hideActionOverlay() {
+      const overlay = document.getElementById('action-anim-overlay');
+      if (!overlay || overlay.classList.contains('hidden')) return;
+      overlay.classList.add('opacity-0');
+      await sleep(220);
+      overlay.classList.add('hidden');
+      overlay.classList.remove('opacity-0');
+    }
+
+    async function switchViewAnimated(hideEl, showEl) {
+      if (hideEl && !hideEl.classList.contains('hidden')) {
+        hideEl.classList.remove('animate-view-in');
+        hideEl.classList.add('animate-view-out');
+        await sleep(200);
+        hideEl.classList.add('hidden');
+        hideEl.classList.remove('animate-view-out');
+      }
+      if (showEl) {
+        showEl.classList.remove('hidden', 'animate-view-out');
+        showEl.classList.remove('animate-view-in');
+        void showEl.offsetWidth;
+        showEl.classList.add('animate-view-in');
+      }
+    }
+
+    async function flushPendingSyncToSupabase() {
+      const queue = getPendingSyncQueue();
+      if (queue.length === 0) return { ok: true, fatalError: null };
+      if (IS_PREVIEW || !supabase) {
+        savePendingSyncQueue([]);
+        return { ok: true, fatalError: null };
+      }
+
+      const remaining = [];
+      let fatalError = null;
+
+      for (let i = 0; i < queue.length; i++) {
+        const op = queue[i];
+        try {
+          let res;
+          if (op.action === 'upsert') {
+            res = await supabase.from(op.table).upsert([op.record], { onConflict: 'id' });
+          } else if (op.action === 'delete') {
+            res = await supabase.from(op.table).delete().eq('id', op.recordId);
+          }
+
+          if (res?.error) {
+            const isNetworkLike = !navigator.onLine || /fetch|network|timeout|load failed|offline|abort/i.test(res.error.message || '');
+            if (isNetworkLike) {
+              remaining.push(op, ...queue.slice(i + 1));
+              break;
+            }
+            // Database constraint / permission error: don't loop forever
+            fatalError = res.error;
+          }
+        } catch (err) {
+          remaining.push(op, ...queue.slice(i + 1));
+          break;
+        }
+      }
+
+      savePendingSyncQueue(remaining);
+      return { ok: remaining.length === 0 && !fatalError, fatalError };
+    }
+
+    function flushPendingSyncKeepalive() {
+      saveSessionToStorage();
+      saveCacheToStorage();
+      if (IS_PREVIEW || !supabase) return;
+      const queue = getPendingSyncQueue();
+      if (queue.length === 0) return;
+
+      const token = state.supabaseAccessToken || SUPABASE_ANON_KEY;
+      const baseHeaders = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal'
+      };
+
+      queue.forEach(op => {
+        try {
+          if (op.action === 'upsert') {
+            fetch(`${SUPABASE_URL}/rest/v1/${op.table}?on_conflict=id`, {
+              method: 'POST',
+              headers: baseHeaders,
+              body: JSON.stringify([op.record]),
+              keepalive: true
+            }).catch(() => { });
+          } else if (op.action === 'delete') {
+            fetch(`${SUPABASE_URL}/rest/v1/${op.table}?id=eq.${encodeURIComponent(op.recordId)}`, {
+              method: 'DELETE',
+              headers: baseHeaders,
+              keepalive: true
+            }).catch(() => { });
+          }
+        } catch (e) { }
+      });
+    }
+
+    async function syncWithSupabase({ reason = 'manual', showOverlay = false } = {}) {
+      if (state.isSyncing) return { ok: true };
+      state.isSyncing = true;
+      updateSyncBadge('syncing');
+
+      if (showOverlay) {
+        showActionOverlay({
+          stateType: 'loading',
+          title: 'Menyinkronkan Supabase...',
+          subtitle: 'Mengirim antrean data dan mengambil pembaruan terbaru'
+        });
+      }
+
+      try {
+        const flushRes = await flushPendingSyncToSupabase();
+        if (!IS_PREVIEW && supabase) {
+          await fetchAllSupabaseData();
+        }
+        state.lastSyncedAt = new Date();
+        saveCacheToStorage();
+        saveSessionToStorage();
+
+        const pendingLeft = getPendingSyncQueue().length;
+        updateSyncBadge(pendingLeft > 0 ? 'pending' : 'synced');
+
+        if (state.currentUser && !document.getElementById('app-view').classList.contains('hidden')) {
+          populateExamSelectors();
+          if (reason === 'manual' || reason === 'refresh' || reason === 'online') {
+            renderCurrentMenu();
+          }
+        }
+
+        if (showOverlay) {
+          showActionOverlay({
+            stateType: 'success',
+            title: pendingLeft > 0 ? 'Tersimpan di Antrean Lokal' : 'Tersinkron ke Supabase!',
+            subtitle: pendingLeft > 0
+              ? 'Data akan otomatis terkirim saat koneksi kembali stabil'
+              : 'Seluruh data terbaru sudah masuk ke database Supabase'
+          });
+          await sleep(550);
+          await hideActionOverlay();
+        }
+
+        return { ok: flushRes.ok && pendingLeft === 0, fatalError: flushRes.fatalError };
+      } catch (err) {
+        console.error('Sync Error:', err);
+        updateSyncBadge('pending');
+        if (showOverlay) await hideActionOverlay();
+        return { ok: false, fatalError: err };
+      } finally {
+        state.isSyncing = false;
+      }
+    }
+
+    window.manualSyncSupabase = async function () {
+      const res = await syncWithSupabase({ reason: 'manual', showOverlay: true });
+      if (res.ok) {
+        showToast('Seluruh data berhasil disinkronkan ke Supabase!', 'success');
+      } else {
+        showToast('Sebagian data masih berada di antrean lokal (cek koneksi).', 'warning');
+      }
+    };
+
+    async function saveRecordWithSync({
+      submitterBtn,
+      table,
+      record,
+      overlayTitle = 'Menyimpan Data...',
+      overlaySuccessTitle = 'Data Tersimpan!',
+      overlaySuccessSub = 'Otomatis tersinkron masuk ke Supabase',
+      toastMsg = 'Data berhasil disimpan dan disinkronkan!',
+      onLocalApply,
+      onRollback
+    }) {
+      setButtonLoading(submitterBtn, true, 'Menyimpan...');
+      updateSyncBadge('syncing');
+      showActionOverlay({
+        stateType: 'loading',
+        title: overlayTitle,
+        subtitle: 'Menyimpan & menyinkronkan masuk ke Supabase...'
+      });
+
+      try {
+        const opId = crypto.randomUUID();
+        if (onLocalApply) onLocalApply();
+        enqueuePendingSync({ id: opId, table, action: 'upsert', record });
+        saveCacheToStorage();
+        saveSessionToStorage();
+
+        const flushRes = await flushPendingSyncToSupabase();
+        if (flushRes.fatalError) {
+          if (onRollback) onRollback();
+          saveCacheToStorage();
+          updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+          await hideActionOverlay();
+          showToast('Gagal menyimpan ke Supabase: ' + flushRes.fatalError.message, 'danger');
+          return false;
+        }
+
+        if (!IS_PREVIEW && supabase && getPendingSyncQueue().length === 0) {
+          try {
+            await fetchAllSupabaseData();
+            state.lastSyncedAt = new Date();
+          } catch (e) { }
+        } else {
+          state.lastSyncedAt = new Date();
+        }
+
+        saveCacheToStorage();
+        saveSessionToStorage();
+        const pendingLeft = getPendingSyncQueue().length;
+        updateSyncBadge(pendingLeft > 0 ? 'pending' : 'synced');
+
+        populateExamSelectors();
+        renderCurrentMenu();
+
+        showActionOverlay({
+          stateType: 'success',
+          title: overlaySuccessTitle,
+          subtitle: pendingLeft > 0
+            ? 'Tersimpan lokal & akan otomatis tersinkron ke Supabase'
+            : overlaySuccessSub
+        });
+        await sleep(550);
+        await hideActionOverlay();
+        showToast(pendingLeft > 0 ? `${toastMsg} (Menunggu koneksi untuk sinkron)` : toastMsg, pendingLeft > 0 ? 'warning' : 'success');
+        return true;
+      } catch (err) {
+        console.error('SaveWithSync Error:', err);
+        if (onRollback) onRollback();
+        updateSyncBadge('pending');
+        await hideActionOverlay();
+        showToast('Terjadi kesalahan saat menyimpan data.', 'danger');
+        return false;
+      } finally {
+        setButtonLoading(submitterBtn, false);
+      }
+    }
+
+    async function deleteRecordWithSync({ table, recordId, onLocalDelete, toastMsg }) {
+      updateSyncBadge('syncing');
+      enqueuePendingSync({ id: crypto.randomUUID(), table, action: 'delete', recordId });
+      if (onLocalDelete) onLocalDelete();
+      saveCacheToStorage();
+      saveSessionToStorage();
+
+      const flushRes = await flushPendingSyncToSupabase();
+      if (!IS_PREVIEW && supabase && getPendingSyncQueue().length === 0) {
+        try {
+          await fetchAllSupabaseData();
+          state.lastSyncedAt = new Date();
+        } catch (e) { }
+      } else {
+        state.lastSyncedAt = new Date();
+      }
+
+      saveCacheToStorage();
+      saveSessionToStorage();
+      updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+      populateExamSelectors();
+      renderCurrentMenu();
+
+      if (flushRes.fatalError) {
+        showToast('Gagal menghapus di Supabase: ' + flushRes.fatalError.message, 'danger');
+      } else {
+        showToast(toastMsg, 'info');
+      }
+    }
+
     // ==================== AUTO SETUP DATABASE (HYBRID / SUPABASE) ====================
     async function autoSetupDatabase() {
       if (IS_PREVIEW || !supabase) {
-        // Load in-memory dummy data ONLY for preview mode
-        state.teachers = structuredClone(INITIAL_SEED_DATA.teachers);
-        state.classes = structuredClone(INITIAL_SEED_DATA.classes);
-        state.exams = structuredClone(INITIAL_SEED_DATA.exams);
-        state.examResults = structuredClone(INITIAL_SEED_DATA.examResults);
-        state.activeExamId = state.exams[0]?.id || null;
+        // Load in-memory dummy data ONLY if no cached state exists
+        if (state.teachers.length === 0) state.teachers = structuredClone(INITIAL_SEED_DATA.teachers);
+        if (state.classes.length === 0) state.classes = structuredClone(INITIAL_SEED_DATA.classes);
+        if (state.exams.length === 0) state.exams = structuredClone(INITIAL_SEED_DATA.exams);
+        if (state.examResults.length === 0) state.examResults = structuredClone(INITIAL_SEED_DATA.examResults);
+        if (!state.activeExamId) state.activeExamId = state.exams[0]?.id || null;
+        state.lastSyncedAt = new Date();
+        updateSyncBadge('synced', 'Mode Lokal');
         return;
       }
 
       try {
+        // Pastikan antrean sinkronisasi lokal masuk ke Supabase terlebih dahulu saat load/refresh
+        await flushPendingSyncToSupabase();
+
         // Cek apakah tabel teachers di Supabase masih kosong
         const { data: existingTeachers, error: tErr } = await supabase.from('teachers').select('id').limit(1);
         if (tErr) throw tErr;
@@ -594,9 +1202,13 @@
         }
 
         await fetchAllSupabaseData();
+        state.lastSyncedAt = new Date();
+        saveCacheToStorage();
+        updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
       } catch (err) {
         console.error('Supabase AutoSetup Error:', err);
-        showToast('Pastikan Anda sudah menjalankan script SQL di Supabase SQL Editor.', 'warning');
+        updateSyncBadge('pending');
+        showToast('Gagal sinkronisasi ke Supabase. Cek koneksi atau script SQL.', 'warning');
       }
     }
 
@@ -612,7 +1224,7 @@
       if (cRes.data) state.classes = cRes.data;
       if (eRes.data) state.exams = eRes.data;
       if (rRes.data) state.examResults = rRes.data;
-      if (!state.activeExamId && state.exams.length > 0) {
+      if ((!state.activeExamId || !state.exams.some(e => e.id === state.activeExamId)) && state.exams.length > 0) {
         state.activeExamId = state.exams[0].id;
       }
     }
@@ -634,13 +1246,13 @@
       };
 
       const toast = document.createElement('div');
-      toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold transition-all duration-300 ${colors[type] || colors.info}`;
+      toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold transition-all duration-300 animate-pop-in ${colors[type] || colors.info}`;
       toast.innerHTML = `
       <i data-lucide="${icons[type] || 'info'}" class="w-4 h-4 shrink-0"></i>
       <span>${message}</span>
     `;
       container.appendChild(toast);
-      lucide.createIcons();
+      lucide.createIcons({ nodes: [toast] });
 
       setTimeout(() => {
         toast.style.opacity = '0';
@@ -654,13 +1266,20 @@
       document.getElementById('modal-title').textContent = title;
       document.getElementById('modal-body').innerHTML = bodyHtml;
       const confirmBtn = document.getElementById('modal-confirm-btn');
+      confirmBtn.disabled = false;
+      confirmBtn.classList.remove('opacity-80', 'cursor-not-allowed');
       confirmBtn.textContent = confirmText;
       confirmBtn.onclick = async () => {
-        await onConfirm();
-        closeModal();
+        setButtonLoading(confirmBtn, true, 'Sinkronisasi...');
+        try {
+          await onConfirm();
+        } finally {
+          setButtonLoading(confirmBtn, false);
+          closeModal();
+        }
       };
       backdrop.classList.remove('hidden');
-      lucide.createIcons();
+      lucide.createIcons({ nodes: [backdrop] });
     }
 
     function closeModal() {
@@ -694,99 +1313,187 @@
       }
     };
 
+    function triggerAuthShake() {
+      const card = document.getElementById('auth-card');
+      if (!card) return;
+      card.classList.remove('animate-shake');
+      void card.offsetWidth;
+      card.classList.add('animate-shake');
+    }
+
     window.handleLogin = async function (e) {
       e.preventDefault();
       const identifier = document.getElementById('login-identifier').value.trim();
       const password = document.getElementById('login-password').value.trim();
+      const loginBtn = document.getElementById('btn-submit-login');
 
-      if (state.authRoleTab === 'admin') {
-        // Admin Login via Supabase Auth
-        if (IS_PREVIEW || !supabase) {
-          if (identifier.toLowerCase() === 'admin@sekolah.sch.id' && password === 'admin123') {
+      setButtonLoading(loginBtn, true, 'Memverifikasi...');
+
+      try {
+        if (state.authRoleTab === 'admin') {
+          // Admin Login via Supabase Auth
+          if (IS_PREVIEW || !supabase) {
+            if (identifier.toLowerCase() === 'admin@sekolah.sch.id' && password === 'admin123') {
+              state.currentUser = {
+                id: 'admin-preview-uid',
+                role: 'admin',
+                full_name: 'Administrator Kurikulum',
+                username: identifier,
+                subject: 'Semua Mata Pelajaran',
+                class_assigned: 'Seluruh Kelas'
+              };
+            } else {
+              triggerAuthShake();
+              showToast('Email atau Password Admin tidak sesuai.', 'danger');
+              return;
+            }
+          } else {
+            const { data, error } = await supabase.auth.signInWithPassword({
+              email: identifier,
+              password: password
+            });
+            if (error || !data.user) {
+              triggerAuthShake();
+              showToast('Gagal login Supabase Auth: ' + (error?.message || 'Akun tidak ditemukan'), 'danger');
+              return;
+            }
+            state.supabaseAccessToken = data.session?.access_token || null;
             state.currentUser = {
-              id: 'admin-preview-uid',
+              id: data.user.id,
               role: 'admin',
               full_name: 'Administrator Kurikulum',
-              username: identifier,
+              username: data.user.email,
               subject: 'Semua Mata Pelajaran',
               class_assigned: 'Seluruh Kelas'
             };
-            enterWorkspace();
-            showToast('Berhasil masuk sebagai Administrator Sekolah!', 'success');
-          } else {
-            showToast('Email atau Password Admin tidak sesuai.', 'danger');
           }
         } else {
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email: identifier,
-            password: password
-          });
-          if (error || !data.user) {
-            showToast('Gagal login Supabase Auth: ' + (error?.message || 'Akun tidak ditemukan'), 'danger');
+          // Teacher Login via Database Table `teachers` Validation
+          let matchedTeacher = null;
+          if (IS_PREVIEW || !supabase) {
+            matchedTeacher = state.teachers.find(
+              t => t.username.toLowerCase() === identifier.toLowerCase() && t.password === password
+            );
+          } else {
+            const { data, error } = await supabase
+              .from('teachers')
+              .select('*')
+              .eq('username', identifier)
+              .eq('password', password)
+              .maybeSingle();
+            if (!error && data) {
+              matchedTeacher = data;
+            } else if (error) {
+              // Fallback ke cache lokal jika koneksi bermasalah
+              matchedTeacher = state.teachers.find(
+                t => t.username.toLowerCase() === identifier.toLowerCase() && t.password === password
+              );
+            }
+          }
+
+          if (!matchedTeacher) {
+            triggerAuthShake();
+            showToast('Username atau Password Guru salah!', 'danger');
             return;
           }
+
           state.currentUser = {
-            id: data.user.id,
-            role: 'admin',
-            full_name: 'Administrator Kurikulum',
-            username: data.user.email,
-            subject: 'Semua Mata Pelajaran',
-            class_assigned: 'Seluruh Kelas'
+            id: matchedTeacher.id,
+            role: 'guru',
+            full_name: matchedTeacher.full_name,
+            username: matchedTeacher.username,
+            subject: matchedTeacher.subject,
+            class_assigned: matchedTeacher.class_assigned
           };
-          await fetchAllSupabaseData();
-          enterWorkspace();
-          showToast('Login Supabase Auth Admin berhasil!', 'success');
-        }
-      } else {
-        // Teacher Login via Database Table `teachers` Validation
-        let matchedTeacher = null;
-        if (IS_PREVIEW || !supabase) {
-          matchedTeacher = state.teachers.find(
-            t => t.username.toLowerCase() === identifier.toLowerCase() && t.password === password
-          );
-        } else {
-          const { data, error } = await supabase
-            .from('teachers')
-            .select('*')
-            .eq('username', identifier)
-            .eq('password', password)
-            .maybeSingle();
-          if (!error && data) matchedTeacher = data;
         }
 
-        if (!matchedTeacher) {
-          showToast('Username/NIP atau Password Guru salah!', 'danger');
-          return;
-        }
+        // Animasi Login + Sinkronisasi Otomatis ke Supabase
+        saveSessionToStorage();
+        showActionOverlay({
+          stateType: 'loading',
+          title: 'Berhasil Masuk!',
+          subtitle: 'Menyinkronkan data terbaru dari Supabase...'
+        });
 
-        state.currentUser = {
-          id: matchedTeacher.id,
-          role: 'guru',
-          full_name: matchedTeacher.full_name,
-          username: matchedTeacher.username,
-          subject: matchedTeacher.subject,
-          class_assigned: matchedTeacher.class_assigned
-        };
-        await fetchAllSupabaseData();
-        enterWorkspace();
-        showToast(`Selamat datang, ${matchedTeacher.full_name}!`, 'success');
+        await syncWithSupabase({ reason: 'login' });
+
+        showActionOverlay({
+          stateType: 'success',
+          title: 'Selamat Datang!',
+          subtitle: `${state.currentUser.full_name} • Tersinkron dengan Supabase`
+        });
+        await sleep(550);
+        await enterWorkspace({ animate: true });
+        await hideActionOverlay();
+        showToast(`Selamat datang, ${state.currentUser.full_name}!`, 'success');
+      } finally {
+        setButtonLoading(loginBtn, false);
       }
     };
 
     window.handleLogout = async function () {
-      if (!IS_PREVIEW && supabase && state.currentUser?.role === 'admin') {
-        await supabase.auth.signOut();
+      const desktopBtn = document.getElementById('btn-logout-desktop');
+      const mobileBtn = document.getElementById('btn-logout-mobile');
+      setButtonLoading(desktopBtn, true, 'Sinkronisasi...');
+      if (mobileBtn) mobileBtn.disabled = true;
+
+      showActionOverlay({
+        stateType: 'loading',
+        title: 'Menyinkronkan & Keluar...',
+        subtitle: 'Memastikan seluruh data tersinkron masuk ke Supabase'
+      });
+
+      try {
+        // Sinkronkan terlebih dahulu sebelum signOut agar sesi & token tetap valid saat upload ke Supabase
+        await syncWithSupabase({ reason: 'logout' });
+
+        if (!IS_PREVIEW && supabase && state.currentUser?.role === 'admin') {
+          await supabase.auth.signOut();
+        }
+      } catch (e) {
+        console.warn('Logout sync warning:', e);
+      } finally {
+        state.currentUser = null;
+        state.activeMenu = 'dashboard';
+        state.supabaseAccessToken = null;
+        clearSessionFromStorage();
+
+        const passInput = document.getElementById('login-password');
+        if (passInput) passInput.value = '';
+
+        showActionOverlay({
+          stateType: 'logout-done',
+          title: 'Tersinkron & Berhasil Keluar',
+          subtitle: 'Data aman di Supabase • Sesi Anda telah ditutup'
+        });
+        await sleep(550);
+
+        await switchViewAnimated(
+          document.getElementById('app-view'),
+          document.getElementById('auth-view')
+        );
+        await hideActionOverlay();
+        setButtonLoading(desktopBtn, false);
+        if (mobileBtn) mobileBtn.disabled = false;
+        showToast('Data tersinkron ke Supabase & Anda telah keluar dari sesi.', 'info');
       }
-      state.currentUser = null;
-      state.activeMenu = 'dashboard';
-      document.getElementById('app-view').classList.add('hidden');
-      document.getElementById('auth-view').classList.remove('hidden');
-      showToast('Anda telah keluar dari sesi aplikasi.', 'info');
     };
 
-    function enterWorkspace() {
-      document.getElementById('auth-view').classList.add('hidden');
-      document.getElementById('app-view').classList.remove('hidden');
+    async function enterWorkspace({ animate = true, fromRefresh = false } = {}) {
+      const authView = document.getElementById('auth-view');
+      const appView = document.getElementById('app-view');
+
+      if (fromRefresh || !animate) {
+        authView.classList.add('hidden');
+        appView.classList.remove('hidden');
+        if (animate) {
+          appView.classList.remove('animate-view-in');
+          void appView.offsetWidth;
+          appView.classList.add('animate-view-in');
+        }
+      } else {
+        await switchViewAnimated(authView, appView);
+      }
 
       // Update User Info in Sidebar
       const u = state.currentUser;
@@ -807,6 +1514,7 @@
       populateExamSelectors();
       renderNavigationMenus();
       renderCurrentMenu();
+      updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : (state.isSyncing ? 'syncing' : 'synced'));
     }
 
     // ==================== NAVIGATION & EXAM SELECTORS ====================
@@ -836,6 +1544,8 @@
 
     window.handleChangeActiveExam = function (examId) {
       state.activeExamId = examId;
+      saveSessionToStorage();
+      saveCacheToStorage();
       populateExamSelectors();
       renderCurrentMenu();
       const activeExam = getActiveExam();
@@ -856,6 +1566,7 @@
         return;
       }
       state.activeMenu = menuId;
+      saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
     };
@@ -1082,7 +1793,10 @@
           container.innerHTML = renderDashboardView(exam, stats);
       }
 
-      lucide.createIcons();
+      container.classList.remove('animate-view-in');
+      void container.offsetWidth;
+      container.classList.add('animate-view-in');
+      lucide.createIcons({ nodes: [container] });
     }
 
     // ==================== 1. DASHBOARD ANALITIK (FLOWORA BENTO STYLE) ====================
@@ -1508,21 +2222,25 @@
         exam_date: examDate
       };
 
-      if (!IS_PREVIEW && supabase) {
-        const { error } = await supabase.from('exams').insert([newExam]);
-        if (error) {
-          showToast('Gagal menyimpan ke Supabase: ' + error.message, 'danger');
-          return;
-        }
-        await fetchAllSupabaseData();
-      } else {
-        state.exams.unshift(newExam);
-      }
+      const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
+      const prevActiveId = state.activeExamId;
 
-      state.activeExamId = newExam.id;
-      populateExamSelectors();
-      renderCurrentMenu();
-      showToast('Paket ulangan baru berhasil disimpan dan diaktifkan!', 'success');
+      await saveRecordWithSync({
+        submitterBtn,
+        table: 'exams',
+        record: newExam,
+        overlayTitle: 'Menyimpan Paket Ulangan...',
+        overlaySuccessTitle: 'Paket Ulangan Tersimpan!',
+        toastMsg: 'Paket ulangan baru berhasil disimpan dan tersinkron!',
+        onLocalApply: () => {
+          state.exams.unshift(newExam);
+          state.activeExamId = newExam.id;
+        },
+        onRollback: () => {
+          state.exams = state.exams.filter(ex => ex.id !== newExam.id);
+          state.activeExamId = prevActiveId;
+        }
+      });
     };
 
     window.handleDeleteExam = function (examId) {
@@ -1533,17 +2251,18 @@
         'Hapus Paket Ulangan',
         `<p>Apakah Anda yakin ingin menghapus paket ulangan <strong>${target.title}</strong> beserta seluruh data nilai siswa di dalamnya?</p>`,
         async () => {
-          if (!IS_PREVIEW && supabase) {
-            await supabase.from('exams').delete().eq('id', examId);
-            await fetchAllSupabaseData();
-          } else {
-            state.exams = state.exams.filter(e => e.id !== examId);
-            state.examResults = state.examResults.filter(r => r.exam_id !== examId);
-          }
-          state.activeExamId = state.exams[0]?.id || null;
-          populateExamSelectors();
-          renderCurrentMenu();
-          showToast('Paket ulangan berhasil dihapus.', 'info');
+          await deleteRecordWithSync({
+            table: 'exams',
+            recordId: examId,
+            onLocalDelete: () => {
+              state.exams = state.exams.filter(e => e.id !== examId);
+              state.examResults = state.examResults.filter(r => r.exam_id !== examId);
+              if (state.activeExamId === examId) {
+                state.activeExamId = state.exams[0]?.id || null;
+              }
+            },
+            toastMsg: 'Paket ulangan berhasil dihapus dan tersinkron.'
+          });
         },
         'Ya, Hapus'
       );
@@ -1771,19 +2490,22 @@
         notes: notes || (isPassed ? 'Tuntas KKM dengan baik.' : 'Perlu remedial pada butir soal yang salah.')
       };
 
-      if (!IS_PREVIEW && supabase) {
-        const { error } = await supabase.from('exam_results').insert([newResult]);
-        if (error) {
-          showToast('Gagal menyimpan nilai ke Supabase: ' + error.message, 'danger');
-          return;
+      const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
+      await saveRecordWithSync({
+        submitterBtn,
+        table: 'exam_results',
+        record: newResult,
+        overlayTitle: 'Menyimpan Nilai Siswa...',
+        overlaySuccessTitle: `Nilai ${studentName} Tersimpan!`,
+        overlaySuccessSub: `Skor ${score} • Otomatis tersinkron ke Supabase`,
+        toastMsg: `Nilai ${studentName} (Skor: ${score}) berhasil disimpan & tersinkron!`,
+        onLocalApply: () => {
+          state.examResults.push(newResult);
+        },
+        onRollback: () => {
+          state.examResults = state.examResults.filter(r => r.id !== newResult.id);
         }
-        await fetchAllSupabaseData();
-      } else {
-        state.examResults.push(newResult);
-      }
-
-      renderCurrentMenu();
-      showToast(`Nilai ${studentName} (Skor: ${score}) berhasil disimpan!`, 'success');
+      });
     };
 
     window.handleDeleteStudentResult = function (resultId) {
@@ -1791,14 +2513,14 @@
         'Hapus Data Nilai Siswa',
         '<p>Apakah Anda yakin ingin menghapus data jawaban siswa ini dari analisis ulangan?</p>',
         async () => {
-          if (!IS_PREVIEW && supabase) {
-            await supabase.from('exam_results').delete().eq('id', resultId);
-            await fetchAllSupabaseData();
-          } else {
-            state.examResults = state.examResults.filter(r => r.id !== resultId);
-          }
-          renderCurrentMenu();
-          showToast('Data jawaban siswa dihapus.', 'info');
+          await deleteRecordWithSync({
+            table: 'exam_results',
+            recordId: resultId,
+            onLocalDelete: () => {
+              state.examResults = state.examResults.filter(r => r.id !== resultId);
+            },
+            toastMsg: 'Data jawaban siswa dihapus dan tersinkron.'
+          });
         },
         'Ya, Hapus'
       );
@@ -2233,19 +2955,21 @@
         class_assigned: classAssigned
       };
 
-      if (!IS_PREVIEW && supabase) {
-        const { error } = await supabase.from('teachers').insert([newTeacher]);
-        if (error) {
-          showToast('Gagal menambah guru: ' + error.message, 'danger');
-          return;
+      const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
+      await saveRecordWithSync({
+        submitterBtn,
+        table: 'teachers',
+        record: newTeacher,
+        overlayTitle: 'Menyimpan Akun Guru...',
+        overlaySuccessTitle: 'Akun Guru Tersimpan!',
+        toastMsg: `Akun Guru ${fullName} berhasil ditambahkan dan tersinkron!`,
+        onLocalApply: () => {
+          state.teachers.push(newTeacher);
+        },
+        onRollback: () => {
+          state.teachers = state.teachers.filter(t => t.id !== newTeacher.id);
         }
-        await fetchAllSupabaseData();
-      } else {
-        state.teachers.push(newTeacher);
-      }
-
-      renderCurrentMenu();
-      showToast(`Akun Guru ${fullName} berhasil ditambahkan!`, 'success');
+      });
     };
 
     window.handleDeleteTeacher = function (teacherId) {
@@ -2253,14 +2977,14 @@
         'Hapus Akun Guru',
         '<p>Apakah Anda yakin ingin mencabut akses login guru ini?</p>',
         async () => {
-          if (!IS_PREVIEW && supabase) {
-            await supabase.from('teachers').delete().eq('id', teacherId);
-            await fetchAllSupabaseData();
-          } else {
-            state.teachers = state.teachers.filter(t => t.id !== teacherId);
-          }
-          renderCurrentMenu();
-          showToast('Akun guru berhasil dihapus.', 'info');
+          await deleteRecordWithSync({
+            table: 'teachers',
+            recordId: teacherId,
+            onLocalDelete: () => {
+              state.teachers = state.teachers.filter(t => t.id !== teacherId);
+            },
+            toastMsg: 'Akun guru berhasil dihapus dan tersinkron.'
+          });
         },
         'Ya, Hapus'
       );
@@ -2278,36 +3002,108 @@
         student_count: 32
       };
 
-      if (!IS_PREVIEW && supabase) {
-        const { error } = await supabase.from('classes').insert([newClass]);
-        if (error) {
-          showToast('Gagal menyimpan kelas: ' + error.message, 'danger');
-          return;
+      const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
+      await saveRecordWithSync({
+        submitterBtn,
+        table: 'classes',
+        record: newClass,
+        overlayTitle: 'Menyimpan Master Kelas...',
+        overlaySuccessTitle: `Kelas ${className} Tersimpan!`,
+        toastMsg: `Kelas ${className} berhasil ditambahkan dan tersinkron!`,
+        onLocalApply: () => {
+          state.classes.push(newClass);
+        },
+        onRollback: () => {
+          state.classes = state.classes.filter(c => c.id !== newClass.id);
         }
-        await fetchAllSupabaseData();
-      } else {
-        state.classes.push(newClass);
-      }
-
-      renderCurrentMenu();
-      showToast(`Kelas ${className} berhasil ditambahkan!`, 'success');
+      });
     };
 
     window.handleDeleteClass = async function (classId) {
-      if (!IS_PREVIEW && supabase) {
-        await supabase.from('classes').delete().eq('id', classId);
-        await fetchAllSupabaseData();
-      } else {
-        state.classes = state.classes.filter(c => c.id !== classId);
-      }
-      renderCurrentMenu();
-      showToast('Data kelas dihapus.', 'info');
+      await deleteRecordWithSync({
+        table: 'classes',
+        recordId: classId,
+        onLocalDelete: () => {
+          state.classes = state.classes.filter(c => c.id !== classId);
+        },
+        toastMsg: 'Data kelas dihapus dan tersinkron.'
+      });
     };
+
+    // ==================== LIFECYCLE HOOKS (REFRESH, CLOSE TAB, ONLINE) ====================
+    window.addEventListener('beforeunload', flushPendingSyncKeepalive);
+    window.addEventListener('pagehide', flushPendingSyncKeepalive);
+    window.addEventListener('online', () => {
+      if (state.currentUser || getPendingSyncQueue().length > 0) {
+        syncWithSupabase({ reason: 'online' });
+      }
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && state.currentUser && !IS_PREVIEW && supabase) {
+        syncWithSupabase({ reason: 'visibility' });
+      }
+    });
 
     // ==================== INITIALIZE APP ON LOAD ====================
     window.addEventListener('DOMContentLoaded', async () => {
       registerSingleFilePWA();
+      loadCacheFromStorage();
+      const savedSession = loadSessionFromStorage();
+
+      if (!IS_PREVIEW && supabase) {
+        supabase.auth.onAuthStateChange((_event, session) => {
+          state.supabaseAccessToken = session?.access_token || null;
+        });
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          state.supabaseAccessToken = session?.access_token || null;
+          if (savedSession?.currentUser?.role === 'admin' && !session?.user) {
+            clearSessionFromStorage();
+            savedSession.currentUser = null;
+          }
+        } catch (e) { }
+      }
+
+      if (savedSession?.currentUser) {
+        state.currentUser = savedSession.currentUser;
+        state.activeMenu = savedSession.activeMenu || 'dashboard';
+        if (savedSession.activeExamId) state.activeExamId = savedSession.activeExamId;
+        await enterWorkspace({ animate: true, fromRefresh: true });
+        updateSyncBadge('syncing', 'Menyinkronkan...');
+      }
+
       await autoSetupDatabase();
+
+      if (!IS_PREVIEW && supabase && state.currentUser?.role === 'guru' && state.teachers.length > 0) {
+        const freshTeacher = state.teachers.find(
+          t => t.id === state.currentUser.id || t.username === state.currentUser.username
+        );
+        if (freshTeacher) {
+          state.currentUser = {
+            id: freshTeacher.id,
+            role: 'guru',
+            full_name: freshTeacher.full_name,
+            username: freshTeacher.username,
+            subject: freshTeacher.subject,
+            class_assigned: freshTeacher.class_assigned
+          };
+          saveSessionToStorage();
+        } else {
+          state.currentUser = null;
+          state.activeMenu = 'dashboard';
+          clearSessionFromStorage();
+          await switchViewAnimated(
+            document.getElementById('app-view'),
+            document.getElementById('auth-view')
+          );
+          showToast('Akun guru tidak lagi aktif, silakan masuk kembali.', 'warning');
+        }
+      }
+
+      if (state.currentUser) {
+        await enterWorkspace({ animate: false, fromRefresh: true });
+      }
+
       lucide.createIcons();
     });
   </script>
