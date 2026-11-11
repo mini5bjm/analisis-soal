@@ -235,11 +235,11 @@
           <form id="login-form" onsubmit="window.handleLogin(event)" class="space-y-4">
             <div>
               <label id="login-id-label" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-                Username / NIP Guru
+                Username Guru
               </label>
               <div class="relative">
                 <i data-lucide="user" class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2"></i>
-                <input type="text" id="login-identifier" required placeholder="Contoh: guru01"
+                <input type="text" id="login-identifier" required placeholder="Masukkan username guru"
                   class="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition" />
               </div>
             </div>
@@ -680,16 +680,16 @@
       if (role === 'guru') {
         tabGuru.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md';
         tabAdmin.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
-        idLabel.textContent = 'Username / NIP Guru';
+        idLabel.textContent = 'Username Guru';
         idInput.type = 'text';
-        idInput.placeholder = 'Contoh: guru01';
+        idInput.placeholder = 'Masukkan username guru';
         helperText.innerHTML = '<strong>Mode Guru:</strong> Validasi langsung ke tabel <code>teachers</code> di database Supabase menggunakan Username/NIP & Password.';
       } else {
         tabAdmin.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md';
         tabGuru.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
-        idLabel.textContent = 'Email Administrator (Supabase Auth)';
+        idLabel.textContent = 'Username Admin';
         idInput.type = 'email';
-        idInput.placeholder = 'admin@sekolah.sch.id';
+        idInput.placeholder = 'Masukkan username admin';
         helperText.innerHTML = '<strong>Mode Admin:</strong> Masuk menggunakan <strong>Supabase Authentication</strong> (Email & Password) untuk akses penuh kurikulum.';
       }
     };
