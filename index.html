@@ -525,7 +525,7 @@
 
       <!-- MOBILE FLOATING BOTTOM NAVIGATION BAR -->
       <nav id="mobile-nav-list"
-        class="mobile-bottom-nav no-print fixed bottom-3 left-3 right-3 h-16 glass-surface rounded-full shadow-2xl border border-slate-200/90 px-2 items-center justify-around z-30">
+        class="mobile-bottom-nav no-print fixed bottom-3 left-3 right-3 h-16 glass-surface rounded-full shadow-2xl border border-slate-200/90 px-2 items-center justify-around gap-1 overflow-x-auto custom-scroll z-30">
         <!-- Populated dynamically by JS -->
       </nav>
 
@@ -631,8 +631,83 @@
     const STORAGE_KEYS = {
       SESSION: 'flowora_session_v1',
       CACHE: 'flowora_state_cache_v1',
-      PENDING_SYNC: 'flowora_pending_sync_v1'
+      PENDING_SYNC: 'flowora_pending_sync_v1',
+      SUBJECTS: 'flowora_subjects_v1'
     };
+
+    const EXAM_TITLE_OPTIONS = [
+      'Sumatif Akhir Semester (SAS)',
+      'Sumatif Tengah Semester (STS)',
+      'Sumatif Akhir Tahun (SAT)',
+      'Ujian Madrasah'
+    ];
+
+    const QUESTION_TYPES = {
+      PG: {
+        id: 'PG',
+        label: 'Pilihan Ganda',
+        shortLabel: 'PG',
+        badgeClass: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+        keyLabel: 'Deretan Kunci Jawaban PG (A/B/C/D/E)',
+        keyPlaceholder: 'Ketik tanpa spasi, misal: ABCDAA...',
+        keyHint: 'Masukkan huruf kunci jawaban (A-E) tanpa spasi sesuai jumlah soal, misal: ABCDAA...',
+        defaultKey: 'ABCDABCDAE',
+        studentLabel: 'Deretan Jawaban PG Siswa',
+        studentPlaceholder: 'Ketik tanpa spasi, misal: ABCDAA...'
+      },
+      BS: {
+        id: 'BS',
+        label: 'Benar Salah',
+        shortLabel: 'Benar Salah',
+        badgeClass: 'bg-sky-100 text-sky-700 border-sky-200',
+        keyLabel: 'Deretan Kunci Benar Salah (B/S)',
+        keyPlaceholder: 'Ketik B/S tanpa spasi, misal: BSSB...',
+        keyHint: 'Gunakan huruf B (Benar) dan S (Salah) tanpa spasi sesuai jumlah soal, misal: BSSB...',
+        defaultKey: 'BSSBBSSBBS',
+        studentLabel: 'Deretan Jawaban Benar Salah Siswa (B/S)',
+        studentPlaceholder: 'Ketik B/S tanpa spasi, misal: BSSB...'
+      },
+      ISIAN: {
+        id: 'ISIAN',
+        label: 'Isian',
+        shortLabel: 'Isian',
+        badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+        keyLabel: 'Angka Nilai Maksimal per Nomor (Isian)',
+        keyPlaceholder: 'Misal: 2415 atau pakai koma 2,4,2,5,...',
+        keyHint: 'Masukkan angka nilai per nomor: langsung (misal 2415) atau pakai koma (misal 2,4,2,5,...).',
+        defaultKey: '2,2,2,2',
+        studentLabel: 'Angka Nilai Siswa per Nomor (Isian)',
+        studentPlaceholder: 'Misal: 2415 atau pakai koma 2,4,2,5,...'
+      },
+      URAIAN: {
+        id: 'URAIAN',
+        label: 'Uraian',
+        shortLabel: 'Uraian',
+        badgeClass: 'bg-purple-100 text-purple-700 border-purple-200',
+        keyLabel: 'Angka Nilai Maksimal per Nomor (Uraian)',
+        keyPlaceholder: 'Misal: 2415 atau pakai koma 2,4,2,5,...',
+        keyHint: 'Masukkan angka nilai per nomor: langsung (misal 2415) atau pakai koma (misal 2,4,2,5,...).',
+        defaultKey: '2,4,2,5',
+        studentLabel: 'Angka Nilai Siswa per Nomor (Uraian)',
+        studentPlaceholder: 'Misal: 2415 atau pakai koma 2,4,2,5,...'
+      }
+    };
+
+    const DEFAULT_SUBJECTS = [
+      "Al Qur'an Hadis",
+      "Akidah Akhlak",
+      "Fikih",
+      "SKI",
+      "Bahasa Arab",
+      "Pend. Pancasila",
+      "Bahasa Indonesia",
+      "Matematika",
+      "IPAS",
+      "PJOK",
+      "SBDP",
+      "Bahasa Inggris",
+      "Baca Tulis Al Qur'an"
+    ];
 
     const state = {
       authRoleTab: 'guru', // 'guru' | 'admin'
@@ -642,6 +717,9 @@
       supabaseAccessToken: null,
       isSyncing: false,
       lastSyncedAt: null,
+      hasSubjectsTable: null,
+      deletedSubjectNames: [],
+      subjects: [],
       teachers: [],
       classes: [],
       exams: [],
@@ -783,6 +861,8 @@
           classes: state.classes,
           exams: state.exams,
           examResults: state.examResults,
+          subjects: state.subjects,
+          deletedSubjectNames: state.deletedSubjectNames,
           activeExamId: state.activeExamId
         }));
       } catch (e) { }
@@ -797,11 +877,341 @@
         if (Array.isArray(cached.classes)) state.classes = cached.classes;
         if (Array.isArray(cached.exams)) state.exams = cached.exams;
         if (Array.isArray(cached.examResults)) state.examResults = cached.examResults;
+        if (Array.isArray(cached.subjects)) state.subjects = cached.subjects;
+        if (Array.isArray(cached.deletedSubjectNames)) state.deletedSubjectNames = cached.deletedSubjectNames;
         if (cached.activeExamId) state.activeExamId = cached.activeExamId;
         return true;
       } catch (e) {
         return false;
       }
+    }
+
+    // ==================== HELPERS: ESCAPE, JENIS SOAL, KOREKSI & MAPEL ====================
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function isNumericQuestionType(qType) {
+      return qType === 'ISIAN' || qType === 'URAIAN';
+    }
+
+    /** Parse angka bobot/skor baik berformat gabung (2415 -> [2,4,1,5]) maupun dipisah koma (2,4,2,5). */
+    function parseNumericScores(rawStr, expectedCount = null) {
+      const cleaned = String(rawStr ?? '').trim().replace(/[^0-9.,;\s]/g, '');
+      if (!cleaned) return [];
+      const hasSeparator = /[,;\s]/.test(cleaned);
+      if (!hasSeparator) {
+        if (expectedCount === 1 && /^\d+(\.\d+)?$/.test(cleaned)) {
+          const single = Number(cleaned);
+          return Number.isFinite(single) && single >= 0 ? [single] : [];
+        }
+        if (/^\d+$/.test(cleaned)) {
+          return cleaned.split('').map(ch => Number(ch));
+        }
+        const num = Number(cleaned);
+        return Number.isFinite(num) && num >= 0 ? [num] : [];
+      }
+      return cleaned
+        .split(/[,;\s]+/)
+        .map(part => part.trim())
+        .filter(Boolean)
+        .map(part => Number(part))
+        .filter(n => Number.isFinite(n) && n >= 0);
+    }
+
+    /** Encode jenis soal dan kunci jawaban ke kolom answer_key agar tetap kompatibel dengan skema Supabase. */
+    function encodeExamAnswerKey(qType, rawKey, expectedCount = null) {
+      const upperType = QUESTION_TYPES[qType] ? qType : 'PG';
+      if (upperType === 'PG') {
+        return String(rawKey || '').toUpperCase().replace(/[^A-E]/g, '');
+      }
+      if (upperType === 'BS') {
+        return `BS:${String(rawKey || '').toUpperCase().replace(/[^BS]/g, '')}`;
+      }
+      const scores = parseNumericScores(rawKey, expectedCount);
+      return `${upperType}:${scores.join(',')}`;
+    }
+
+    /** Decode metadata jenis soal, daftar kunci/bobot, dan tampilan kunci dari object exam. */
+    function decodeExamMeta(exam) {
+      const rawField = String(exam?.answer_key || '').trim();
+      let questionType = 'PG';
+      let rawKey = rawField;
+
+      const prefixMatch = rawField.match(/^(PG|BS|ISIAN|URAIAN):(.*)$/i);
+      if (prefixMatch) {
+        questionType = prefixMatch[1].toUpperCase();
+        rawKey = prefixMatch[2].trim();
+      }
+
+      const typeMeta = QUESTION_TYPES[questionType] || QUESTION_TYPES.PG;
+      const declaredCount = Number(exam?.total_questions) || null;
+
+      if (isNumericQuestionType(questionType)) {
+        const keyScores = parseNumericScores(rawKey, declaredCount);
+        const maxTotalScore = keyScores.reduce((acc, v) => acc + v, 0);
+        return {
+          questionType,
+          typeMeta,
+          rawKey,
+          keyItems: keyScores.map(String),
+          keyScores,
+          maxTotalScore,
+          displayKey: keyScores.join(', ')
+        };
+      }
+
+      if (questionType === 'BS') {
+        const cleanBS = rawKey.toUpperCase().replace(/[^BS]/g, '');
+        const items = cleanBS.split('');
+        return {
+          questionType,
+          typeMeta,
+          rawKey: cleanBS,
+          keyItems: items,
+          keyScores: items.map(() => 1),
+          maxTotalScore: declaredCount || items.length,
+          displayKey: cleanBS
+        };
+      }
+
+      const cleanPG = rawKey.toUpperCase().replace(/[^A-E]/g, '');
+      const items = cleanPG.split('');
+      return {
+        questionType: 'PG',
+        typeMeta: QUESTION_TYPES.PG,
+        rawKey: cleanPG,
+        keyItems: items,
+        keyScores: items.map(() => 1),
+        maxTotalScore: declaredCount || items.length,
+        displayKey: cleanPG
+      };
+    }
+
+    /** Hitung skor, ketuntasan butir, dan ringkasan koreksi secara seragam untuk PG, BS, Isian, dan Uraian. */
+    function scoreStudentResponse(exam, rawStudentAns) {
+      const meta = decodeExamMeta(exam);
+      const qType = meta.questionType;
+      const numQ = Number(exam?.total_questions) || meta.keyItems.length || 0;
+
+      if (isNumericQuestionType(qType)) {
+        const values = parseNumericScores(rawStudentAns, numQ);
+        const exceededItems = [];
+        const itemResults = [];
+        let earnedTotal = 0;
+        let masteredCount = 0;
+
+        for (let i = 0; i < numQ; i++) {
+          const maxScore = Number(meta.keyScores[i] ?? 0);
+          const studentVal = values[i];
+          const hasVal = studentVal !== undefined;
+          const earned = hasVal ? studentVal : 0;
+          if (hasVal && studentVal > maxScore) exceededItems.push(i + 1);
+          earnedTotal += earned;
+          const ratio = maxScore > 0 ? earned / maxScore : 0;
+          const isMastered = hasVal && ratio >= 0.75;
+          if (isMastered) masteredCount++;
+          itemResults.push({
+            index: i,
+            number: i + 1,
+            keyVal: maxScore,
+            studentVal: hasVal ? studentVal : '-',
+            earned,
+            max: maxScore,
+            isCorrect: isMastered,
+            isPartial: hasVal && earned > 0 && earned < maxScore
+          });
+        }
+
+        const maxTotal = meta.maxTotalScore || 0;
+        const score = maxTotal > 0 ? Math.min(100, Math.round((earnedTotal / maxTotal) * 100)) : 0;
+        return {
+          questionType: qType,
+          cleanStorageValue: values.join(','),
+          displayStudentValue: values.join(', '),
+          itemCount: values.length,
+          expectedCount: numQ,
+          isValidLength: values.length === numQ && exceededItems.length === 0,
+          exceededItems,
+          correctCount: masteredCount,
+          earnedTotal: +earnedTotal.toFixed(2),
+          maxTotal: +maxTotal.toFixed(2),
+          score,
+          itemResults
+        };
+      }
+
+      const regex = qType === 'BS' ? /[^BS]/g : /[^A-E]/g;
+      const cleanStr = String(rawStudentAns ?? '').toUpperCase().replace(regex, '');
+      const itemResults = [];
+      let correctCount = 0;
+
+      for (let i = 0; i < numQ; i++) {
+        const keyVal = meta.keyItems[i] || (qType === 'BS' ? 'B' : 'A');
+        const studentVal = cleanStr[i] || '';
+        const isCorrect = Boolean(studentVal && studentVal === keyVal);
+        if (isCorrect) correctCount++;
+        itemResults.push({
+          index: i,
+          number: i + 1,
+          keyVal,
+          studentVal: studentVal || '-',
+          earned: isCorrect ? 1 : 0,
+          max: 1,
+          isCorrect,
+          isPartial: false
+        });
+      }
+
+      const score = numQ > 0 ? Math.round((correctCount / numQ) * 100) : 0;
+      return {
+        questionType: qType,
+        cleanStorageValue: cleanStr,
+        displayStudentValue: cleanStr,
+        itemCount: cleanStr.length,
+        expectedCount: numQ,
+        isValidLength: cleanStr.length === numQ,
+        exceededItems: [],
+        correctCount,
+        earnedTotal: correctCount,
+        maxTotal: numQ,
+        score,
+        itemResults
+      };
+    }
+
+    function loadSubjectsMetaFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.SUBJECTS);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function saveSubjectsMetaToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify({
+          subjects: state.subjects,
+          deletedNames: state.deletedSubjectNames
+        }));
+      } catch (e) { }
+    }
+
+    function parseTeacherSubjects(subjectStr) {
+      return String(subjectStr || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s && s !== '-');
+    }
+
+    function defaultSubjectUuid(idx) {
+      return `55555555-5555-4555-8555-5555555555${String(idx + 1).padStart(2, '0')}`;
+    }
+
+    /** Gabungkan daftar Mapel bawaan Madrasah, mapel dari localStorage/tabel DB, serta pengampunya di tabel teachers. */
+    function mergeSubjectsState({ dbSubjects = null, teachers = state.teachers, exams = state.exams } = {}) {
+      const storedMeta = loadSubjectsMetaFromStorage();
+      if (Array.isArray(storedMeta?.deletedNames) && state.deletedSubjectNames.length === 0) {
+        state.deletedSubjectNames = storedMeta.deletedNames;
+      }
+      const deletedSet = new Set(state.deletedSubjectNames.map(n => n.toLowerCase()));
+
+      const teacherBySubjectLower = new Map();
+      (teachers || []).forEach(t => {
+        parseTeacherSubjects(t.subject).forEach(subName => {
+          teacherBySubjectLower.set(subName.toLowerCase(), t.id);
+        });
+      });
+
+      const byLowerName = new Map();
+      const registerSubject = (item, allowTeacherOverwrite = true) => {
+        const cleanName = String(item?.name || '').trim();
+        if (!cleanName || cleanName === '-') return;
+        const lower = cleanName.toLowerCase();
+        if (deletedSet.has(lower)) return;
+
+        const existing = byLowerName.get(lower);
+        const teacherFromDb = teacherBySubjectLower.get(lower) || null;
+        if (!existing) {
+          byLowerName.set(lower, {
+            id: item.id || crypto.randomUUID(),
+            name: cleanName,
+            teacher_id: allowTeacherOverwrite && teacherFromDb !== null ? teacherFromDb : (item.teacher_id || teacherFromDb || null)
+          });
+        } else if (allowTeacherOverwrite && teacherFromDb !== null) {
+          existing.teacher_id = teacherFromDb;
+        }
+      };
+
+      if (Array.isArray(dbSubjects) && dbSubjects.length > 0) {
+        dbSubjects.forEach(s => registerSubject(s, true));
+      } else if (Array.isArray(state.subjects) && state.subjects.length > 0) {
+        state.subjects.forEach(s => registerSubject(s, true));
+      } else if (Array.isArray(storedMeta?.subjects) && storedMeta.subjects.length > 0) {
+        storedMeta.subjects.forEach(s => registerSubject(s, true));
+      }
+
+      DEFAULT_SUBJECTS.forEach((name, idx) => {
+        registerSubject({ id: defaultSubjectUuid(idx), name, teacher_id: null }, true);
+      });
+
+      (teachers || []).forEach(t => {
+        parseTeacherSubjects(t.subject).forEach(name => {
+          registerSubject({ id: crypto.randomUUID(), name, teacher_id: t.id }, true);
+        });
+      });
+
+      (exams || []).forEach(ex => {
+        if (ex.subject && !deletedSet.has(ex.subject.trim().toLowerCase())) {
+          registerSubject({ id: crypto.randomUUID(), name: ex.subject.trim(), teacher_id: ex.teacher_id || null }, true);
+        }
+      });
+
+      state.subjects = Array.from(byLowerName.values());
+      saveSubjectsMetaToStorage();
+    }
+
+    function getSubjectTeacher(subjectName) {
+      const lower = String(subjectName || '').trim().toLowerCase();
+      const subj = state.subjects.find(s => s.name.toLowerCase() === lower);
+      if (subj?.teacher_id) {
+        const found = state.teachers.find(t => t.id === subj.teacher_id);
+        if (found) return found;
+      }
+      return state.teachers.find(t => parseTeacherSubjects(t.subject).some(n => n.toLowerCase() === lower)) || null;
+    }
+
+    function buildTeacherSubjectString(teacherId) {
+      const names = state.subjects
+        .filter(s => s.teacher_id === teacherId)
+        .map(s => s.name);
+      return names.length > 0 ? names.join(', ') : '-';
+    }
+
+    function queueSubjectTeacherSync(affectedTeacherIds, subjectRecord = null, subjectAction = 'upsert') {
+      const uniqueIds = [...new Set(affectedTeacherIds.filter(Boolean))];
+      uniqueIds.forEach(tid => {
+        const teacher = state.teachers.find(t => t.id === tid);
+        if (!teacher) return;
+        teacher.subject = buildTeacherSubjectString(tid);
+        enqueuePendingSync({ id: crypto.randomUUID(), table: 'teachers', action: 'upsert', record: { ...teacher } });
+      });
+      if (state.hasSubjectsTable === true && subjectRecord) {
+        if (subjectAction === 'delete') {
+          enqueuePendingSync({ id: crypto.randomUUID(), table: 'subjects', action: 'delete', recordId: subjectRecord.id });
+        } else {
+          enqueuePendingSync({ id: crypto.randomUUID(), table: 'subjects', action: 'upsert', record: { ...subjectRecord } });
+        }
+      }
+      saveSubjectsMetaToStorage();
+      saveCacheToStorage();
     }
 
     function getPendingSyncQueue() {
@@ -945,6 +1355,7 @@
 
       for (let i = 0; i < queue.length; i++) {
         const op = queue[i];
+        if (op.table === 'subjects' && state.hasSubjectsTable === false) continue;
         try {
           let res;
           if (op.action === 'upsert') {
@@ -954,6 +1365,10 @@
           }
 
           if (res?.error) {
+            if (op.table === 'subjects' && /does not exist|schema cache|not find the table|PGRST205|42P01/i.test(res.error.message || res.error.code || '')) {
+              state.hasSubjectsTable = false;
+              continue;
+            }
             const isNetworkLike = !navigator.onLine || /fetch|network|timeout|load failed|offline|abort/i.test(res.error.message || '');
             if (isNetworkLike) {
               remaining.push(op, ...queue.slice(i + 1));
@@ -1185,6 +1600,7 @@
         if (state.classes.length === 0) state.classes = structuredClone(INITIAL_SEED_DATA.classes);
         if (state.exams.length === 0) state.exams = structuredClone(INITIAL_SEED_DATA.exams);
         if (state.examResults.length === 0) state.examResults = structuredClone(INITIAL_SEED_DATA.examResults);
+        mergeSubjectsState();
         if (!state.activeExamId) state.activeExamId = state.exams[0]?.id || null;
         state.lastSyncedAt = new Date();
         updateSyncBadge('synced', 'Mode Lokal');
@@ -1212,13 +1628,17 @@
         updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
       } catch (err) {
         console.error('Supabase AutoSetup Error:', err);
+        mergeSubjectsState();
         updateSyncBadge('pending');
         showToast('Gagal sinkronisasi ke Supabase. Cek koneksi atau script SQL.', 'warning');
       }
     }
 
     async function fetchAllSupabaseData() {
-      if (IS_PREVIEW || !supabase) return;
+      if (IS_PREVIEW || !supabase) {
+        mergeSubjectsState();
+        return;
+      }
       const [tRes, cRes, eRes, rRes] = await Promise.all([
         supabase.from('teachers').select('*').order('created_at', { ascending: true }),
         supabase.from('classes').select('*').order('class_name', { ascending: true }),
@@ -1229,6 +1649,25 @@
       if (cRes.data) state.classes = cRes.data;
       if (eRes.data) state.exams = eRes.data;
       if (rRes.data) state.examResults = rRes.data;
+
+      let dbSubjects = null;
+      if (state.hasSubjectsTable !== false) {
+        try {
+          const sRes = await supabase.from('subjects').select('*').order('name', { ascending: true });
+          if (sRes.error) {
+            if (/does not exist|schema cache|not find the table|PGRST205|42P01/i.test(sRes.error.message || sRes.error.code || '')) {
+              state.hasSubjectsTable = false;
+            }
+          } else if (Array.isArray(sRes.data)) {
+            state.hasSubjectsTable = true;
+            dbSubjects = sRes.data;
+          }
+        } catch (e) {
+          state.hasSubjectsTable = false;
+        }
+      }
+
+      mergeSubjectsState({ dbSubjects });
       if ((!state.activeExamId || !state.exams.some(e => e.id === state.activeExamId)) && state.exams.length > 0) {
         state.activeExamId = state.exams[0].id;
       }
@@ -1536,6 +1975,7 @@
         roleBadge.className = 'px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200';
       }
 
+      mergeSubjectsState();
       populateExamSelectors();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -1545,10 +1985,11 @@
     // ==================== NAVIGATION & EXAM SELECTORS ====================
     const MENU_CONFIG = [
       { id: 'dashboard', label: 'Dashboard Analitik', shortLabel: 'Dashboard', icon: 'layout-dashboard', subtitle: 'Ringkasan performa ulangan, ketuntasan KKM, dan grafik klasikal', roles: ['admin', 'guru'] },
-      { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, KKM, jumlah butir soal, dan kunci jawaban', roles: ['admin', 'guru'] },
-      { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban pilihan ganda dan perhitungan nilai siswa', roles: ['admin', 'guru'] },
-      { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Indeks tingkat kesukaran (P), daya pembeda (D), dan kualitas opsi pengecoh', roles: ['admin', 'guru'] },
+      { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, jenis soal, KKM, jumlah butir, dan kunci jawaban', roles: ['admin', 'guru'] },
+      { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban PG, Benar Salah, Isian, dan Uraian', roles: ['admin', 'guru'] },
+      { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Indeks tingkat kesukaran (P), daya pembeda (D), dan kualitas butir soal', roles: ['admin', 'guru'] },
       { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['admin', 'guru'] },
+      { id: 'manajemen_mapel', label: 'Mapel & Guru Pengampu', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Tambah mata pelajaran dan tentukan guru yang mengampu setiap mapel', roles: ['admin', 'guru'] },
       { id: 'manajemen_guru', label: 'Data Guru & Kelas', shortLabel: 'Guru/Kelas', icon: 'users-round', subtitle: 'Manajemen akun login guru mata pelajaran dan master kelas sekolah', roles: ['admin'] }
     ];
 
@@ -1622,7 +2063,7 @@
         const isActive = state.activeMenu === m.id;
         return `
         <button type="button" onclick="window.navigateMenu('${m.id}')"
-          class="flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${isActive ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-700 font-semibold'
+          class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${isActive ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-700 font-semibold'
           }">
           <div class="${isActive ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}">
             <i data-lucide="${m.icon}" class="w-4 h-4"></i>
@@ -1645,6 +2086,7 @@
     function computeExamStatistics(exam) {
       if (!exam) {
         return {
+          examMeta: null,
           results: [],
           totalStudents: 0,
           avgScore: 0,
@@ -1657,6 +2099,8 @@
         };
       }
 
+      const examMeta = decodeExamMeta(exam);
+      const qType = examMeta.questionType;
       const results = state.examResults
         .filter(r => r.exam_id === exam.id)
         .slice()
@@ -1665,6 +2109,7 @@
       const totalStudents = results.length;
       if (totalStudents === 0) {
         return {
+          examMeta,
           results: [],
           totalStudents: 0,
           avgScore: 0,
@@ -1688,38 +2133,65 @@
 
       // Split Upper Group (Kelompok Atas) and Lower Group (Kelompok Bawah) for Daya Pembeda (D)
       const halfSize = Math.max(1, Math.floor(totalStudents / 2));
-      const upperGroup = results.slice(0, halfSize);
-      const lowerGroup = results.slice(totalStudents - halfSize);
+      const gradedAll = results.map(r => scoreStudentResponse(exam, r.student_answers));
+      const gradedUpper = gradedAll.slice(0, halfSize);
+      const gradedLower = gradedAll.slice(totalStudents - halfSize);
 
-      const keyChars = (exam.answer_key || '').toUpperCase().split('');
-      const numQ = Number(exam.total_questions) || keyChars.length;
-
+      const numQ = Number(exam.total_questions) || examMeta.keyItems.length;
       const itemAnalysis = [];
+
       for (let i = 0; i < numQ; i++) {
-        const keyChar = keyChars[i] || 'A';
+        let keyDisplay = '';
+        let pIndex = 0;
+        let dIndex = 0;
         let correctTotal = 0;
-        let upperCorrect = 0;
-        let lowerCorrect = 0;
-        const optionCounts = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+        let correctPercent = 0;
+        let optionCounts = null;
+        let metricSummary = '';
+        let maxScore = 1;
+        let meanScore = 0;
 
-        results.forEach(r => {
-          const ans = ((r.student_answers || '')[i] || '').toUpperCase();
-          if (optionCounts[ans] !== undefined) optionCounts[ans]++;
-          if (ans === keyChar) correctTotal++;
-        });
+        if (isNumericQuestionType(qType)) {
+          maxScore = Number(examMeta.keyScores[i] ?? 0);
+          keyDisplay = String(maxScore);
+          const sumAll = gradedAll.reduce((acc, g) => acc + (g.itemResults[i]?.earned || 0), 0);
+          const sumUpper = gradedUpper.reduce((acc, g) => acc + (g.itemResults[i]?.earned || 0), 0);
+          const sumLower = gradedLower.reduce((acc, g) => acc + (g.itemResults[i]?.earned || 0), 0);
+          correctTotal = gradedAll.filter(g => g.itemResults[i]?.isCorrect).length;
 
-        upperGroup.forEach(r => {
-          const ans = ((r.student_answers || '')[i] || '').toUpperCase();
-          if (ans === keyChar) upperCorrect++;
-        });
+          meanScore = +(sumAll / totalStudents).toFixed(1);
+          const meanUpper = sumUpper / gradedUpper.length;
+          const meanLower = sumLower / gradedLower.length;
+          pIndex = maxScore > 0 ? +((sumAll / totalStudents) / maxScore).toFixed(2) : 0;
+          dIndex = maxScore > 0 ? +((meanUpper - meanLower) / maxScore).toFixed(2) : 0;
+          correctPercent = maxScore > 0 ? Math.min(100, Math.round(((sumAll / totalStudents) / maxScore) * 100)) : 0;
+          metricSummary = `Rata ${meanScore}/${maxScore} Poin`;
+        } else {
+          keyDisplay = examMeta.keyItems[i] || (qType === 'BS' ? 'B' : 'A');
+          optionCounts = qType === 'BS' ? { B: 0, S: 0 } : { A: 0, B: 0, C: 0, D: 0, E: 0 };
+          let upperCorrect = 0;
+          let lowerCorrect = 0;
 
-        lowerGroup.forEach(r => {
-          const ans = ((r.student_answers || '')[i] || '').toUpperCase();
-          if (ans === keyChar) lowerCorrect++;
-        });
+          gradedAll.forEach(g => {
+            const ans = g.itemResults[i]?.studentVal || '';
+            if (optionCounts[ans] !== undefined) optionCounts[ans]++;
+            if (ans === keyDisplay) correctTotal++;
+          });
+          gradedUpper.forEach(g => {
+            if (g.itemResults[i]?.studentVal === keyDisplay) upperCorrect++;
+          });
+          gradedLower.forEach(g => {
+            if (g.itemResults[i]?.studentVal === keyDisplay) lowerCorrect++;
+          });
 
-        // Indeks Tingkat Kesukaran (P = B / JS)
-        const pIndex = +(correctTotal / totalStudents).toFixed(2);
+          pIndex = +(correctTotal / totalStudents).toFixed(2);
+          const pA = upperCorrect / gradedUpper.length;
+          const pB = lowerCorrect / gradedLower.length;
+          dIndex = +(pA - pB).toFixed(2);
+          correctPercent = Math.round((correctTotal / totalStudents) * 100);
+          metricSummary = `${correctTotal}/${totalStudents} Siswa Benar`;
+        }
+
         let difficultyLabel = 'Sedang';
         let difficultyBadge = 'bg-blue-50 text-blue-600 border-blue-200';
         if (pIndex > 0.70) {
@@ -1729,11 +2201,6 @@
           difficultyLabel = 'Sukar';
           difficultyBadge = 'bg-rose-50 text-rose-600 border-rose-200';
         }
-
-        // Indeks Daya Pembeda (D = PA - PB)
-        const pA = upperCorrect / upperGroup.length;
-        const pB = lowerCorrect / lowerGroup.length;
-        const dIndex = +(pA - pB).toFixed(2);
 
         let discrimLabel = 'Cukup';
         let discrimBadge = 'bg-amber-50 text-amber-600 border-amber-200';
@@ -1761,9 +2228,13 @@
 
         itemAnalysis.push({
           number: i + 1,
-          key: keyChar,
+          questionType: qType,
+          key: keyDisplay,
+          maxScore,
+          meanScore,
           correctCount: correctTotal,
-          correctPercent: Math.round((correctTotal / totalStudents) * 100),
+          correctPercent,
+          metricSummary,
           pIndex,
           difficultyLabel,
           difficultyBadge,
@@ -1810,6 +2281,9 @@
           break;
         case 'remedial_pengayaan':
           container.innerHTML = renderRemedialPengayaanView(exam, stats);
+          break;
+        case 'manajemen_mapel':
+          container.innerHTML = renderManajemenMapelView();
           break;
         case 'manajemen_guru':
           container.innerHTML = renderManajemenGuruView();
@@ -2007,15 +2481,20 @@
             <div class="space-y-3 max-h-[290px] overflow-y-auto custom-scroll pr-1">
               ${stats.results.length === 0 ? `
                 <div class="text-center py-8 text-xs text-slate-400">Belum ada data nilai siswa.</div>
-              ` : stats.results.slice(0, 6).map((r, i) => `
+              ` : stats.results.slice(0, 6).map((r, i) => {
+        const graded = scoreStudentResponse(exam, r.student_answers);
+        const subLabel = isNumericQuestionType(graded.questionType)
+          ? `Skor ${graded.earnedTotal}/${graded.maxTotal} poin (${graded.correctCount}/${exam.total_questions} tuntas)`
+          : `Benar ${r.correct_count}/${exam.total_questions} soal`;
+        return `
                 <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50/80 border border-slate-100">
                   <div class="flex items-center gap-3 min-w-0">
                     <div class="w-8 h-8 rounded-full ${r.score >= exam.kkm ? 'bg-indigo-600 text-white' : 'bg-amber-500 text-white'} font-extrabold text-xs flex items-center justify-center shrink-0">
                       #${i + 1}
                     </div>
                     <div class="min-w-0">
-                      <div class="text-xs font-bold text-slate-900 truncate">${r.student_name}</div>
-                      <div class="text-[11px] text-slate-500">Benar ${r.correct_count}/${exam.total_questions} soal</div>
+                      <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(r.student_name)}</div>
+                      <div class="text-[11px] text-slate-500">${subLabel}</div>
                     </div>
                   </div>
                   <div class="text-right shrink-0">
@@ -2025,7 +2504,8 @@
                     </span>
                   </div>
                 </div>
-              `).join('')}
+              `;
+      }).join('')}
             </div>
           </div>
 
@@ -2078,7 +2558,33 @@
 
     // ==================== 2. MANAJEMEN ULANGAN & KUNCI JAWABAN ====================
     function renderManajemenUlanganView() {
-      const classOptions = state.classes.map(c => `<option value="${c.class_name}">${c.class_name}</option>`).join('');
+      if (state.subjects.length === 0) mergeSubjectsState();
+
+      const classOptions = state.classes.map(c => `<option value="${escapeHtml(c.class_name)}">${escapeHtml(c.class_name)}</option>`).join('');
+      const titleOptions = EXAM_TITLE_OPTIONS.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+      const qTypeOptions = Object.values(QUESTION_TYPES).map(qt => `<option value="${qt.id}">${qt.label}</option>`).join('');
+
+      const userSubjects = state.currentUser?.role === 'guru' ? parseTeacherSubjects(state.currentUser.subject) : [];
+      const defaultSubject = (userSubjects.length > 0 && state.subjects.some(s => s.name.toLowerCase() === userSubjects[0].toLowerCase()))
+        ? state.subjects.find(s => s.name.toLowerCase() === userSubjects[0].toLowerCase()).name
+        : (state.subjects[0]?.name || '');
+
+      const subjectOptions = state.subjects.length > 0
+        ? state.subjects.map(s => {
+          const pengampu = s.teacher_id ? state.teachers.find(t => t.id === s.teacher_id) : null;
+          const label = pengampu ? `${s.name} — ${pengampu.full_name}` : s.name;
+          return `<option value="${escapeHtml(s.name)}" ${s.name === defaultSubject ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+        }).join('')
+        : '<option value="">Belum ada mapel</option>';
+
+      const defaultTeacherObj = getSubjectTeacher(defaultSubject) || (state.currentUser?.role === 'guru' ? state.teachers.find(t => t.id === state.currentUser.id) : null) || state.teachers[0];
+      const teacherOptions = state.teachers.length > 0
+        ? `<option value="">-- Pilih Guru Pengampu --</option>` + state.teachers.map(t =>
+          `<option value="${t.id}" ${defaultTeacherObj && t.id === defaultTeacherObj.id ? 'selected' : ''}>${escapeHtml(t.full_name)}</option>`
+        ).join('')
+        : '<option value="">Belum ada data guru</option>';
+
+      const defaultTypeMeta = QUESTION_TYPES.PG;
 
       return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -2091,26 +2597,50 @@
             </div>
             <div>
               <h3 class="text-base font-extrabold text-slate-900">Buat Paket Ulangan & Kunci</h3>
-              <p class="text-xs text-slate-500">Atur KKM dan kunci jawaban untuk koreksi otomatis</p>
+              <p class="text-xs text-slate-500">Atur jenis soal, mapel pengampu, KKM, dan kunci jawaban</p>
             </div>
           </div>
 
           <form onsubmit="window.handleSaveExam(event)" class="space-y-4">
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">Judul Ulangan / Penilaian</label>
-              <input type="text" id="exam-title" required placeholder="Contoh: UH 2: Trigonometri Dasar"
-                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <select id="exam-title" required
+                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                ${titleOptions}
+              </select>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700">Mata Pelajaran</label>
+                  <button type="button" onclick="window.navigateMenu('manajemen_mapel')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Mapel</button>
+                </div>
+                <select id="exam-subject" required onchange="window.syncExamTeacherFromSubject()"
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  ${subjectOptions}
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Guru Pengampu</label>
+                <select id="exam-teacher"
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  ${teacherOptions}
+                </select>
+              </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Mata Pelajaran</label>
-                <input type="text" id="exam-subject" required value="${state.currentUser?.role === 'guru' ? state.currentUser.subject : 'Matematika Wajib'}"
-                  class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Jenis Soal</label>
+                <select id="exam-question-type" required onchange="window.handleQuestionTypeChange()"
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  ${qTypeOptions}
+                </select>
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Pilih Kelas</label>
-                <select id="exam-class" class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <select id="exam-class" class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
                   ${classOptions}
                 </select>
               </div>
@@ -2123,8 +2653,8 @@
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Jml Soal PG</label>
-                <input type="number" id="exam-total-q" required min="5" max="50" value="10" oninput="window.syncAnswerKeyLength()"
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Jumlah Soal</label>
+                <input type="number" id="exam-total-q" required min="1" max="100" value="10" oninput="window.syncAnswerKeyLength()"
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div>
@@ -2135,14 +2665,14 @@
             </div>
 
             <div>
-              <div class="flex items-center justify-between mb-1.5">
-                <label class="text-xs font-bold text-slate-700">Deretan Kunci Jawaban (A/B/C/D/E)</label>
-                <span id="key-length-counter" class="text-[11px] font-extrabold text-indigo-600">10 / 10 Karakter</span>
+              <div class="flex items-center justify-between mb-1.5 gap-2">
+                <label id="exam-key-label" class="text-xs font-bold text-slate-700">${defaultTypeMeta.keyLabel}</label>
+                <span id="key-length-counter" class="text-[11px] font-extrabold text-indigo-600 shrink-0">10 / 10 Karakter</span>
               </div>
-              <input type="text" id="exam-answer-key" required value="ABCDABCDAE" oninput="window.syncAnswerKeyLength()"
-                placeholder="Ketik tanpa spasi, misal: ABCDABCDAE"
+              <input type="text" id="exam-answer-key" required value="${defaultTypeMeta.defaultKey}" oninput="window.syncAnswerKeyLength()"
+                placeholder="${defaultTypeMeta.keyPlaceholder}"
                 class="w-full px-4 py-3 rounded-2xl bg-indigo-50/60 border border-indigo-200 font-mono text-sm font-extrabold tracking-widest uppercase text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <p class="text-[11px] text-slate-500 mt-1">Pastikan jumlah huruf kunci jawaban sama dengan jumlah soal PG.</p>
+              <p id="exam-key-hint" class="text-[11px] text-slate-500 mt-1">${defaultTypeMeta.keyHint}</p>
             </div>
 
             <button type="submit" class="w-full py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
@@ -2164,24 +2694,29 @@
           <div class="space-y-3">
             ${state.exams.map(ex => {
         const s = computeExamStatistics(ex);
+        const exMeta = s.examMeta || decodeExamMeta(ex);
+        const teacherObj = state.teachers.find(t => t.id === ex.teacher_id) || getSubjectTeacher(ex.subject);
         const isSelected = ex.id === state.activeExamId;
         return `
                 <div class="p-4 rounded-2xl border transition ${isSelected ? 'bg-indigo-50/70 border-indigo-300 shadow-sm' : 'bg-white border-slate-200/80 hover:border-slate-300'} flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div class="space-y-1.5">
                     <div class="flex items-center gap-2 flex-wrap">
-                      <span class="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-extrabold">${ex.class_name}</span>
-                      <span class="text-xs font-bold text-indigo-700">${ex.subject}</span>
+                      <span class="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-extrabold">${escapeHtml(ex.class_name)}</span>
+                      <span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${exMeta.typeMeta.badgeClass}">${exMeta.typeMeta.label}</span>
+                      <span class="text-xs font-bold text-indigo-700">${escapeHtml(ex.subject)}</span>
                       <span class="text-[11px] text-slate-400">• ${ex.exam_date}</span>
                     </div>
-                    <h4 class="text-sm font-extrabold text-slate-900">${ex.title}</h4>
+                    <h4 class="text-sm font-extrabold text-slate-900">${escapeHtml(ex.title)}</h4>
+                    ${teacherObj ? `<div class="text-[11px] text-slate-500 font-semibold">Pengampu: <span class="text-slate-700">${escapeHtml(teacherObj.full_name)}</span></div>` : ''}
                     <div class="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
                       <span>KKM: <strong>${ex.kkm}</strong></span>
-                      <span>Soal: <strong>${ex.total_questions} PG</strong></span>
+                      <span>Soal: <strong>${ex.total_questions} ${exMeta.typeMeta.shortLabel}</strong></span>
+                      ${isNumericQuestionType(exMeta.questionType) ? `<span>Bobot Total: <strong>${exMeta.maxTotalScore}</strong></span>` : ''}
                       <span>Peserta: <strong>${s.totalStudents} Siswa</strong></span>
                       <span>Ketuntasan: <strong class="text-emerald-600">${s.classicalMastery}%</strong></span>
                     </div>
                     <div class="text-[11px] font-mono bg-slate-100 px-2.5 py-1 rounded-lg inline-block text-slate-700">
-                      Kunci: <strong>${ex.answer_key}</strong>
+                      ${isNumericQuestionType(exMeta.questionType) ? 'Nilai/No' : 'Kunci'}: <strong>${escapeHtml(exMeta.displayKey)}</strong>
                     </div>
                   </div>
 
@@ -2205,45 +2740,130 @@
     `;
     }
 
+    window.syncExamTeacherFromSubject = function () {
+      const subjSelect = document.getElementById('exam-subject');
+      const teacherSelect = document.getElementById('exam-teacher');
+      if (!subjSelect || !teacherSelect) return;
+      const teacherObj = getSubjectTeacher(subjSelect.value);
+      if (teacherObj) {
+        teacherSelect.value = teacherObj.id;
+      }
+    };
+
+    window.handleQuestionTypeChange = function () {
+      const typeSelect = document.getElementById('exam-question-type');
+      const totalInput = document.getElementById('exam-total-q');
+      const keyInput = document.getElementById('exam-answer-key');
+      const labelEl = document.getElementById('exam-key-label');
+      const hintEl = document.getElementById('exam-key-hint');
+      if (!typeSelect || !keyInput) return;
+
+      const qType = typeSelect.value || 'PG';
+      const meta = QUESTION_TYPES[qType] || QUESTION_TYPES.PG;
+      if (labelEl) labelEl.textContent = meta.keyLabel;
+      if (hintEl) hintEl.textContent = meta.keyHint;
+      keyInput.placeholder = meta.keyPlaceholder;
+
+      if (isNumericQuestionType(qType)) {
+        keyInput.classList.remove('uppercase');
+      } else {
+        keyInput.classList.add('uppercase');
+      }
+
+      const defaultKeys = Object.values(QUESTION_TYPES).map(t => t.defaultKey);
+      const currentVal = keyInput.value.trim();
+      if (!currentVal || defaultKeys.includes(currentVal) || (isNumericQuestionType(qType) && /[A-Z]/i.test(currentVal)) || (!isNumericQuestionType(qType) && /\d|,/.test(currentVal))) {
+        keyInput.value = meta.defaultKey;
+        if (totalInput) {
+          totalInput.value = isNumericQuestionType(qType)
+            ? parseNumericScores(meta.defaultKey).length
+            : meta.defaultKey.length;
+        }
+      }
+
+      window.syncAnswerKeyLength();
+    };
+
     window.syncAnswerKeyLength = function () {
+      const typeSelect = document.getElementById('exam-question-type');
       const totalInput = document.getElementById('exam-total-q');
       const keyInput = document.getElementById('exam-answer-key');
       const counter = document.getElementById('key-length-counter');
       if (!totalInput || !keyInput || !counter) return;
 
-      const cleanKey = keyInput.value.toUpperCase().replace(/[^A-E]/g, '');
+      const qType = typeSelect?.value || 'PG';
+      const targetLen = Math.max(1, Number(totalInput.value) || 1);
+
+      if (isNumericQuestionType(qType)) {
+        const cleanRaw = keyInput.value.replace(/[^0-9.,;\s]/g, '');
+        if (cleanRaw !== keyInput.value) keyInput.value = cleanRaw;
+        const scores = parseNumericScores(cleanRaw, targetLen);
+        const totalMax = scores.reduce((acc, n) => acc + n, 0);
+        const isMatch = scores.length === targetLen && totalMax > 0;
+        counter.textContent = `${scores.length} / ${targetLen} Nomor • Total Bobot ${totalMax}`;
+        counter.className = isMatch
+          ? 'text-[11px] font-extrabold text-emerald-600 shrink-0'
+          : 'text-[11px] font-extrabold text-rose-600 shrink-0';
+        return;
+      }
+
+      const regex = qType === 'BS' ? /[^BS]/g : /[^A-E]/g;
+      const cleanKey = keyInput.value.toUpperCase().replace(regex, '');
       keyInput.value = cleanKey;
-      const targetLen = Number(totalInput.value) || 10;
       counter.textContent = `${cleanKey.length} / ${targetLen} Karakter`;
       counter.className = cleanKey.length === targetLen
-        ? 'text-[11px] font-extrabold text-emerald-600'
-        : 'text-[11px] font-extrabold text-rose-600';
+        ? 'text-[11px] font-extrabold text-emerald-600 shrink-0'
+        : 'text-[11px] font-extrabold text-rose-600 shrink-0';
     };
 
     window.handleSaveExam = async function (e) {
       e.preventDefault();
       const title = document.getElementById('exam-title').value.trim();
       const subject = document.getElementById('exam-subject').value.trim();
+      const teacherId = document.getElementById('exam-teacher')?.value || (state.currentUser?.role === 'guru' ? state.currentUser.id : (state.teachers[0]?.id || null));
       const className = document.getElementById('exam-class').value;
+      const qType = document.getElementById('exam-question-type')?.value || 'PG';
       const kkm = Number(document.getElementById('exam-kkm').value);
       const totalQuestions = Number(document.getElementById('exam-total-q').value);
       const examDate = document.getElementById('exam-date').value;
-      const answerKey = document.getElementById('exam-answer-key').value.toUpperCase().replace(/[^A-E]/g, '');
+      const rawKey = document.getElementById('exam-answer-key').value;
 
-      if (answerKey.length !== totalQuestions) {
-        showToast(`Panjang Kunci Jawaban (${answerKey.length}) harus sama dengan Jumlah Soal (${totalQuestions})!`, 'warning');
+      if (!subject) {
+        showToast('Pilih Mata Pelajaran terlebih dahulu (atau tambahkan di menu Mapel).', 'warning');
         return;
       }
 
+      if (isNumericQuestionType(qType)) {
+        const scores = parseNumericScores(rawKey, totalQuestions);
+        const totalWeight = scores.reduce((a, b) => a + b, 0);
+        if (scores.length !== totalQuestions) {
+          showToast(`Jumlah nilai per nomor (${scores.length}) harus sama dengan Jumlah Soal (${totalQuestions})!`, 'warning');
+          return;
+        }
+        if (totalWeight <= 0) {
+          showToast('Total bobot nilai maksimal harus lebih dari 0.', 'warning');
+          return;
+        }
+      } else {
+        const regex = qType === 'BS' ? /[^BS]/g : /[^A-E]/g;
+        const cleanKey = rawKey.toUpperCase().replace(regex, '');
+        if (cleanKey.length !== totalQuestions) {
+          showToast(`Panjang Kunci Jawaban (${cleanKey.length}) harus sama dengan Jumlah Soal (${totalQuestions})!`, 'warning');
+          return;
+        }
+      }
+
+      const encodedKey = encodeExamAnswerKey(qType, rawKey, totalQuestions);
+
       const newExam = {
         id: crypto.randomUUID(),
-        teacher_id: state.currentUser?.role === 'guru' ? state.currentUser.id : (state.teachers[0]?.id || null),
+        teacher_id: teacherId || null,
         title,
         subject,
         class_name: className,
         kkm,
         total_questions: totalQuestions,
-        answer_key: answerKey,
+        answer_key: encodedKey,
         exam_date: examDate
       };
 
@@ -2299,27 +2919,35 @@
         return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Silakan buat Paket Ulangan terlebih dahulu pada menu <strong>Paket Ulangan & Kunci</strong>.</div>`;
       }
 
+      const examMeta = decodeExamMeta(exam);
+      const isNumType = isNumericQuestionType(examMeta.questionType);
+
       return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <!-- Left Form: Input Lembar Jawaban Siswa -->
         <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                 <i data-lucide="user-plus" class="w-5 h-5"></i>
               </div>
-              <div>
+              <div class="min-w-0">
                 <h3 class="text-base font-extrabold text-slate-900">Input Jawaban Siswa</h3>
-                <p class="text-xs text-slate-500">${exam.title} (${exam.class_name})</p>
+                <p class="text-xs text-slate-500 truncate">${escapeHtml(exam.title)} (${escapeHtml(exam.class_name)})</p>
               </div>
             </div>
-            <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold">KKM ${exam.kkm}</span>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="px-2.5 py-1 rounded-full border text-[10px] font-extrabold ${examMeta.typeMeta.badgeClass}">${examMeta.typeMeta.label}</span>
+              <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold">KKM ${exam.kkm}</span>
+            </div>
           </div>
 
-          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
-            <span class="font-semibold text-slate-600">Kunci Jawaban (${exam.total_questions} Soal):</span>
-            <span class="font-mono font-extrabold tracking-widest text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg">${exam.answer_key}</span>
+          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span class="font-semibold text-slate-600">
+              ${isNumType ? `Nilai Maks per No (${exam.total_questions} Soal • Total ${examMeta.maxTotalScore})` : `Kunci Jawaban ${examMeta.typeMeta.shortLabel} (${exam.total_questions} Soal)`}:
+            </span>
+            <span class="font-mono font-extrabold tracking-wider text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg">${escapeHtml(examMeta.displayKey)}</span>
           </div>
 
           <form onsubmit="window.handleSaveStudentResult(event)" class="space-y-4">
@@ -2338,23 +2966,28 @@
 
             <div>
               <div class="flex items-center justify-between mb-1.5">
-                <label class="text-xs font-bold text-slate-700">Deretan Jawaban PG Siswa (${exam.total_questions} Huruf)</label>
+                <label class="text-xs font-bold text-slate-700">${examMeta.typeMeta.studentLabel} (${exam.total_questions} Soal)</label>
                 <button type="button" onclick="window.fillRandomStudentAnswer()" class="text-[11px] font-bold text-indigo-600 hover:underline">
                   + Isi Simulasi Cepat
                 </button>
               </div>
-              <input type="text" id="student-answers" required maxlength="${exam.total_questions}" oninput="window.previewLiveScore()"
-                placeholder="Ketik jawaban siswa, misal: ${exam.answer_key}"
-                class="w-full px-4 py-3 rounded-2xl bg-white border border-slate-300 font-mono text-sm font-extrabold tracking-widest uppercase text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input type="text" id="student-answers" required maxlength="${isNumType ? 250 : exam.total_questions}" oninput="window.previewLiveScore()"
+                placeholder="${examMeta.typeMeta.studentPlaceholder}"
+                class="w-full px-4 py-3 rounded-2xl bg-white border border-slate-300 font-mono text-sm font-extrabold tracking-widest ${isNumType ? '' : 'uppercase'} text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <p class="text-[11px] text-slate-500 mt-1">
+                ${isNumType
+          ? `Ketik skor per nomor langsung (misal 2415) atau dipisah koma (misal ${examMeta.displayKey}).`
+          : (examMeta.questionType === 'BS' ? 'Ketik huruf B (Benar) atau S (Salah) tanpa spasi sesuai jumlah soal.' : 'Ketik huruf A-E tanpa spasi sesuai jumlah soal.')}
+              </p>
             </div>
 
             <!-- Live Auto-Grading Preview Box -->
-            <div id="live-grading-preview" class="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between">
+            <div id="live-grading-preview" class="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between gap-3">
               <div>
                 <div class="text-[11px] font-bold uppercase text-indigo-600">Pratinjau Koreksi Otomatis</div>
-                <div id="live-grade-detail" class="text-xs text-slate-600 mt-0.5">Ketik jawaban siswa untuk melihat skor otomatis</div>
+                <div id="live-grade-detail" class="text-xs text-slate-600 mt-0.5">Ketik jawaban/skor siswa untuk melihat nilai akhir</div>
               </div>
-              <div id="live-grade-score" class="text-2xl font-extrabold text-indigo-700">0</div>
+              <div id="live-grade-score" class="text-2xl font-extrabold text-indigo-700 shrink-0">0</div>
             </div>
 
             <div>
@@ -2374,7 +3007,9 @@
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 class="text-base font-extrabold text-slate-900">Tabel Hasil Koreksi Jawaban Siswa</h3>
-              <p class="text-xs text-slate-500">Hijau = Jawaban Benar, Merah = Jawaban Salah</p>
+              <p class="text-xs text-slate-500">
+                ${isNumType ? 'Hijau = Tuntas (≥75% bobot), Kuning = Parsial, Merah = Skor 0' : 'Hijau = Jawaban Benar, Merah = Jawaban Salah'}
+              </p>
             </div>
             <div class="flex items-center gap-2">
               <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
@@ -2392,7 +3027,7 @@
                 <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
                   <th class="py-3 px-3">Siswa</th>
                   <th class="py-3 px-3">Rincian Jawaban vs Kunci</th>
-                  <th class="py-3 px-3 text-center">Benar</th>
+                  <th class="py-3 px-3 text-center">${isNumType ? 'Skor' : 'Benar'}</th>
                   <th class="py-3 px-3 text-center">Nilai</th>
                   <th class="py-3 px-3 text-center">Status</th>
                   <th class="py-3 px-3 text-right">Aksi</th>
@@ -2402,23 +3037,29 @@
                 ${stats.results.length === 0 ? `
                   <tr><td colspan="6" class="py-8 text-center text-slate-400">Belum ada jawaban siswa yang diinput pada ulangan ini.</td></tr>
                 ` : stats.results.map(r => {
-        const keyArr = exam.answer_key.split('');
-        const ansBadges = keyArr.map((k, idx) => {
-          const sAns = (r.student_answers[idx] || '-').toUpperCase();
-          const isRight = sAns === k;
-          return `<span class="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-mono font-bold ${isRight ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}" title="Soal #${idx + 1}: Kunci ${k}, Jawab ${sAns}">${sAns}</span>`;
+        const graded = scoreStudentResponse(exam, r.student_answers);
+        const ansBadges = graded.itemResults.map(item => {
+          if (isNumType) {
+            const cls = item.isCorrect
+              ? 'bg-emerald-100 text-emerald-700'
+              : (item.isPartial ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700');
+            return `<span class="inline-flex items-center justify-center px-1.5 h-5 rounded text-[10px] font-mono font-bold ${cls}" title="Soal #${item.number}: Skor ${item.studentVal} / Maks ${item.keyVal}">${item.studentVal}/${item.keyVal}</span>`;
+          }
+          return `<span class="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-mono font-bold ${item.isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}" title="Soal #${item.number}: Kunci ${item.keyVal}, Jawab ${item.studentVal}">${item.studentVal}</span>`;
         }).join(' ');
 
         return `
                     <tr class="hover:bg-slate-50/80 transition">
                       <td class="py-3 px-3">
-                        <div class="font-bold text-slate-900">${r.student_name}</div>
-                        <div class="text-[11px] text-slate-400">NIS: ${r.student_nis}</div>
+                        <div class="font-bold text-slate-900">${escapeHtml(r.student_name)}</div>
+                        <div class="text-[11px] text-slate-400">NIS: ${escapeHtml(r.student_nis)}</div>
                       </td>
                       <td class="py-3 px-3">
                         <div class="flex flex-wrap gap-1">${ansBadges}</div>
                       </td>
-                      <td class="py-3 px-3 text-center font-bold text-slate-700">${r.correct_count}/${exam.total_questions}</td>
+                      <td class="py-3 px-3 text-center font-bold text-slate-700">
+                        ${isNumType ? `${graded.earnedTotal}/${graded.maxTotal}` : `${r.correct_count}/${exam.total_questions}`}
+                      </td>
                       <td class="py-3 px-3 text-center">
                         <span class="text-sm font-extrabold ${r.score >= exam.kkm ? 'text-emerald-600' : 'text-rose-600'}">${r.score}</span>
                       </td>
@@ -2447,10 +3088,22 @@
     window.fillRandomStudentAnswer = function () {
       const exam = getActiveExam();
       if (!exam) return;
-      const opts = ['A', 'B', 'C', 'D', 'E'];
-      const key = exam.answer_key.split('');
-      // 75% chance matching key for realistic test data
-      const generated = key.map(k => (Math.random() < 0.75 ? k : opts[Math.floor(Math.random() * opts.length)])).join('');
+      const examMeta = decodeExamMeta(exam);
+      let generated = '';
+
+      if (isNumericQuestionType(examMeta.questionType)) {
+        const scores = examMeta.keyScores.map(maxVal => {
+          const minNice = Math.floor(maxVal * 0.5);
+          return Math.random() < 0.75
+            ? maxVal
+            : Math.max(0, minNice + Math.floor(Math.random() * (maxVal - minNice + 1)));
+        });
+        generated = scores.join(',');
+      } else {
+        const opts = examMeta.questionType === 'BS' ? ['B', 'S'] : ['A', 'B', 'C', 'D', 'E'];
+        generated = examMeta.keyItems.map(k => (Math.random() < 0.75 ? k : opts[Math.floor(Math.random() * opts.length)])).join('');
+      }
+
       const ansInput = document.getElementById('student-answers');
       if (ansInput) {
         ansInput.value = generated;
@@ -2465,20 +3118,29 @@
       const scoreEl = document.getElementById('live-grade-score');
       if (!exam || !ansInput || !detailEl || !scoreEl) return;
 
-      const cleanAns = ansInput.value.toUpperCase().replace(/[^A-E]/g, '');
-      ansInput.value = cleanAns;
-
-      const key = exam.answer_key.toUpperCase();
-      let correct = 0;
-      for (let i = 0; i < key.length; i++) {
-        if (cleanAns[i] && cleanAns[i] === key[i]) correct++;
+      const examMeta = decodeExamMeta(exam);
+      if (isNumericQuestionType(examMeta.questionType)) {
+        const cleanRaw = ansInput.value.replace(/[^0-9.,;\s]/g, '');
+        if (cleanRaw !== ansInput.value) ansInput.value = cleanRaw;
+      } else {
+        const regex = examMeta.questionType === 'BS' ? /[^BS]/g : /[^A-E]/g;
+        const cleanAns = ansInput.value.toUpperCase().replace(regex, '');
+        ansInput.value = cleanAns;
       }
-      const score = Math.round((correct / key.length) * 100);
-      const passed = score >= exam.kkm;
 
-      detailEl.innerHTML = `Benar <strong>${correct}</strong> dari <strong>${key.length}</strong> soal • Status: <strong class="${passed ? 'text-emerald-600' : 'text-amber-600'}">${passed ? 'TUNTAS KKM' : 'PERLU REMEDIAL'}</strong>`;
-      scoreEl.textContent = score;
-      scoreEl.className = `text-2xl font-extrabold ${passed ? 'text-emerald-600' : 'text-amber-600'}`;
+      const graded = scoreStudentResponse(exam, ansInput.value);
+      const passed = graded.score >= Number(exam.kkm);
+
+      if (graded.exceededItems.length > 0) {
+        detailEl.innerHTML = `<span class="text-rose-600 font-bold">Nilai soal No. ${graded.exceededItems.join(', ')} melebihi batas maksimal!</span>`;
+      } else if (isNumericQuestionType(graded.questionType)) {
+        detailEl.innerHTML = `Total Skor <strong>${graded.earnedTotal}</strong> / <strong>${graded.maxTotal}</strong> (${graded.itemCount}/${graded.expectedCount} nomor) • Status: <strong class="${passed ? 'text-emerald-600' : 'text-amber-600'}">${passed ? 'TUNTAS KKM' : 'PERLU REMEDIAL'}</strong>`;
+      } else {
+        detailEl.innerHTML = `Benar <strong>${graded.correctCount}</strong> dari <strong>${graded.expectedCount}</strong> soal • Status: <strong class="${passed ? 'text-emerald-600' : 'text-amber-600'}">${passed ? 'TUNTAS KKM' : 'PERLU REMEDIAL'}</strong>`;
+      }
+
+      scoreEl.textContent = graded.score;
+      scoreEl.className = `text-2xl font-extrabold shrink-0 ${passed ? 'text-emerald-600' : 'text-amber-600'}`;
     };
 
     window.handleSaveStudentResult = async function (e) {
@@ -2488,19 +3150,22 @@
 
       const studentName = document.getElementById('student-name').value.trim();
       const studentNis = document.getElementById('student-nis').value.trim();
-      const studentAnswers = document.getElementById('student-answers').value.toUpperCase().replace(/[^A-E]/g, '');
+      const rawAnswers = document.getElementById('student-answers').value;
       const notes = document.getElementById('student-notes').value.trim();
 
-      if (studentAnswers.length !== Number(exam.total_questions)) {
-        showToast(`Jumlah jawaban siswa (${studentAnswers.length}) harus ${exam.total_questions} huruf!`, 'warning');
+      const graded = scoreStudentResponse(exam, rawAnswers);
+
+      if (graded.exceededItems.length > 0) {
+        showToast(`Skor siswa melebihi bobot maksimal pada soal No. ${graded.exceededItems.join(', ')}!`, 'warning');
         return;
       }
 
-      let correctCount = 0;
-      for (let i = 0; i < exam.answer_key.length; i++) {
-        if (studentAnswers[i] === exam.answer_key[i]) correctCount++;
+      if (graded.itemCount !== Number(exam.total_questions)) {
+        showToast(`Jumlah jawaban/skor siswa (${graded.itemCount}) harus ${exam.total_questions} soal!`, 'warning');
+        return;
       }
-      const score = Math.round((correctCount / exam.total_questions) * 100);
+
+      const score = graded.score;
       const isPassed = score >= Number(exam.kkm);
 
       const newResult = {
@@ -2508,11 +3173,11 @@
         exam_id: exam.id,
         student_name: studentName,
         student_nis: studentNis,
-        student_answers: studentAnswers,
-        correct_count: correctCount,
+        student_answers: graded.cleanStorageValue,
+        correct_count: graded.correctCount,
         score,
         is_passed: isPassed,
-        notes: notes || (isPassed ? 'Tuntas KKM dengan baik.' : 'Perlu remedial pada butir soal yang salah.')
+        notes: notes || (isPassed ? 'Tuntas KKM dengan baik.' : 'Perlu remedial pada butir soal yang belum tuntas.')
       };
 
       const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
@@ -2557,9 +3222,16 @@
         return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Pilih paket ulangan terlebih dahulu.</div>`;
       }
 
+      const examMeta = stats.examMeta || decodeExamMeta(exam);
+      const qType = examMeta.questionType;
+      const isNumType = isNumericQuestionType(qType);
       const acceptedCount = stats.itemAnalysis.filter(i => i.statusAction === 'Diterima (Bank Soal)').length;
       const reviseCount = stats.itemAnalysis.filter(i => i.statusAction === 'Perlu Revisi').length;
       const discardCount = stats.itemAnalysis.filter(i => i.statusAction === 'Dibuang / Ganti').length;
+
+      const distHeaderLabel = isNumType
+        ? 'Rata-rata / Bobot Maks'
+        : (qType === 'BS' ? 'Sebaran Jawaban (B/S)' : 'Sebaran Opsi (A/B/C/D/E)');
 
       return `
       <!-- Summary Metrics Row for Item Quality -->
@@ -2602,8 +3274,11 @@
       <div class="glass-surface rounded-3xl p-6 space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 class="text-base font-extrabold text-slate-900">Tabel Analisis Kualitas Butir Soal (${exam.title})</h3>
-            <p class="text-xs text-slate-500">Menghitung Tingkat Kesukaran (P), Daya Pembeda Kelompok Atas-Bawah (D), dan Distribusi Pengecoh</p>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="text-base font-extrabold text-slate-900">Tabel Analisis Kualitas Butir Soal (${escapeHtml(exam.title)})</h3>
+              <span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${examMeta.typeMeta.badgeClass}">${examMeta.typeMeta.label}</span>
+            </div>
+            <p class="text-xs text-slate-500">Menghitung Tingkat Kesukaran (P), Daya Pembeda Kelompok Atas-Bawah (D), dan Distribusi Jawaban</p>
           </div>
           <button type="button" onclick="window.print()" class="no-print px-4 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 w-fit">
             <i data-lucide="printer" class="w-4 h-4"></i> Cetak Analisis Butir
@@ -2615,26 +3290,52 @@
             <thead>
               <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
                 <th class="py-3.5 px-3">No Soal</th>
-                <th class="py-3.5 px-3 text-center">Kunci</th>
-                <th class="py-3.5 px-3">Ketuntasan Butir (%)</th>
+                <th class="py-3.5 px-3 text-center">${isNumType ? 'Bobot' : 'Kunci'}</th>
+                <th class="py-3.5 px-3">${isNumType ? 'Penguasaan Butir (%)' : 'Ketuntasan Butir (%)'}</th>
                 <th class="py-3.5 px-3 text-center">Indeks Kesukaran (P)</th>
                 <th class="py-3.5 px-3 text-center">Daya Pembeda (D)</th>
-                <th class="py-3.5 px-3 text-center">Sebaran Opsi (A/B/C/D/E)</th>
+                <th class="py-3.5 px-3 text-center">${distHeaderLabel}</th>
                 <th class="py-3.5 px-3 text-right">Rekomendasi Status</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-xs">
               ${stats.itemAnalysis.length === 0 ? `
                 <tr><td colspan="7" class="py-8 text-center text-slate-400">Belum ada data jawaban siswa untuk dianalisis.</td></tr>
-              ` : stats.itemAnalysis.map(item => `
+              ` : stats.itemAnalysis.map(item => {
+        let distCell = '';
+        if (isNumType) {
+          distCell = `
+            <div class="inline-flex items-center gap-1.5 bg-slate-100 px-3 py-1 rounded-xl font-bold text-slate-700">
+              <span>Rata ${item.meanScore}</span>
+              <span class="text-slate-400">/</span>
+              <span class="text-indigo-600">${item.maxScore}</span>
+            </div>`;
+        } else if (qType === 'BS') {
+          distCell = `
+            <div class="inline-flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-xl">
+              <span class="${item.key === 'B' ? 'font-extrabold text-indigo-600' : ''}">B:${item.optionCounts.B}</span>•
+              <span class="${item.key === 'S' ? 'font-extrabold text-indigo-600' : ''}">S:${item.optionCounts.S}</span>
+            </div>`;
+        } else {
+          distCell = `
+            <div class="inline-flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-xl">
+              <span class="${item.key === 'A' ? 'font-extrabold text-indigo-600' : ''}">A:${item.optionCounts.A}</span>•
+              <span class="${item.key === 'B' ? 'font-extrabold text-indigo-600' : ''}">B:${item.optionCounts.B}</span>•
+              <span class="${item.key === 'C' ? 'font-extrabold text-indigo-600' : ''}">C:${item.optionCounts.C}</span>•
+              <span class="${item.key === 'D' ? 'font-extrabold text-indigo-600' : ''}">D:${item.optionCounts.D}</span>•
+              <span class="${item.key === 'E' ? 'font-extrabold text-indigo-600' : ''}">E:${item.optionCounts.E}</span>
+            </div>`;
+        }
+
+        return `
                 <tr class="hover:bg-slate-50/80 transition">
                   <td class="py-3.5 px-3 font-extrabold text-slate-900">Butir #${item.number}</td>
                   <td class="py-3.5 px-3 text-center">
-                    <span class="w-7 h-7 rounded-xl bg-indigo-600 text-white font-mono font-extrabold inline-flex items-center justify-center">${item.key}</span>
+                    <span class="min-w-[28px] h-7 px-2 rounded-xl bg-indigo-600 text-white font-mono font-extrabold inline-flex items-center justify-center">${item.key}</span>
                   </td>
                   <td class="py-3.5 px-3 min-w-[160px]">
                     <div class="flex items-center justify-between text-[11px] font-bold mb-1">
-                      <span>${item.correctCount}/${stats.totalStudents} Siswa Benar</span>
+                      <span>${item.metricSummary}</span>
                       <span class="text-indigo-600">${item.correctPercent}%</span>
                     </div>
                     <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -2654,13 +3355,7 @@
                     </span>
                   </td>
                   <td class="py-3.5 px-3 text-center font-mono text-[11px]">
-                    <div class="inline-flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-xl">
-                      <span class="${item.key === 'A' ? 'font-extrabold text-indigo-600' : ''}">A:${item.optionCounts.A}</span>•
-                      <span class="${item.key === 'B' ? 'font-extrabold text-indigo-600' : ''}">B:${item.optionCounts.B}</span>•
-                      <span class="${item.key === 'C' ? 'font-extrabold text-indigo-600' : ''}">C:${item.optionCounts.C}</span>•
-                      <span class="${item.key === 'D' ? 'font-extrabold text-indigo-600' : ''}">D:${item.optionCounts.D}</span>•
-                      <span class="${item.key === 'E' ? 'font-extrabold text-indigo-600' : ''}">E:${item.optionCounts.E}</span>
-                    </div>
+                    ${distCell}
                   </td>
                   <td class="py-3.5 px-3 text-right">
                     <span class="px-3 py-1 rounded-full text-[11px] font-extrabold ${item.statusColor}">
@@ -2668,7 +3363,8 @@
                     </span>
                   </td>
                 </tr>
-              `).join('')}
+              `;
+      }).join('')}
             </tbody>
           </table>
         </div>
@@ -2685,13 +3381,9 @@
       const remedialStudents = stats.results.filter(r => Number(r.score) < Number(exam.kkm));
       const enrichmentStudents = stats.results.filter(r => Number(r.score) >= Number(exam.kkm));
 
-      // Find failed item numbers for each remedial student
       const getWeakQuestions = (ansStr) => {
-        const key = exam.answer_key.toUpperCase();
-        const missed = [];
-        for (let i = 0; i < key.length; i++) {
-          if ((ansStr[i] || '').toUpperCase() !== key[i]) missed.push(i + 1);
-        }
+        const graded = scoreStudentResponse(exam, ansStr);
+        const missed = graded.itemResults.filter(item => !item.isCorrect).map(item => item.number);
         return missed.length > 0 ? `No. ${missed.join(', ')}` : '-';
       };
 
@@ -2807,14 +3499,23 @@
       const exam = getActiveExam();
       if (!exam) return;
       const stats = computeExamStatistics(exam);
+      const examMeta = stats.examMeta || decodeExamMeta(exam);
+      const isNumType = isNumericQuestionType(examMeta.questionType);
 
       let csv = `Laporan Analisis Hasil Ulangan - ${exam.title} (${exam.class_name})\n`;
-      csv += `Mata Pelajaran,${exam.subject},KKM,${exam.kkm},Tanggal,${exam.exam_date}\n\n`;
-      csv += `NIS,Nama Siswa,Jawaban Siswa,Jumlah Benar,Nilai Akhir,Status Ketuntasan,Catatan\n`;
+      csv += `Mata Pelajaran,${exam.subject},Jenis Soal,${examMeta.typeMeta.label},KKM,${exam.kkm},Tanggal,${exam.exam_date}\n\n`;
+      csv += isNumType
+        ? `NIS,Nama Siswa,Skor Per Nomor,Total Poin,Butir Tuntas,Nilai Akhir,Status Ketuntasan,Catatan\n`
+        : `NIS,Nama Siswa,Jawaban Siswa,Jumlah Benar,Nilai Akhir,Status Ketuntasan,Catatan\n`;
 
       stats.results.forEach(r => {
         const status = r.score >= exam.kkm ? 'TUNTAS' : 'REMEDIAL';
-        csv += `"${r.student_nis}","${r.student_name}","${r.student_answers}",${r.correct_count},${r.score},${status},"${r.notes || ''}"\n`;
+        const graded = scoreStudentResponse(exam, r.student_answers);
+        if (isNumType) {
+          csv += `"${r.student_nis}","${r.student_name}","${graded.displayStudentValue}",${graded.earnedTotal}/${graded.maxTotal},${r.correct_count},${r.score},${status},"${r.notes || ''}"\n`;
+        } else {
+          csv += `"${r.student_nis}","${r.student_name}","${r.student_answers}",${r.correct_count},${r.score},${status},"${r.notes || ''}"\n`;
+        }
       });
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2828,8 +3529,270 @@
       showToast('File CSV Analisis Nilai berhasil diunduh!', 'success');
     };
 
-    // ==================== 6. MANAJEMEN GURU & KELAS (KHUSUS ADMIN) ====================
+    // ==================== 6. MANAJEMEN MAPEL & GURU PENGAMPU ====================
+    function renderManajemenMapelView() {
+      if (state.subjects.length === 0) mergeSubjectsState();
+
+      const teacherOptions = state.teachers.length > 0
+        ? `<option value="">-- Pilih Guru Pengampu (Opsional) --</option>` + state.teachers.map(t =>
+          `<option value="${t.id}">${escapeHtml(t.full_name)} (${escapeHtml(t.username)})</option>`
+        ).join('')
+        : '<option value="">Belum ada akun guru terdaftar</option>';
+
+      const sortedSubjects = state.subjects.slice();
+
+      return `
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Form: Tambah Mapel & Pilih Guru Pengampu -->
+        <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <i data-lucide="book-plus" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Tambah Mata Pelajaran</h3>
+              <p class="text-xs text-slate-500">Tambahkan mapel dan tentukan guru pengampunya</p>
+            </div>
+          </div>
+
+          <form onsubmit="window.handleSaveSubject(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Mata Pelajaran</label>
+              <input type="text" id="subj-name" required placeholder="Contoh: Bahasa Arab / Tahfidz"
+                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">Pilih Guru yang Mengampu Mapel</label>
+              <select id="subj-teacher"
+                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                ${teacherOptions}
+              </select>
+            </div>
+
+            <div class="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-[11px] text-slate-600 leading-relaxed flex items-start gap-2.5">
+              <i data-lucide="info" class="w-4 h-4 text-indigo-600 shrink-0 mt-0.5"></i>
+              <span>Daftar mapel & guru pengampu otomatis muncul di form <strong>Paket Ulangan & Kunci</strong> serta terhubung dengan data pengampu di Supabase.</span>
+            </div>
+
+            <button type="submit" class="w-full py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+              <i data-lucide="save" class="w-4 h-4"></i> Simpan Mapel & Pengampu
+            </button>
+
+            ${state.currentUser?.role === 'admin' ? `
+              <button type="button" onclick="window.navigateMenu('manajemen_guru')" class="w-full py-2.5 px-4 rounded-full bg-slate-100 hover:bg-slate-200/70 text-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
+                <i data-lucide="users-round" class="w-3.5 h-3.5"></i> Kelola Daftar Akun Guru
+              </button>
+            ` : ''}
+          </form>
+        </div>
+
+        <!-- Right List: Daftar Mapel & Pemilihan Guru Pengampu -->
+        <div class="lg:col-span-7 glass-surface rounded-3xl p-6 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Daftar Mapel & Guru Pengampu</h3>
+              <p class="text-xs text-slate-500">Ubah dropdown guru pada tiap mapel untuk menetapkan atau mengganti pengampu</p>
+            </div>
+            <span class="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold w-fit">${sortedSubjects.length} Mapel</span>
+          </div>
+
+          <div class="space-y-2.5 max-h-[540px] overflow-y-auto custom-scroll pr-1">
+            ${sortedSubjects.length === 0 ? `
+              <div class="py-10 text-center text-xs text-slate-400">Belum ada mata pelajaran terdaftar.</div>
+            ` : sortedSubjects.map(subj => {
+        const assignedTeacher = subj.teacher_id ? state.teachers.find(t => t.id === subj.teacher_id) : null;
+        const examCount = state.exams.filter(ex => (ex.subject || '').trim().toLowerCase() === subj.name.toLowerCase()).length;
+        const rowTeacherOptions = `<option value="">-- Belum Ada Pengampu --</option>` + state.teachers.map(t =>
+          `<option value="${t.id}" ${subj.teacher_id === t.id ? 'selected' : ''}>${escapeHtml(t.full_name)}</option>`
+        ).join('');
+
+        return `
+                <div class="p-3.5 rounded-2xl bg-white border border-slate-200/80 hover:border-indigo-200 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-xs font-extrabold text-slate-900">${escapeHtml(subj.name)}</span>
+                      ${examCount > 0 ? `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">${examCount} Paket Ulangan</span>` : ''}
+                    </div>
+                    <div class="text-[11px] mt-0.5 ${assignedTeacher ? 'text-emerald-600 font-semibold' : 'text-slate-400'}">
+                      ${assignedTeacher ? `Diampu oleh: ${escapeHtml(assignedTeacher.full_name)}` : 'Belum dipilih guru pengampu'}
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2 shrink-0">
+                    <select data-subject="${escapeHtml(subj.name)}" onchange="window.handleAssignSubjectTeacher(this.dataset.subject, this.value)"
+                      class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[210px]">
+                      ${rowTeacherOptions}
+                    </select>
+                    <button type="button" data-subject="${escapeHtml(subj.name)}" onclick="window.handleDeleteSubject(this.dataset.subject)"
+                      class="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 transition" title="Hapus Mapel">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                  </div>
+                </div>
+              `;
+      }).join('')}
+          </div>
+        </div>
+
+      </div>
+    `;
+    }
+
+    window.handleSaveSubject = async function (e) {
+      e.preventDefault();
+      const nameInput = document.getElementById('subj-name');
+      const teacherSelect = document.getElementById('subj-teacher');
+      const cleanName = nameInput?.value.trim() || '';
+      const teacherId = teacherSelect?.value || null;
+
+      if (!cleanName) {
+        showToast('Nama mata pelajaran wajib diisi.', 'warning');
+        return;
+      }
+
+      const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
+      setButtonLoading(submitterBtn, true, 'Menyimpan...');
+      showActionOverlay({
+        stateType: 'loading',
+        title: 'Menyimpan Mata Pelajaran...',
+        subtitle: 'Memperbarui mapel, pengampu, dan sinkronisasi Supabase'
+      });
+
+      try {
+        const lower = cleanName.toLowerCase();
+        state.deletedSubjectNames = state.deletedSubjectNames.filter(n => n.toLowerCase() !== lower);
+        const existing = state.subjects.find(s => s.name.toLowerCase() === lower);
+        const affectedTeacherIds = [];
+        let subjectRecord;
+
+        if (existing) {
+          if (existing.teacher_id) affectedTeacherIds.push(existing.teacher_id);
+          existing.name = cleanName;
+          existing.teacher_id = teacherId;
+          if (teacherId) affectedTeacherIds.push(teacherId);
+          subjectRecord = existing;
+        } else {
+          subjectRecord = { id: crypto.randomUUID(), name: cleanName, teacher_id: teacherId };
+          state.subjects.push(subjectRecord);
+          if (teacherId) affectedTeacherIds.push(teacherId);
+        }
+
+        if (state.currentUser?.role === 'guru' && affectedTeacherIds.includes(state.currentUser.id)) {
+          const updatedMe = state.teachers.find(t => t.id === state.currentUser.id);
+          if (updatedMe) {
+            state.currentUser.subject = buildTeacherSubjectString(updatedMe.id);
+            const subEl = document.getElementById('user-display-sub');
+            if (subEl) subEl.textContent = `${state.currentUser.subject} • ${state.currentUser.class_assigned}`;
+          }
+        }
+
+        queueSubjectTeacherSync(affectedTeacherIds, subjectRecord, 'upsert');
+        saveSessionToStorage();
+        updateSyncBadge('syncing');
+
+        const flushRes = await flushPendingSyncToSupabase();
+        const pendingLeft = getPendingSyncQueue().length;
+        state.lastSyncedAt = new Date();
+        saveCacheToStorage();
+        updateSyncBadge(pendingLeft > 0 ? 'pending' : 'synced');
+
+        if (flushRes.fatalError) {
+          await hideActionOverlay();
+          showToast('Gagal sinkron ke Supabase: ' + flushRes.fatalError.message, 'danger');
+          return;
+        }
+
+        renderCurrentMenu();
+        showActionOverlay({
+          stateType: 'success',
+          title: existing ? 'Pengampu Mapel Diperbarui!' : 'Mapel Baru Tersimpan!',
+          subtitle: pendingLeft > 0 ? 'Tersimpan lokal, menunggu sinkronisasi' : 'Tersinkronisasi dengan database Supabase'
+        });
+        await sleep(500);
+        await hideActionOverlay();
+        showToast(existing ? `Mapel "${cleanName}" diperbarui dan tersinkron!` : `Mapel "${cleanName}" berhasil ditambahkan!`, 'success');
+      } finally {
+        setButtonLoading(submitterBtn, false);
+      }
+    };
+
+    window.handleAssignSubjectTeacher = async function (subjectName, newTeacherId) {
+      const target = state.subjects.find(s => s.name.toLowerCase() === String(subjectName || '').trim().toLowerCase());
+      if (!target) return;
+
+      const prevTeacherId = target.teacher_id || null;
+      const cleanTeacherId = newTeacherId || null;
+      if (prevTeacherId === cleanTeacherId) return;
+
+      target.teacher_id = cleanTeacherId;
+      queueSubjectTeacherSync([prevTeacherId, cleanTeacherId], target, 'upsert');
+
+      if (state.currentUser?.role === 'guru' && (state.currentUser.id === prevTeacherId || state.currentUser.id === cleanTeacherId)) {
+        state.currentUser.subject = buildTeacherSubjectString(state.currentUser.id);
+        const subEl = document.getElementById('user-display-sub');
+        if (subEl) subEl.textContent = `${state.currentUser.subject} • ${state.currentUser.class_assigned}`;
+      }
+      saveSessionToStorage();
+
+      updateSyncBadge('syncing');
+      const flushRes = await flushPendingSyncToSupabase();
+      state.lastSyncedAt = new Date();
+      saveCacheToStorage();
+      updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+
+      renderCurrentMenu();
+      if (flushRes.fatalError) {
+        showToast('Gagal sinkron pengampu ke Supabase: ' + flushRes.fatalError.message, 'danger');
+      } else {
+        showToast(`Guru pengampu mapel "${target.name}" berhasil diperbarui & tersinkron.`, 'success');
+      }
+    };
+
+    window.handleDeleteSubject = function (subjectName) {
+      const target = state.subjects.find(s => s.name.toLowerCase() === String(subjectName || '').trim().toLowerCase());
+      if (!target) return;
+
+      openConfirmModal(
+        'Hapus Mata Pelajaran',
+        `<p>Apakah Anda yakin ingin menghapus mata pelajaran <strong>${escapeHtml(target.name)}</strong> dari daftar pilihan?</p>`,
+        async () => {
+          const prevTeacherId = target.teacher_id || null;
+          if (!state.deletedSubjectNames.some(n => n.toLowerCase() === target.name.toLowerCase())) {
+            state.deletedSubjectNames.push(target.name);
+          }
+          state.subjects = state.subjects.filter(s => s.id !== target.id && s.name.toLowerCase() !== target.name.toLowerCase());
+          queueSubjectTeacherSync([prevTeacherId], target, 'delete');
+
+          if (state.currentUser?.role === 'guru' && state.currentUser.id === prevTeacherId) {
+            state.currentUser.subject = buildTeacherSubjectString(state.currentUser.id);
+            const subEl = document.getElementById('user-display-sub');
+            if (subEl) subEl.textContent = `${state.currentUser.subject} • ${state.currentUser.class_assigned}`;
+          }
+          saveSessionToStorage();
+
+          updateSyncBadge('syncing');
+          const flushRes = await flushPendingSyncToSupabase();
+          state.lastSyncedAt = new Date();
+          saveCacheToStorage();
+          updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+          renderCurrentMenu();
+
+          if (flushRes.fatalError) {
+            showToast('Gagal menghapus di Supabase: ' + flushRes.fatalError.message, 'danger');
+          } else {
+            showToast(`Mapel "${target.name}" dihapus dari daftar.`, 'info');
+          }
+        },
+        'Ya, Hapus'
+      );
+    };
+
+    // ==================== 7. MANAJEMEN GURU & KELAS (KHUSUS ADMIN) ====================
     function renderManajemenGuruView() {
+      if (state.subjects.length === 0) mergeSubjectsState();
+
       return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -2865,16 +3828,25 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Mata Pelajaran</label>
-                <input type="text" id="t-subject" required placeholder="Fisika"
-                  class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Kelas Ampuan</label>
+              <input type="text" id="t-classes" required placeholder="Contoh: Kelas 4A, Kelas 5B"
+                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-bold text-slate-700">Mata Pelajaran yang Diampu</label>
+                <button type="button" onclick="window.navigateMenu('manajemen_mapel')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Kelola Mapel</button>
               </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Kelas Ampuan</label>
-                <input type="text" id="t-classes" required placeholder="X-MIPA 1, XI-MIPA 1"
-                  class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto custom-scroll pr-1">
+                ${state.subjects.map(subj => `
+                  <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/40 cursor-pointer transition">
+                    <input type="checkbox" name="t-subject-chk" value="${escapeHtml(subj.name)}"
+                      class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shrink-0" />
+                    <span class="text-xs font-semibold text-slate-700 truncate">${escapeHtml(subj.name)}</span>
+                  </label>
+                `).join('')}
               </div>
             </div>
 
@@ -2968,9 +3940,15 @@
       const fullName = document.getElementById('t-fullname').value.trim();
       const username = document.getElementById('t-username').value.trim();
       const password = document.getElementById('t-password').value.trim();
-      const subject = document.getElementById('t-subject').value.trim();
+      const checkedSubjects = Array.from(document.querySelectorAll('input[name="t-subject-chk"]:checked')).map(cb => cb.value.trim()).filter(Boolean);
       const classAssigned = document.getElementById('t-classes').value.trim();
 
+      if (checkedSubjects.length === 0) {
+        showToast('Pilih minimal satu mata pelajaran yang diampu guru.', 'warning');
+        return;
+      }
+
+      const subject = checkedSubjects.join(', ');
       const newTeacher = {
         id: crypto.randomUUID(),
         full_name: fullName,
@@ -2980,6 +3958,7 @@
         class_assigned: classAssigned
       };
 
+      const prevTeachersSnapshot = state.subjects.map(s => ({ id: s.id, teacher_id: s.teacher_id }));
       const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
       await saveRecordWithSync({
         submitterBtn,
@@ -2990,9 +3969,19 @@
         toastMsg: `Akun Guru ${fullName} berhasil ditambahkan dan tersinkron!`,
         onLocalApply: () => {
           state.teachers.push(newTeacher);
+          checkedSubjects.forEach(subName => {
+            const subj = state.subjects.find(s => s.name.toLowerCase() === subName.toLowerCase());
+            if (subj) subj.teacher_id = newTeacher.id;
+          });
+          saveSubjectsMetaToStorage();
         },
         onRollback: () => {
           state.teachers = state.teachers.filter(t => t.id !== newTeacher.id);
+          prevTeachersSnapshot.forEach(snap => {
+            const subj = state.subjects.find(s => s.id === snap.id);
+            if (subj) subj.teacher_id = snap.teacher_id;
+          });
+          saveSubjectsMetaToStorage();
         }
       });
     };
@@ -3007,6 +3996,10 @@
             recordId: teacherId,
             onLocalDelete: () => {
               state.teachers = state.teachers.filter(t => t.id !== teacherId);
+              state.subjects.forEach(s => {
+                if (s.teacher_id === teacherId) s.teacher_id = null;
+              });
+              saveSubjectsMetaToStorage();
             },
             toastMsg: 'Akun guru berhasil dihapus dan tersinkron.'
           });
