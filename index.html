@@ -1953,6 +1953,40 @@
               </div>
             </div>
 
+            <!-- Kartu Status Cloud & Cadangan Data (Backup / Restore) -->
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-5">
+              <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg font-bold border border-indigo-100">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-base font-extrabold text-slate-900">Sinkronisasi Cloud Firebase &amp; Cadangan Data (.json)</h4>
+                    <p class="text-xs text-slate-500">Pastikan perubahan identitas madrasah, akun, dan data nilai tersinkron ke Firebase atau cadangkan secara manual.</p>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button type="button" id="btn-force-cloud-sync" onclick="forceSyncAllToCloud()" class="px-4 py-2.5 rounded-full bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md shadow-teal-600/20 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Sinkronkan Semua ke Cloud</span>
+                  </button>
+                  <button type="button" onclick="exportFullBackupJson()" class="px-4 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Unduh Backup (.json)</span>
+                  </button>
+                  <input type="file" id="import-backup-json-file" class="hidden" accept=".json,application/json" onchange="handleImportBackupJson(event)" />
+                  <button type="button" onclick="document.getElementById('import-backup-json-file').click()" class="px-4 py-2.5 rounded-full bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 text-xs font-bold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-upload"></i>
+                    <span>Pulihkan Backup (.json)</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="pengaturan-cloud-status-box" class="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                Memeriksa status koneksi Firebase Cloud...
+              </div>
+            </div>
+
           </section>
 
           <!-- Dark Navy Corporate Footer (Exact GyanAstra Reference) -->
@@ -2199,6 +2233,66 @@
     let isCloudConnected = false;
     let collection, doc, setDoc, deleteDoc, getDocs;
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'smart-anabutir-app';
+    let startupCloudPromise = null;
+    let cloudSyncState = {
+      sdkReady: false,
+      readOk: false,
+      writeOk: null,
+      lastErrorCode: '',
+      lastErrorMsg: '',
+      lastSyncedAt: null
+    };
+
+    function updateCloudStatusBadges() {
+      const badgeEl = document.getElementById('login-mode-badge');
+      const pillEl = document.getElementById('sync-status-pill');
+
+      if (!cloudSyncState.sdkReady && !cloudSyncState.readOk && !cloudSyncState.lastErrorCode) {
+        if (badgeEl) {
+          badgeEl.textContent = 'Memeriksa Koneksi Cloud...';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-slate-500/20 text-slate-300 font-semibold';
+        }
+        if (pillEl) {
+          pillEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Menghubungkan...';
+          pillEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200';
+        }
+        return;
+      }
+
+      if (isCloudConnected && cloudSyncState.readOk && cloudSyncState.writeOk !== false) {
+        if (badgeEl) {
+          badgeEl.textContent = 'Terhubung ke Firebase (Live)';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-semibold';
+        }
+        if (pillEl) {
+          pillEl.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i>Cloud Terhubung';
+          pillEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200';
+        }
+      } else if (cloudSyncState.lastErrorCode && (cloudSyncState.lastErrorCode.includes('permission') || cloudSyncState.lastErrorCode.includes('unauthenticated'))) {
+        if (badgeEl) {
+          badgeEl.textContent = 'Cloud Terkunci (Cek Rules Firebase)';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold';
+          badgeEl.title = cloudSyncState.lastErrorMsg || 'Izin baca/tulis Firestore ditolak';
+        }
+        if (pillEl) {
+          pillEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i>Izin Cloud Ditolak (Lokal)';
+          pillEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300';
+          pillEl.title = cloudSyncState.lastErrorMsg || 'Data hanya tersimpan di browser ini karena izin Firestore ditolak';
+        }
+      } else {
+        if (badgeEl) {
+          badgeEl.textContent = 'Mode Lokal Browser (Offline)';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-slate-500/20 text-slate-300 font-semibold';
+        }
+        if (pillEl) {
+          pillEl.innerHTML = '<i class="fa-solid fa-hard-drive mr-1"></i>Mode Lokal Browser';
+          pillEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300';
+        }
+      }
+      if (typeof renderCloudStatusBox === 'function') {
+        renderCloudStatusBox();
+      }
+    }
 
     let currentLoginTab = 'admin';
     let currentUser = null; // { role: 'admin'|'guru', nama, username, kelas }
@@ -2216,7 +2310,8 @@
       namaSekolah: 'MI Al-Hikmah Terpadu',
       subNamaSekolah: 'Kementerian Agama Republik Indonesia',
       alamatSekolah: 'Jl. Madrasah No. 12, Telp (021) 123456',
-      kepalaSekolah: 'Ust. H. Ahmad Fauzi, M.Pd'
+      kepalaSekolah: 'Ust. H. Ahmad Fauzi, M.Pd',
+      updatedAt: 0
     };
 
     // =========================================================
@@ -2238,19 +2333,26 @@
         username: 'admin',
         password: 'admin123',
         nama: 'Administrator Utama',
-        role: 'admin'
+        role: 'admin',
+        isCustom: false,
+        updatedAt: 0
       };
     }
 
-    function saveAdminCredentials(adminObj, skipCloud = false) {
+    async function saveAdminCredentials(adminObj, skipCloud = false, preserveTimestamp = false) {
+      const uname = (adminObj.username || 'admin').trim();
+      const pwd = (adminObj.password || 'admin123').trim();
+      const nm = (adminObj.nama || 'Administrator Utama').trim();
+      const computedCustom = Boolean(pwd !== 'admin123' || uname !== 'admin' || nm !== 'Administrator Utama' || adminObj.isCustom);
+
       const obj = {
         id: 'usr_admin',
         role: 'admin',
-        username: (adminObj.username || 'admin').trim(),
-        password: (adminObj.password || 'admin123').trim(),
-        nama: (adminObj.nama || 'Administrator Utama').trim(),
-        isCustom: adminObj.isCustom !== undefined ? adminObj.isCustom : (adminObj.password !== 'admin123' || adminObj.username !== 'admin'),
-        updatedAt: adminObj.updatedAt || Date.now()
+        username: uname,
+        password: pwd,
+        nama: nm,
+        isCustom: computedCustom,
+        updatedAt: (preserveTimestamp && adminObj.updatedAt) ? adminObj.updatedAt : Date.now()
       };
       try {
         localStorage.setItem('smart_anabutir_admin_v2', JSON.stringify(obj));
@@ -2261,9 +2363,9 @@
         localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
       } catch (e) {}
       if (!skipCloud) {
-        saveDocToCloud('app_settings', 'admin_account', obj);
+        return await saveDocToCloud('app_settings', 'admin_account', obj);
       }
-      return obj;
+      return { local: true, cloud: false, obj };
     }
 
     // Session Persistence Helpers (Menyimpan sesi ke localStorage agar tahan refresh, ganti tab, atau replace file)
@@ -2339,6 +2441,7 @@
     async function autoSetupDatabase() {
       const seed = getInitialSeedData();
       loadLocalSeed(seed);
+      let initialSettingsSnap = null;
 
       try {
         if (!IS_PREVIEW && typeof firebaseConfig !== 'undefined' && firebaseConfig.apiKey !== "API_KEY_ANDA") {
@@ -2355,7 +2458,8 @@
           const app = fbApp.getApps().length === 0 ? fbApp.initializeApp(firebaseConfig) : fbApp.getApps()[0];
           db = fbFirestore.getFirestore(app);
           auth = fbAuth.getAuth(app);
-          
+          cloudSyncState.sdkReady = true;
+
           if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
             try {
               await fbAuth.signInWithCustomToken(auth, __initial_auth_token);
@@ -2369,33 +2473,98 @@
               console.info('Firebase anonymous auth tidak aktif (normal):', anonErr.message);
             }
           }
-          isCloudConnected = true;
-          const badgeEl = document.getElementById('login-mode-badge');
-          if (badgeEl) badgeEl.textContent = "Terhubung ke Firebase (Live)";
-          const pillEl = document.getElementById('sync-status-pill');
-          if (pillEl) pillEl.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i>Cloud Terhubung';
+
+          // Uji akses baca Firestore yang sebenarnya sebelum menandai Cloud Terhubung
+          try {
+            initialSettingsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'app_settings'));
+            isCloudConnected = true;
+            cloudSyncState.readOk = true;
+            cloudSyncState.lastErrorCode = '';
+            cloudSyncState.lastErrorMsg = '';
+            cloudSyncState.lastSyncedAt = Date.now();
+          } catch (readErr) {
+            isCloudConnected = false;
+            cloudSyncState.readOk = false;
+            cloudSyncState.lastErrorCode = readErr?.code || 'firestore-read-error';
+            cloudSyncState.lastErrorMsg = readErr?.message || String(readErr || 'Gagal membaca Firestore');
+            console.warn('Firestore tidak dapat diakses (mode lokal aktif):', readErr);
+          }
+        } else {
+          cloudSyncState.sdkReady = false;
+          isCloudConnected = false;
         }
       } catch (err) {
+        isCloudConnected = false;
+        cloudSyncState.readOk = false;
+        cloudSyncState.lastErrorCode = err?.code || 'firebase-init-error';
+        cloudSyncState.lastErrorMsg = err?.message || String(err || 'Inisialisasi Firebase gagal');
         console.warn('Firebase init fallback to local memory:', err);
       }
 
-      // Ambil data dari Firestore jika terhubung, dan bersihkan sisa data dummy lama jika ada
-      if (isCloudConnected && db) {
+      updateCloudStatusBadges();
+
+      // Ambil data dari Firestore jika benar-benar terhubung
+      if (isCloudConnected && db && initialSettingsSnap) {
         try {
-          // 0. Pengaturan Aplikasi & Identitas Sekolah
+          // 0a. Pengaturan Aplikasi & Identitas Sekolah
           try {
-            const setSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'app_settings'));
-            let foundSettings = false;
-            setSnap.forEach(d => {
-              if (d.id === 'general') {
-                appSettings = { ...appSettings, ...d.data() };
-                foundSettings = true;
+            const generalDoc = initialSettingsSnap.docs.find(d => d.id === 'general');
+            if (generalDoc && generalDoc.data()) {
+              const rawGeneral = { ...generalDoc.data() };
+              delete rawGeneral.adminUser; // Jangan biarkan dokumen general lama menimpa akun admin
+              const cloudUpdated = Number(rawGeneral.updatedAt || 0);
+              const localUpdated = Number(appSettings.updatedAt || 0);
+              const cloudIsCustomSchool = Boolean(rawGeneral.namaSekolah && rawGeneral.namaSekolah !== 'MI Al-Hikmah Terpadu') || cloudUpdated > 0;
+              const localIsCustomSchool = Boolean(appSettings.namaSekolah && appSettings.namaSekolah !== 'MI Al-Hikmah Terpadu') || localUpdated > 0;
+
+              if (cloudIsCustomSchool && (!localIsCustomSchool || cloudUpdated >= localUpdated)) {
+                appSettings = { ...appSettings, ...rawGeneral };
+                delete appSettings.adminUser;
+                localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
+              } else if (localIsCustomSchool && (!cloudIsCustomSchool || localUpdated > cloudUpdated)) {
+                const { adminUser: _dropAdmin, ...cleanLocalSettings } = appSettings;
+                await saveDocToCloud('app_settings', 'general', cleanLocalSettings);
               }
-            });
-            if (foundSettings) {
-              localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
+            } else {
+              const localIsCustomSchool = Boolean(appSettings.namaSekolah && appSettings.namaSekolah !== 'MI Al-Hikmah Terpadu') || Number(appSettings.updatedAt || 0) > 0;
+              if (localIsCustomSchool) {
+                const { adminUser: _dropAdmin, ...cleanLocalSettings } = appSettings;
+                await saveDocToCloud('app_settings', 'general', cleanLocalSettings);
+              }
             }
-          } catch (e) {}
+          } catch (e) {
+            console.warn('Firestore sync settings warning:', e);
+          }
+
+          // 0b. Kredensial Admin (Sinkronisasi berbasis timestamp & prioritas kustom)
+          try {
+            const adminDoc = initialSettingsSnap.docs.find(d => d.id === 'admin_account');
+            const curLocalAdmin = getAdminCredentials();
+            const localIsCustom = Boolean(curLocalAdmin.isCustom) ||
+              (curLocalAdmin.password && curLocalAdmin.password !== 'admin123') ||
+              (curLocalAdmin.username && curLocalAdmin.username !== 'admin') ||
+              (curLocalAdmin.nama && curLocalAdmin.nama !== 'Administrator Madrasah');
+
+            if (adminDoc && adminDoc.data()) {
+              const cloudAdmin = adminDoc.data();
+              const cloudIsCustom = Boolean(cloudAdmin.isCustom) ||
+                (cloudAdmin.password && cloudAdmin.password !== 'admin123') ||
+                (cloudAdmin.username && cloudAdmin.username !== 'admin') ||
+                (cloudAdmin.nama && cloudAdmin.nama !== 'Administrator Madrasah');
+              const cloudTs = Number(cloudAdmin.updatedAt || 0);
+              const localTs = Number(curLocalAdmin.updatedAt || 0);
+
+              if (cloudIsCustom && (!localIsCustom || cloudTs >= localTs)) {
+                await saveAdminCredentials({ ...curLocalAdmin, ...cloudAdmin, isCustom: true }, true, true);
+              } else if (localIsCustom && (!cloudIsCustom || localTs > cloudTs)) {
+                await saveDocToCloud('app_settings', 'admin_account', curLocalAdmin);
+              }
+            } else if (localIsCustom) {
+              await saveDocToCloud('app_settings', 'admin_account', curLocalAdmin);
+            }
+          } catch (aErr) {
+            console.warn('Firestore sync admin warning:', aErr);
+          }
 
           // 1. Paket Ujian
           try {
@@ -2405,56 +2574,37 @@
               const data = d.data();
               const title = (data.judulUjian || '').toLowerCase();
               const kelas = (data.kelas || '').toLowerCase();
-              // Bersihkan dummy lama jika masih tersisa
-              if (data.id === 'ujian_pas_pai_6' || data.id === 'ujian_demo' || (title.includes('asesmen sumatif') && (kelas.includes('ganjil') || kelas.includes('vi')))) {
+              const isDummyKelas = /ganjil|\bvi\b/i.test(kelas);
+              if (data.id === 'ujian_pas_pai_6' || data.id === 'ujian_demo' || (title.includes('asesmen sumatif') && isDummyKelas)) {
                 try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'paket_ujian', d.id)); } catch (e) {}
               } else {
                 cloudExams.push(data);
               }
             }
             const cloudIds = new Set(cloudExams.map(e => e.id));
-            const localOnly = (paketUjianList || []).filter(e => !cloudIds.has(e.id));
+            const localOnly = (paketUjianList || []).filter(e => e && e.id && !cloudIds.has(e.id));
             paketUjianList = [...cloudExams, ...localOnly].filter(e => {
               const title = (e.judulUjian || '').toLowerCase();
               const kelas = (e.kelas || '').toLowerCase();
-              return !(title.includes('asesmen sumatif') && (kelas.includes('ganjil') || kelas.includes('vi'))) && e.id !== 'ujian_pas_pai_6' && e.id !== 'ujian_demo';
+              const isDummyKelas = /ganjil|\bvi\b/i.test(kelas);
+              return !(title.includes('asesmen sumatif') && isDummyKelas) && e.id !== 'ujian_pas_pai_6' && e.id !== 'ujian_demo';
             });
             localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
+            if (localOnly.length > 0) {
+              Promise.allSettled(
+                localOnly.map(e => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'paket_ujian', e.id), e))
+              ).catch(() => {});
+            }
           } catch (e) {
             console.warn('Firestore fetch exams warning:', e);
           }
 
           // 2. Akun Guru (Murni Tenaga Pendidik, Admin dikelola terpisah)
           try {
-            // Ambil akun admin tersimpan di cloud jika ada (dengan perlindungan kredensial lokal kustom)
-            try {
-              const adminSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'app_settings'));
-              const adminDoc = adminSnap.docs.find(d => d.id === 'admin_account');
-              if (adminDoc && adminDoc.data()) {
-                const cloudAdmin = adminDoc.data();
-                const curLocalAdmin = getAdminCredentials();
-                const cloudIsCustom = cloudAdmin.isCustom || (cloudAdmin.password && cloudAdmin.password !== 'admin123') || (cloudAdmin.username && cloudAdmin.username !== 'admin');
-                const localIsCustom = curLocalAdmin.isCustom || (curLocalAdmin.password && curLocalAdmin.password !== 'admin123') || (curLocalAdmin.username && curLocalAdmin.username !== 'admin');
-
-                // Hanya timpa lokal jika cloud benar-benar memiliki kredensial kustom yang lebih baru
-                // JANGAN PERNAH timpa jika admin lokal sudah diganti (custom) dan cloud masih password default ('admin123')
-                if (cloudIsCustom && (!localIsCustom || (cloudAdmin.updatedAt && cloudAdmin.updatedAt > (curLocalAdmin.updatedAt || 0)))) {
-                  saveAdminCredentials(cloudAdmin, true);
-                } else if (localIsCustom && !cloudIsCustom) {
-                  // Sinkronkan kredensial kustom lokal ke cloud
-                  saveDocToCloud('app_settings', 'admin_account', curLocalAdmin);
-                }
-              } else {
-                const curLocalAdmin = getAdminCredentials();
-                saveDocToCloud('app_settings', 'admin_account', curLocalAdmin);
-              }
-            } catch (aErr) {}
-
             const accSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users_peserta'));
             const cloudAccounts = [];
             for (const d of accSnap.docs) {
               const data = d.data();
-              // Bersihkan dummy guru lama dan admin dari koleksi guru
               if (['usr_g1', 'usr_g2', 'usr_g3', 'usr_admin'].includes(data.id) || ['guru1', 'guru2', 'sitiaminah'].includes((data.username || '').toLowerCase()) || data.role === 'admin') {
                 try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', d.id)); } catch (e) {}
               } else {
@@ -2463,21 +2613,36 @@
             }
             if (cloudAccounts.length > 0) {
               const localMap = new Map((pesertaAccounts || []).map(a => [a.id, a]));
+              const newerLocalToPush = [];
               const mergedAccounts = cloudAccounts.map(c => {
                 const l = localMap.get(c.id);
                 if (!l) return c;
-                if (l.updatedAt && c.updatedAt) {
-                  return l.updatedAt >= c.updatedAt ? l : c;
+                const lTs = Number(l.updatedAt || 0);
+                const cTs = Number(c.updatedAt || 0);
+                if (lTs > cTs) {
+                  newerLocalToPush.push(l);
+                  return l;
                 }
                 return c;
               });
               const cloudIds = new Set(cloudAccounts.map(a => a.id));
-              const localOnly = (pesertaAccounts || []).filter(a => a.id && !cloudIds.has(a.id));
+              const localOnly = (pesertaAccounts || []).filter(a => a && a.id && !cloudIds.has(a.id));
               pesertaAccounts = [...mergedAccounts, ...localOnly].filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
               localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
+              const pushList = [...newerLocalToPush, ...localOnly].filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
+              if (pushList.length > 0) {
+                Promise.allSettled(
+                  pushList.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', a.id), a))
+                ).catch(() => {});
+              }
             } else {
               pesertaAccounts = (pesertaAccounts || []).filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
               localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
+              if (pesertaAccounts.length > 0) {
+                Promise.allSettled(
+                  pesertaAccounts.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', a.id), a))
+                ).catch(() => {});
+              }
             }
           } catch (e) {
             console.warn('Firestore fetch accounts warning:', e);
@@ -2489,11 +2654,15 @@
             const cloudSiswa = siswaSnap.docs.map(d => d.data());
             if (cloudSiswa.length > 0) {
               const cloudIds = new Set(cloudSiswa.map(s => s.id));
-              const localOnly = (masterSiswaList || []).filter(s => !cloudIds.has(s.id));
+              const localOnly = (masterSiswaList || []).filter(s => s && s.id && !cloudIds.has(s.id));
               masterSiswaList = [...cloudSiswa, ...localOnly];
               localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
+              if (localOnly.length > 0) {
+                Promise.allSettled(
+                  localOnly.map(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_siswa', s.id), s))
+                ).catch(() => {});
+              }
             } else if (masterSiswaList && masterSiswaList.length > 0) {
-              // JANGAN TIMPA DENGAN [] KETIKA CLOUD KOSONG! Pertahankan master siswa lokal!
               Promise.allSettled(
                 masterSiswaList.map(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_siswa', s.id), s))
               ).catch(() => {});
@@ -2516,11 +2685,15 @@
             }
             if (cloudAnswers.length > 0) {
               const cloudIds = new Set(cloudAnswers.map(a => a.id));
-              const localOnly = (jawabanSiswaList || []).filter(a => !cloudIds.has(a.id));
+              const localOnly = (jawabanSiswaList || []).filter(a => a && a.id && !cloudIds.has(a.id));
               jawabanSiswaList = [...cloudAnswers, ...localOnly];
               localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
+              if (localOnly.length > 0) {
+                Promise.allSettled(
+                  localOnly.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa', a.id), a))
+                ).catch(() => {});
+              }
             } else if (jawabanSiswaList && jawabanSiswaList.length > 0) {
-              // Pertahankan data jawaban siswa lokal!
               Promise.allSettled(
                 jawabanSiswaList.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa', a.id), a))
               ).catch(() => {});
@@ -2528,13 +2701,14 @@
           } catch (e) {
             console.warn('Firestore fetch answers warning:', e);
           }
+
+          cloudSyncState.lastSyncedAt = Date.now();
         } catch (e) {
           console.warn('Firestore fetch error, fallback to local storage:', e);
-          loadLocalSeed(seed);
         }
-      } else {
-        loadLocalSeed(seed);
       }
+
+      updateCloudStatusBadges();
 
       if (paketUjianList.length > 0 && !paketUjianList.some(p => p.id === activeExamId)) {
         activeExamId = paketUjianList[0].id;
@@ -2554,7 +2728,8 @@
         paketUjianList = (storedExams ? JSON.parse(storedExams) : (seed.seedExams || [])).filter(e => {
           const title = (e.judulUjian || '').toLowerCase();
           const kelas = (e.kelas || '').toLowerCase();
-          return !(title.includes('asesmen sumatif') && (kelas.includes('ganjil') || kelas.includes('vi'))) && e.id !== 'ujian_pas_pai_6' && e.id !== 'ujian_demo';
+          const isDummyKelas = /ganjil|\bvi\b/i.test(kelas);
+          return !(title.includes('asesmen sumatif') && isDummyKelas) && e.id !== 'ujian_pas_pai_6' && e.id !== 'ujian_demo';
         });
         pesertaAccounts = storedGuru ? JSON.parse(storedGuru) : (seed.seedAccounts || []);
         masterSiswaList = storedSiswa ? JSON.parse(storedSiswa) : (seed.seedSiswa || []);
@@ -2565,7 +2740,11 @@
         localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
         if (storedSettings) {
           try {
-            appSettings = { ...appSettings, ...JSON.parse(storedSettings) };
+            const parsedSettings = JSON.parse(storedSettings);
+            if (parsedSettings && typeof parsedSettings === 'object') {
+              delete parsedSettings.adminUser;
+              appSettings = { ...appSettings, ...parsedSettings };
+            }
           } catch (e) {}
         }
       } catch (e) {
@@ -2612,14 +2791,39 @@
         console.warn('LocalStorage save error:', e);
       }
 
-      // 2. Sinkronisasi ke Firebase Firestore jika terhubung
-      if (isCloudConnected && db && setDoc && doc) {
+      // 2. Sinkronisasi ke Firebase Firestore jika tersedia
+      if (!IS_PREVIEW && db && setDoc && doc) {
         try {
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, docId), dataObj);
+          isCloudConnected = true;
+          cloudSyncState.readOk = true;
+          cloudSyncState.writeOk = true;
+          cloudSyncState.lastErrorCode = '';
+          cloudSyncState.lastErrorMsg = '';
+          cloudSyncState.lastSyncedAt = Date.now();
+          updateCloudStatusBadges();
+          return { local: true, cloud: true };
         } catch (e) {
-          console.warn("Cloud save note (data tersimpan aman di browser/local storage):", e);
+          const code = e?.code || 'write-error';
+          const msg = e?.message || String(e || '');
+          cloudSyncState.writeOk = false;
+          cloudSyncState.lastErrorCode = code;
+          cloudSyncState.lastErrorMsg = msg;
+          if (code === 'permission-denied' || code === 'unauthenticated') {
+            isCloudConnected = false;
+          }
+          updateCloudStatusBadges();
+          console.warn("Cloud save gagal (data tersimpan di browser/localStorage ini saja):", e);
+          return { local: true, cloud: false, errorCode: code, errorMsg: msg };
         }
       }
+      updateCloudStatusBadges();
+      return {
+        local: true,
+        cloud: false,
+        errorCode: cloudSyncState.lastErrorCode || 'offline',
+        errorMsg: cloudSyncState.lastErrorMsg || 'Mode Lokal (Firebase belum terhubung)'
+      };
     }
 
     async function deleteDocFromCloud(collectionName, docId) {
@@ -2856,6 +3060,17 @@
       }
 
       try {
+        // Pastikan sinkronisasi awal Firebase selesai agar kredensial & identitas terbaru sudah termuat
+        if (startupCloudPromise) {
+          try {
+            await startupCloudPromise;
+          } catch (syncWaitErr) {
+            console.warn('Startup sync wait warning:', syncWaitErr);
+          }
+          applyAppSettingsUI();
+          updateCloudStatusBadges();
+        }
+
         // =========================================================
         // JALUR 1: LOGIN ADMINISTRATOR
         // HANYA MENGGUNAKAN USERNAME & PASSWORD YANG DIATUR DI APLIKASI
@@ -6266,6 +6481,87 @@
       if (inpAdminUser && !inpAdminUser.matches(':focus')) inpAdminUser.value = adminCreds.username || 'admin';
       const inpAdminNama = document.getElementById('setting-admin-nama');
       if (inpAdminNama && !inpAdminNama.matches(':focus')) inpAdminNama.value = adminCreds.nama || 'Administrator Utama';
+
+      // 6. Panel Status Cloud & Ringkasan Data
+      renderCloudStatusBox();
+    }
+
+    function escHtmlSimple(val) {
+      return String(val ?? '').replace(/[&<>\x22\x27]/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]));
+    }
+
+    function renderCloudStatusBox() {
+      const box = document.getElementById('pengaturan-cloud-status-box');
+      if (!box) return;
+      const adminCreds = getAdminCredentials();
+      const adminIsCustom = Boolean(adminCreds.isCustom) ||
+        (adminCreds.password && adminCreds.password !== 'admin123') ||
+        (adminCreds.username && adminCreds.username !== 'admin') ||
+        (adminCreds.nama && adminCreds.nama !== 'Administrator Madrasah');
+      const adminStatusLabel = adminIsCustom
+        ? `Kustom (${escHtmlSimple(adminCreds.username || 'admin')})`
+        : 'Bawaan (admin)';
+      const statsHtml = `
+        <div class="mt-2.5 pt-2 border-t border-black/10 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-semibold">
+          <span>Madrasah: <b>${escHtmlSimple(appSettings.namaSekolah || '-')}</b></span>
+          <span>Admin: <b>${adminStatusLabel}</b></span>
+          <span>Guru / Siswa: <b>${(pesertaAccounts || []).length} / ${(masterSiswaList || []).length}</b></span>
+          <span>Ujian / Jawab: <b>${(paketUjianList || []).length} / ${(jawabanSiswaList || []).length}</b></span>
+        </div>`;
+
+      if (IS_PREVIEW || !cloudSyncState.sdkReady) {
+        box.className = 'mb-5 p-4 rounded-xl border border-amber-200 bg-amber-50/90 text-xs text-amber-900 leading-relaxed';
+        box.innerHTML = `
+          <div class="flex items-start gap-2.5">
+            <i class="fa-solid fa-hard-drive text-amber-600 text-base mt-0.5 shrink-0"></i>
+            <div class="flex-1">
+              <p class="font-bold text-amber-950">Mode Penyimpanan Lokal Browser (Cloud Firebase Belum Aktif)</p>
+              <p class="mt-0.5 text-amber-800">Saat ini data hanya tersimpan di <b>localStorage</b> browser ini. Jika file <code>index.html</code> dipindahkan, dibuka di browser/perangkat lain, atau cache browser dihapus, pengaturan akan kembali ke awal. Unduh <b>Cadangan (.json)</b> secara berkala agar mudah dipulihkan.</p>
+              ${statsHtml}
+            </div>
+          </div>`;
+        return;
+      }
+
+      if (isCloudConnected && cloudSyncState.readOk !== false && cloudSyncState.writeOk !== false) {
+        const syncTime = cloudSyncState.lastSyncedAt
+          ? new Date(cloudSyncState.lastSyncedAt).toLocaleString('id-ID')
+          : 'Baru saja';
+        box.className = 'mb-5 p-4 rounded-xl border border-emerald-200 bg-emerald-50/90 text-xs text-emerald-900 leading-relaxed';
+        box.innerHTML = `
+          <div class="flex items-start gap-2.5">
+            <i class="fa-solid fa-circle-check text-emerald-600 text-base mt-0.5 shrink-0"></i>
+            <div class="flex-1">
+              <p class="font-bold text-emerald-950">Terhubung &amp; Tersinkronisasi ke Cloud Firebase</p>
+              <p class="mt-0.5 text-emerald-800">Identitas madrasah, akun Admin/Guru, siswa, paket ujian, dan jawaban aman tersimpan di browser serta Cloud Firestore (Sinkron terakhir: <b>${escHtmlSimple(syncTime)}</b>).</p>
+              ${statsHtml}
+            </div>
+          </div>`;
+        return;
+      }
+
+      const errCode = cloudSyncState.lastErrorCode || 'unknown';
+      const isPerm = errCode === 'permission-denied' || errCode === 'unauthenticated';
+      const rulesSnippet = `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /artifacts/{appId}/public/data/{col}/{docId} {\n      allow read, write: if true;\n    }\n  }\n}`;
+      box.className = 'mb-5 p-4 rounded-xl border border-rose-300 bg-rose-50/95 text-xs text-rose-900 leading-relaxed';
+      box.innerHTML = `
+        <div class="flex items-start gap-2.5">
+          <i class="fa-solid fa-triangle-exclamation text-rose-600 text-base mt-0.5 shrink-0"></i>
+          <div class="flex-1 space-y-2">
+            <p class="font-bold text-rose-950">${isPerm ? 'Akses Cloud Firebase Ditolak (permission-denied)' : 'Gagal Tersinkronisasi ke Cloud Firebase (' + escHtmlSimple(errCode) + ')'}</p>
+            <p class="text-rose-800">${isPerm
+              ? 'Aturan keamanan (Firestore Rules) di Firebase Console kemungkinan kedaluwarsa (Test Mode 30 hari habis) atau memblokir baca/tulis. Selama diblokir, perubahan hanya tersimpan di browser ini saja dan tampak kembali ke awal saat dibuka di lokasi/browser lain.'
+              : escHtmlSimple(cloudSyncState.lastErrorMsg || 'Periksa koneksi internet Anda lalu klik Paksa Sinkron ke Cloud.')}</p>
+            ${isPerm ? `<details class="bg-white/90 border border-rose-200 rounded-lg p-2.5">
+              <summary class="cursor-pointer font-bold text-rose-900">Lihat Panduan Perbaikan Firestore Rules di Firebase Console</summary>
+              <p class="mt-1.5 text-[11px] text-slate-700">Buka Firebase Console &rarr; Project <b>analisis-soal-d2d59</b> &rarr; <b>Firestore Database</b> &rarr; tab <b>Rules</b>, lalu pastikan aturan mengizinkan koleksi aplikasi ini:</p>
+              <pre class="mt-1.5 p-2 rounded bg-slate-900 text-teal-300 text-[10px] overflow-x-auto select-all">${escHtmlSimple(rulesSnippet)}</pre>
+            </details>` : ''}
+            ${statsHtml}
+          </div>
+        </div>`;
     }
 
     function renderPengaturanView() {
@@ -6284,15 +6580,29 @@
         return;
       }
 
+      delete appSettings.adminUser;
       appSettings.namaSekolah = nama;
       appSettings.subNamaSekolah = sub;
       appSettings.alamatSekolah = alamat;
       appSettings.kepalaSekolah = kamad;
+      appSettings.updatedAt = Date.now();
 
-      await saveDocToCloud('app_settings', 'general', appSettings);
+      const res = await saveDocToCloud('app_settings', 'general', {
+        namaSekolah: appSettings.namaSekolah,
+        subNamaSekolah: appSettings.subNamaSekolah,
+        alamatSekolah: appSettings.alamatSekolah,
+        kepalaSekolah: appSettings.kepalaSekolah,
+        updatedAt: appSettings.updatedAt
+      });
       applyAppSettingsUI();
       animateButtonSaveFeedback(e, 'Sekolah Tersimpan!');
-      showToast('Identitas madrasah/sekolah berhasil disimpan!', 'success');
+      if (res && res.cloud) {
+        showToast('Identitas madrasah berhasil disimpan ke browser & Cloud Firebase!', 'success');
+      } else if (cloudSyncState.sdkReady) {
+        showToast('Tersimpan di browser ini, namun GAGAL sinkron ke Cloud Firebase (' + (res?.errorCode || 'error') + '). Cek status Cloud atau unduh cadangan JSON.', 'error');
+      } else {
+        showToast('Identitas madrasah berhasil disimpan di perangkat ini (Mode Lokal)!', 'success');
+      }
     };
 
     window.handleSaveAdminUser = async function(e) {
@@ -6315,7 +6625,8 @@
       const adminCreds = getAdminCredentials();
       adminCreds.username = newUsername;
       adminCreds.nama = newNama;
-      saveAdminCredentials(adminCreds);
+      adminCreds.isCustom = true;
+      const res = await saveAdminCredentials(adminCreds, false, false);
 
       // Update sesi aktif jika login sebagai admin
       if (currentUser && currentUser.role === 'admin') {
@@ -6331,7 +6642,13 @@
 
       applyAppSettingsUI();
       animateButtonSaveFeedback(e, 'Admin Diperbarui!');
-      showToast('Profil Administrator (Username & Nama) berhasil diperbarui!', 'success');
+      if (res && res.cloud) {
+        showToast('Profil Administrator tersimpan di browser & Cloud Firebase!', 'success');
+      } else if (cloudSyncState.sdkReady) {
+        showToast('Profil Admin tersimpan di browser ini, namun GAGAL sinkron ke Cloud (' + (res?.errorCode || 'error') + '). Unduh cadangan JSON.', 'error');
+      } else {
+        showToast('Profil Administrator (Username & Nama) berhasil diperbarui di perangkat ini!', 'success');
+      }
     };
 
     window.handleSaveAdminPassword = async function(e) {
@@ -6363,14 +6680,210 @@
       }
 
       adminCreds.password = newPass;
-      saveAdminCredentials(adminCreds);
+      adminCreds.isCustom = true;
+      const res = await saveAdminCredentials(adminCreds, false, false);
 
       document.getElementById('setting-admin-cur-pass').value = '';
       document.getElementById('setting-admin-new-pass').value = '';
       document.getElementById('setting-admin-confirm-pass').value = '';
 
+      applyAppSettingsUI();
       animateButtonSaveFeedback(e, 'Sandi Diubah!');
-      showToast('Kata sandi Administrator berhasil diubah! Gunakan kata sandi baru untuk login berikutnya.', 'success');
+      if (res && res.cloud) {
+        showToast('Kata sandi Administrator tersimpan di browser & Cloud Firebase!', 'success');
+      } else if (cloudSyncState.sdkReady) {
+        showToast('Kata sandi tersimpan di browser ini, namun GAGAL sinkron ke Cloud (' + (res?.errorCode || 'error') + '). Unduh cadangan JSON.', 'error');
+      } else {
+        showToast('Kata sandi Administrator berhasil diubah di perangkat ini!', 'success');
+      }
+    };
+
+    window.forceSyncAllToCloud = async function() {
+      const btn = document.getElementById('btn-force-cloud-sync');
+      const oldHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Menyinkronkan...';
+      }
+      try {
+        if (!cloudSyncState.sdkReady && !IS_PREVIEW) {
+          await autoSetupDatabase();
+        }
+        if (IS_PREVIEW || !db || !setDoc || !doc) {
+          applyAppSettingsUI();
+          showToast('Cloud Firebase belum tersedia di mode lokal/pratinjau. Gunakan tombol Unduh Cadangan (.json).', 'error');
+          return;
+        }
+
+        const { adminUser: _dropAdmin, ...cleanGeneral } = appSettings;
+        cleanGeneral.updatedAt = Number(cleanGeneral.updatedAt || Date.now());
+        appSettings.updatedAt = cleanGeneral.updatedAt;
+        const genRes = await saveDocToCloud('app_settings', 'general', cleanGeneral);
+        if (!genRes || !genRes.cloud) {
+          applyAppSettingsUI();
+          showToast('Gagal menulis ke Firebase (' + (genRes?.errorCode || 'error') + '). Cek status Cloud & Firestore Rules.', 'error');
+          return;
+        }
+
+        const adminCreds = getAdminCredentials();
+        adminCreds.updatedAt = Number(adminCreds.updatedAt || Date.now());
+        await saveDocToCloud('app_settings', 'admin_account', adminCreds);
+
+        const tasks = [];
+        (pesertaAccounts || []).forEach(a => {
+          if (a && a.id) tasks.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', a.id), a));
+        });
+        (masterSiswaList || []).forEach(s => {
+          if (s && s.id) tasks.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_siswa', s.id), s));
+        });
+        (paketUjianList || []).forEach(p => {
+          if (p && p.id) tasks.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'paket_ujian', p.id), p));
+        });
+        (jawabanSiswaList || []).forEach(j => {
+          if (j && j.id) tasks.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa', j.id), j));
+        });
+
+        const results = await Promise.allSettled(tasks);
+        const failCount = results.filter(r => r.status === 'rejected').length;
+        const okCount = results.length - failCount + 2;
+        cloudSyncState.lastSyncedAt = Date.now();
+        cloudSyncState.writeOk = failCount === 0;
+        applyAppSettingsUI();
+
+        if (failCount === 0) {
+          showToast(`Berhasil menyinkronkan ${okCount} dokumen (Pengaturan, Admin, Guru, Siswa, Ujian, Jawaban) ke Firebase!`, 'success');
+        } else {
+          showToast(`Tersinkron ${okCount} dokumen, namun ${failCount} dokumen gagal ditulis ke Cloud.`, 'error');
+        }
+      } catch (err) {
+        showToast('Gagal sinkronisasi ke Cloud: ' + (err?.message || err), 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = oldHtml || '<i class="fa-solid fa-cloud-arrow-up"></i><span>Paksa Sinkron ke Cloud Sekarang</span>';
+        }
+      }
+    };
+
+    window.exportFullBackupJson = function() {
+      try {
+        const { adminUser: _dropAdmin, ...cleanGeneral } = appSettings;
+        const payload = {
+          format: 'smart-anabutir-backup-v1',
+          exportedAt: new Date().toISOString(),
+          appId,
+          appSettings: cleanGeneral,
+          adminAccount: getAdminCredentials(),
+          pesertaAccounts: pesertaAccounts || [],
+          masterSiswaList: masterSiswaList || [],
+          paketUjianList: paketUjianList || [],
+          jawabanSiswaList: jawabanSiswaList || []
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateTag = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `Cadangan_SmartAnabutir_${dateTag}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('File cadangan lengkap (.json) berhasil diunduh!', 'success');
+      } catch (err) {
+        showToast('Gagal mengekspor cadangan JSON: ' + (err?.message || err), 'error');
+      }
+    };
+
+    window.handleImportBackupJson = function(event) {
+      const inputEl = event?.target;
+      const file = inputEl?.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const parsed = JSON.parse(String(ev.target?.result || ''));
+          const isValid = parsed && typeof parsed === 'object' && (
+            parsed.format === 'smart-anabutir-backup-v1' ||
+            parsed.appSettings || parsed.adminAccount ||
+            Array.isArray(parsed.pesertaAccounts) ||
+            Array.isArray(parsed.masterSiswaList) ||
+            Array.isArray(parsed.paketUjianList) ||
+            Array.isArray(parsed.jawabanSiswaList)
+          );
+          if (!isValid) {
+            showToast('Format file cadangan JSON tidak valid.', 'error');
+            return;
+          }
+
+          const gCount = Array.isArray(parsed.pesertaAccounts) ? parsed.pesertaAccounts.length : (pesertaAccounts || []).length;
+          const sCount = Array.isArray(parsed.masterSiswaList) ? parsed.masterSiswaList.length : (masterSiswaList || []).length;
+          const pCount = Array.isArray(parsed.paketUjianList) ? parsed.paketUjianList.length : (paketUjianList || []).length;
+          const jCount = Array.isArray(parsed.jawabanSiswaList) ? parsed.jawabanSiswaList.length : (jawabanSiswaList || []).length;
+
+          showConfirmModal(
+            'Pulihkan Data Cadangan (.json)?',
+            `Data saat ini akan diperbarui dari file cadangan (${parsed.appSettings?.namaSekolah || appSettings.namaSekolah} | ${gCount} Guru, ${sCount} Siswa, ${pCount} Paket Ujian, ${jCount} Jawaban). Lanjutkan?`,
+            async () => {
+              if (parsed.appSettings && typeof parsed.appSettings === 'object') {
+                const { adminUser: _dropAdmin, ...cleanImported } = parsed.appSettings;
+                appSettings = { ...appSettings, ...cleanImported, updatedAt: Date.now() };
+                delete appSettings.adminUser;
+                localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
+              }
+              if (parsed.adminAccount && typeof parsed.adminAccount === 'object') {
+                await saveAdminCredentials({ ...getAdminCredentials(), ...parsed.adminAccount, isCustom: true }, true, false);
+              }
+              if (Array.isArray(parsed.pesertaAccounts)) {
+                pesertaAccounts = parsed.pesertaAccounts.filter(a => a && a.id !== 'usr_admin' && a.role !== 'admin');
+                localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
+              }
+              if (Array.isArray(parsed.masterSiswaList)) {
+                masterSiswaList = parsed.masterSiswaList;
+                localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
+              }
+              if (Array.isArray(parsed.paketUjianList)) {
+                paketUjianList = parsed.paketUjianList;
+                localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
+                activeExamId = paketUjianList[0]?.id || '';
+              }
+              if (Array.isArray(parsed.jawabanSiswaList)) {
+                jawabanSiswaList = parsed.jawabanSiswaList;
+                localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
+              }
+
+              if (currentUser && currentUser.role === 'admin') {
+                const latestAdmin = getAdminCredentials();
+                currentUser.nama = latestAdmin.nama || currentUser.nama;
+                currentUser.username = latestAdmin.username || currentUser.username;
+                saveSessionState(currentUser, currentMenu);
+                const nameEl = document.getElementById('user-display-name');
+                if (nameEl) nameEl.textContent = currentUser.nama;
+                const initials = (currentUser.nama || 'AD').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                const badgeEl = document.getElementById('user-avatar-badge');
+                if (badgeEl) badgeEl.textContent = initials || 'AD';
+              }
+
+              if (currentUser) {
+                renderAllViews();
+              } else {
+                applyAppSettingsUI();
+              }
+              showToast('Data cadangan berhasil dipulihkan!', 'success');
+
+              if (isCloudConnected) {
+                await forceSyncAllToCloud();
+              }
+            }
+          );
+        } catch (err) {
+          showToast('Gagal membaca file cadangan JSON: ' + (err?.message || err), 'error');
+        } finally {
+          if (inputEl) inputEl.value = '';
+        }
+      };
+      reader.readAsText(file);
     };
 
     // =========================================================
@@ -6679,6 +7192,8 @@
 
     window.addEventListener('DOMContentLoaded', async () => {
       initSingleFilePWA();
+      applyAppSettingsUI();
+      updateCloudStatusBadges();
 
       // Cek apakah ada sesi login yang tersimpan agar saat di-refresh tidak kembali ke halaman login
       const savedSession = loadSessionState();
@@ -6690,8 +7205,27 @@
         applyUserSession(savedSession.menu || 'dashboard');
       }
 
-      await autoSetupDatabase();
+      startupCloudPromise = autoSetupDatabase();
+      await startupCloudPromise;
+
+      applyAppSettingsUI();
+      updateCloudStatusBadges();
+
       if (currentUser) {
+        if (currentUser.role === 'admin') {
+          const latestAdmin = getAdminCredentials();
+          currentUser.nama = latestAdmin.nama || currentUser.nama;
+          currentUser.username = latestAdmin.username || currentUser.username;
+          saveSessionState(currentUser, currentMenu);
+          const nameEl = document.getElementById('user-display-name');
+          if (nameEl) nameEl.textContent = currentUser.nama;
+          const initials = (currentUser.nama || 'AD').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          const badgeEl = document.getElementById('user-avatar-badge');
+          if (badgeEl) badgeEl.textContent = initials || 'AD';
+        }
+        if (activeExamId && !paketUjianList.some(p => p.id === activeExamId)) {
+          activeExamId = paketUjianList[0]?.id || '';
+        }
         renderAllViews();
       }
     });
