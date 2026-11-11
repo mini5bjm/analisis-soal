@@ -1083,6 +1083,7 @@
       editingTeacherId: null,
       editingExamId: null,
       editingResultId: null,
+      lastSavedStudentRef: null,
       subjects: [],
       students: [],
       teachers: [],
@@ -2816,6 +2817,7 @@
         state.editingTeacherId = null;
         state.editingExamId = null;
         state.editingResultId = null;
+        state.lastSavedStudentRef = null;
         state.headerExamClassFilter = 'ALL';
         state.examClassFilter = 'ALL';
         state.examSubjectFilter = 'ALL';
@@ -3263,6 +3265,7 @@
       }
       state.activeExamId = examId;
       state.editingResultId = null;
+      state.lastSavedStudentRef = null;
       state.pagination.inputResults = 1;
       state.pagination.itemAnalysis = 1;
       state.pagination.remedial = 1;
@@ -3296,6 +3299,7 @@
       state.editingTeacherId = null;
       state.editingExamId = null;
       state.editingResultId = null;
+      state.lastSavedStudentRef = null;
       saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -4878,20 +4882,91 @@
       return String(val || '').trim().toLowerCase().replace(/\s+/g, ' ');
     }
 
+    /** Bandingkan identitas dua data siswa berdasarkan NIS (utama) atau nama saat NIS kosong. */
+    function isSameStudentIdentity(nisA, nameA, nisB, nameB) {
+      const cleanNisA = normalizeStudentMatchText(nisA);
+      const cleanNameA = normalizeStudentMatchText(nameA);
+      const cleanNisB = normalizeStudentMatchText(nisB);
+      const cleanNameB = normalizeStudentMatchText(nameB);
+      if (cleanNisA && cleanNisB && cleanNisA === cleanNisB) return true;
+      if (cleanNameA && cleanNameB && cleanNameA === cleanNameB && (!cleanNisA || !cleanNisB)) return true;
+      return false;
+    }
+
     function findExistingExamResultForStudent(examId, nis, fullName = '', excludeResultId = null) {
       if (!examId) return null;
-      const cleanNis = normalizeStudentMatchText(nis);
-      const cleanName = normalizeStudentMatchText(fullName);
-      if (!cleanNis && !cleanName) return null;
+      if (!normalizeStudentMatchText(nis) && !normalizeStudentMatchText(fullName)) return null;
       return state.examResults.find(r => {
         if (r.exam_id !== examId) return false;
         if (excludeResultId && r.id === excludeResultId) return false;
-        const rNis = normalizeStudentMatchText(r.student_nis);
-        const rName = normalizeStudentMatchText(r.student_name);
-        if (cleanNis && rNis && rNis === cleanNis) return true;
-        if (cleanName && rName && rName === cleanName && (!cleanNis || !rNis)) return true;
-        return false;
+        return isSameStudentIdentity(r.student_nis, r.student_name, nis, fullName);
       }) || null;
+    }
+
+    /** Susun daftar cepat siswa urut abjad, status terisi, dan kandidat siswa berikutnya yang belum diisi. */
+    function getQuickPickStudentsData(exam) {
+      if (!exam || state.students.length === 0) {
+        return {
+          matchingStudents: [],
+          listToPick: [],
+          entries: [],
+          lockedCount: 0,
+          remainingCount: 0,
+          nextStudent: null
+        };
+      }
+      const matchingStudents = state.students.filter(stu => stu.class_name === exam.class_name);
+      const listToPick = sortByNameAlphabetical(
+        matchingStudents.length > 0 ? matchingStudents : state.students,
+        'full_name',
+        'nis'
+      );
+      let lockedCount = 0;
+      const entries = listToPick.map(stu => {
+        const existingRes = findExistingExamResultForStudent(exam.id, stu.nis, stu.full_name);
+        if (existingRes) lockedCount++;
+        return { student: stu, existingRes };
+      });
+      const remainingCount = entries.length - lockedCount;
+
+      let nextStudent = null;
+      if (remainingCount > 0) {
+        const ref = state.lastSavedStudentRef;
+        let startIdx = 0;
+        if (ref && ref.examId === exam.id) {
+          const prevIdx = entries.findIndex(entry =>
+            (ref.studentId && entry.student.id === ref.studentId) ||
+            isSameStudentIdentity(entry.student.nis, entry.student.full_name, ref.nis, ref.name)
+          );
+          if (prevIdx !== -1) startIdx = (prevIdx + 1) % entries.length;
+        }
+        for (let offset = 0; offset < entries.length; offset++) {
+          const candidate = entries[(startIdx + offset) % entries.length];
+          if (!candidate.existingRes) {
+            nextStudent = candidate.student;
+            break;
+          }
+        }
+      }
+
+      return { matchingStudents, listToPick, entries, lockedCount, remainingCount, nextStudent };
+    }
+
+    function getAutoNextHintInnerHtml(studentName) {
+      if (!studentName) {
+        return `<i data-lucide="user-plus" class="w-3.5 h-3.5 shrink-0"></i><span>Mode ketik manual. Setelah disimpan otomatis lanjut ke siswa berikutnya yang belum terisi.</span>`;
+      }
+      return `<i data-lucide="arrow-right" class="w-3.5 h-3.5 shrink-0"></i><span>Siap diisi: <strong>${escapeHtml(studentName)}</strong> • Otomatis pindah ke siswa selanjutnya setelah disimpan.</span>`;
+    }
+
+    function focusStudentAnswerInput(exam) {
+      if (!exam) return;
+      const examMeta = decodeExamMeta(exam);
+      const targetId = examMeta.isMultiType
+        ? `student-answers-${examMeta.sections[0]?.questionType}`
+        : 'student-answers';
+      const el = document.getElementById(targetId);
+      if (el && !el.disabled) el.focus({ preventScroll: true });
     }
 
     function renderInputNilaiView(exam, stats) {
@@ -4904,11 +4979,18 @@
         : null;
       if (state.editingResultId && !editingResult) state.editingResultId = null;
 
+      const quickPickData = !editingResult ? getQuickPickStudentsData(exam) : null;
+      const autoNextStudent = quickPickData?.nextStudent || null;
+
       const examMeta = decodeExamMeta(exam);
       const isNumType = isNumericQuestionType(examMeta.questionType);
       const showNumericScoreCol = examMeta.hasWeightedScore;
-      const initStudentName = editingResult ? String(editingResult.student_name || '') : '';
-      const initStudentNis = editingResult ? String(editingResult.student_nis || '') : '';
+      const initStudentName = editingResult
+        ? String(editingResult.student_name || '')
+        : String(autoNextStudent?.full_name || '');
+      const initStudentNis = editingResult
+        ? String(editingResult.student_nis || '')
+        : String(autoNextStudent?.nis || '');
       const initStudentNotes = editingResult ? String(editingResult.notes || '') : '';
       const editSectionAnswers = editingResult ? parseStudentAnswerSections(examMeta, editingResult.student_answers) : {};
 
@@ -5045,23 +5127,15 @@
                   Batal
                 </button>
               </div>
-            ` : (state.students.length > 0 ? (() => {
-        const matchingStudents = state.students.filter(stu => stu.class_name === exam.class_name);
-        const listToPick = sortByNameAlphabetical(
-          matchingStudents.length > 0 ? matchingStudents : state.students,
-          'full_name',
-          'nis'
-        );
-        let lockedCount = 0;
-        const quickOptionsHtml = listToPick.map(stu => {
-          const existingRes = findExistingExamResultForStudent(exam.id, stu.nis, stu.full_name);
+            ` : (quickPickData && quickPickData.listToPick.length > 0 ? (() => {
+        const { matchingStudents, entries, lockedCount, remainingCount } = quickPickData;
+        const quickOptionsHtml = entries.map(({ student: stu, existingRes }) => {
           if (existingRes) {
-            lockedCount++;
             return `<option value="${stu.id}" disabled class="text-slate-400">🔒 ${escapeHtml(stu.full_name)} • NIS: ${escapeHtml(stu.nis)} (Sudah Terisi • Nilai ${existingRes.score})</option>`;
           }
-          return `<option value="${stu.id}">${escapeHtml(stu.full_name)} • NIS: ${escapeHtml(stu.nis)} (${escapeHtml(stu.class_name)})</option>`;
+          const isSelected = autoNextStudent && autoNextStudent.id === stu.id;
+          return `<option value="${stu.id}"${isSelected ? ' selected' : ''}>${escapeHtml(stu.full_name)} • NIS: ${escapeHtml(stu.nis)} (${escapeHtml(stu.class_name)})</option>`;
         }).join('');
-        const remainingCount = listToPick.length - lockedCount;
         return `
               <div>
                 <div class="flex items-center justify-between mb-1.5 gap-2">
@@ -5073,7 +5147,7 @@
                 </div>
                 <select id="student-quick-pick" onchange="window.pickStudentForInput(this.value)"
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-indigo-50/50 border border-indigo-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="">${remainingCount === 0 ? `-- Semua siswa ${matchingStudents.length > 0 ? `(${escapeHtml(exam.class_name)}) ` : ''}sudah terisi --` : `-- Pilih Siswa ${matchingStudents.length > 0 ? `(${escapeHtml(exam.class_name)})` : '(Semua Kelas)'} atau ketik manual --`}</option>
+                  <option value="">${remainingCount === 0 ? `-- Semua siswa ${matchingStudents.length > 0 ? `(${escapeHtml(exam.class_name)}) ` : ''}sudah terisi --` : `-- Ketik Manual ${matchingStudents.length > 0 ? `(${escapeHtml(exam.class_name)})` : '(Semua Kelas)'} / Kosongkan --`}</option>
                   ${quickOptionsHtml}
                 </select>
                 ${remainingCount === 0 ? `
@@ -5081,7 +5155,11 @@
                     <i data-lucide="lock" class="w-3.5 h-3.5 shrink-0"></i>
                     <span>Seluruh siswa pada daftar sudah terisi & terkunci. Gunakan tombol <strong>Edit</strong> di tabel kanan untuk mengubah nilai.</span>
                   </p>
-                ` : ''}
+                ` : `
+                  <p id="student-auto-next-hint" class="text-[11px] text-indigo-600/90 font-semibold mt-1.5 flex items-center gap-1">
+                    ${getAutoNextHintInnerHtml(autoNextStudent?.full_name || '')}
+                  </p>
+                `}
               </div>`;
       })() : '')}
             <div class="grid grid-cols-3 gap-3">
@@ -5299,8 +5377,21 @@
     };
 
     window.pickStudentForInput = function (studentId) {
+      const nameEl = document.getElementById('student-name');
+      const nisEl = document.getElementById('student-nis');
+      const hintEl = document.getElementById('student-auto-next-hint');
+      const refreshHint = studentName => {
+        if (!hintEl) return;
+        hintEl.innerHTML = getAutoNextHintInnerHtml(studentName);
+        if (window.lucide) lucide.createIcons({ nodes: [hintEl] });
+      };
+
       if (!studentId) {
+        if (nameEl) nameEl.value = '';
+        if (nisEl) nisEl.value = '';
+        refreshHint('');
         window.checkDuplicateStudentLock();
+        if (nameEl) nameEl.focus({ preventScroll: true });
         return;
       }
       const exam = getActiveExam();
@@ -5317,11 +5408,12 @@
         }
       }
 
-      const nameEl = document.getElementById('student-name');
-      const nisEl = document.getElementById('student-nis');
       if (nameEl) nameEl.value = stu.full_name || '';
       if (nisEl) nisEl.value = stu.nis || '';
-      window.checkDuplicateStudentLock();
+      refreshHint(stu.full_name || '');
+      if (!window.checkDuplicateStudentLock()) {
+        focusStudentAnswerInput(exam);
+      }
     };
 
     window.handleEditStudentResult = function (resultId) {
@@ -5335,11 +5427,7 @@
       if (formCard) {
         formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      const examMeta = decodeExamMeta(exam);
-      const focusTarget = examMeta.isMultiType
-        ? document.getElementById(`student-answers-${examMeta.sections[0]?.questionType}`)
-        : document.getElementById('student-answers');
-      if (focusTarget) focusTarget.focus({ preventScroll: true });
+      focusStudentAnswerInput(exam);
     };
 
     window.handleCancelEditStudentResult = function () {
@@ -5487,9 +5575,11 @@
 
       const prevEditingId = state.editingResultId;
       const prevResultCopy = existingResult ? { ...existingResult } : null;
+      const prevLastSavedRef = state.lastSavedStudentRef;
+      const selectedQuickPickId = document.getElementById('student-quick-pick')?.value || null;
       const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
 
-      await saveRecordWithSync({
+      const saved = await saveRecordWithSync({
         submitterBtn,
         table: 'exam_results',
         record: resultRecord,
@@ -5507,6 +5597,12 @@
           } else {
             state.examResults.push(resultRecord);
           }
+          state.lastSavedStudentRef = {
+            examId: exam.id,
+            studentId: selectedQuickPickId,
+            nis: studentNis,
+            name: studentName
+          };
         },
         onRollback: () => {
           if (prevResultCopy) {
@@ -5516,8 +5612,13 @@
           } else {
             state.examResults = state.examResults.filter(r => r.id !== resultRecord.id);
           }
+          state.lastSavedStudentRef = prevLastSavedRef;
         }
       });
+
+      if (saved && getQuickPickStudentsData(exam).nextStudent) {
+        focusStudentAnswerInput(exam);
+      }
     };
 
     window.handleDeleteStudentResult = function (resultId) {
@@ -5531,6 +5632,7 @@
             onLocalDelete: () => {
               state.examResults = state.examResults.filter(r => r.id !== resultId);
               if (state.editingResultId === resultId) state.editingResultId = null;
+              state.lastSavedStudentRef = null;
             },
             toastMsg: 'Data jawaban siswa dihapus dan tersinkron.'
           });
