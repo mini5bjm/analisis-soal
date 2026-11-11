@@ -1,19 +1,22 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Flowora EduAnalytics — Sistem Analisis Hasil Ulangan</title>
 
   <!-- PWA Manifest Data URI (1-File Standard) -->
-  <link rel="manifest" href='data:application/manifest+json,{"name":"Flowora EduAnalytics - Analisis Ulangan","short_name":"EduAnalytics","start_url":".","display":"standalone","background_color":"#F8FAFC","theme_color":"#4F46E5","icons":[{"src":"https://placehold.co/192x192/4F46E5/ffffff?text=FA","sizes":"192x192","type":"image/png"},{"src":"https://placehold.co/512x512/4F46E5/ffffff?text=FA","sizes":"512x512","type":"image/png"}]}' />
+  <link rel="manifest"
+    href='data:application/manifest+json,{"name":"Flowora EduAnalytics - Analisis Ulangan","short_name":"EduAnalytics","start_url":".","display":"standalone","background_color":"#F8FAFC","theme_color":"#4F46E5","icons":[{"src":"https://placehold.co/192x192/4F46E5/ffffff?text=FA","sizes":"192x192","type":"image/png"},{"src":"https://placehold.co/512x512/4F46E5/ffffff?text=FA","sizes":"512x512","type":"image/png"}]}' />
   <meta name="theme-color" content="#4F46E5" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
 
   <!-- Google Fonts: Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -59,7 +62,7 @@
     /* Ambient Flowora Background Blobs */
     .ambient-bg {
       background-color: #F8FAFC;
-      background-image: 
+      background-image:
         radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
         radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.10) 0px, transparent 50%),
         radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.08) 0px, transparent 50%);
@@ -103,13 +106,16 @@
       width: 6px;
       height: 6px;
     }
+
     .custom-scroll::-webkit-scrollbar-track {
       background: transparent;
     }
+
     .custom-scroll::-webkit-scrollbar-thumb {
       background: #CBD5E1;
       border-radius: 9999px;
     }
+
     .custom-scroll::-webkit-scrollbar-thumb:hover {
       background: #94A3B8;
     }
@@ -119,17 +125,21 @@
       .desktop-sidebar {
         display: none !important;
       }
+
       .mobile-bottom-nav {
         display: flex !important;
       }
+
       .main-scroll-area {
         padding-bottom: 6.5rem !important;
       }
     }
+
     @media (min-width: 1024px) {
       .desktop-sidebar {
         display: flex !important;
       }
+
       .mobile-bottom-nav {
         display: none !important;
       }
@@ -143,14 +153,17 @@
         overflow: visible !important;
         background: white !important;
       }
+
       .no-print {
         display: none !important;
       }
+
       .main-scroll-area {
         overflow: visible !important;
         height: auto !important;
         padding: 0 !important;
       }
+
       .glass-surface {
         box-shadow: none !important;
         border: 1px solid #cbd5e1 !important;
@@ -158,268 +171,281 @@
     }
   </style>
 </head>
+
 <body>
 
-<div id="flowora-app-root" class="ambient-bg flex flex-col lg:flex-row">
+  <div id="flowora-app-root" class="ambient-bg flex flex-col lg:flex-row">
 
-  <!-- ==================== VIEW 1: LOGIN SCREEN ==================== -->
-  <div id="auth-view" class="w-full h-full overflow-y-auto custom-scroll flex items-center justify-center p-4 md:p-8">
-    <div class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 glass-surface rounded-3xl overflow-hidden shadow-2xl border border-white/80">
-      
-      <!-- Left Hero Showcase (Flowora Style) -->
-      <div class="lg:col-span-6 p-8 md:p-10 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white flex flex-col justify-between relative overflow-hidden">
-        <div class="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white/10 blur-2xl pointer-events-none"></div>
-        <div class="absolute -bottom-24 -left-16 w-72 h-72 rounded-full bg-purple-400/20 blur-2xl pointer-events-none"></div>
+    <!-- ==================== VIEW 1: LOGIN SCREEN ==================== -->
+    <div id="auth-view" class="w-full h-full overflow-y-auto custom-scroll flex items-center justify-center p-4 md:p-8">
+      <div
+        class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 glass-surface rounded-3xl overflow-hidden shadow-2xl border border-white/80">
 
-        <div class="relative z-10">
-          <div class="inline-flex items-center gap-2.5 bg-white/15 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide mb-6 border border-white/20">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            SMART EXAM ANALYTICS PLATFORM
+        <!-- Left Hero Showcase (Flowora Style) -->
+        <div
+          class="lg:col-span-6 p-8 md:p-10 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white flex flex-col justify-center relative overflow-hidden">
+          <div class="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white/10 blur-2xl pointer-events-none"></div>
+          <div
+            class="absolute -bottom-24 -left-16 w-72 h-72 rounded-full bg-purple-400/20 blur-2xl pointer-events-none">
           </div>
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-11 h-11 rounded-2xl bg-white text-indigo-600 flex items-center justify-center font-extrabold text-xl shadow-lg">
-              F
+
+          <div class="relative z-10">
+            <div
+              class="inline-flex items-center gap-2.5 bg-white/15 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide mb-6 border border-white/20">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              SMART EXAM ANALYTICS PLATFORM
             </div>
-            <span class="text-2xl font-extrabold tracking-tight">Flowora <span class="font-medium text-indigo-200">Edu</span></span>
+            <div class="flex items-center gap-3 mb-4">
+              <div
+                class="w-11 h-11 rounded-2xl bg-white text-indigo-600 flex items-center justify-center font-extrabold text-xl shadow-lg">
+                F
+              </div>
+              <span class="text-2xl font-extrabold tracking-tight">Flowora <span
+                  class="font-medium text-indigo-200">Edu</span></span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-4">
+              Satu Platform.<br />Analisis Ulangan Tanpa Batas.
+            </h1>
+            <p class="text-indigo-100/90 text-sm leading-relaxed">
+              Otomatisasi koreksi kunci jawaban, analisis tingkat kesukaran, daya pembeda butir soal, hingga pemetaan
+              program remedial & pengayaan secara real-time.
+            </p>
           </div>
-          <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-4">
-            Satu Platform.<br/>Analisis Ulangan Tanpa Batas.
-          </h1>
-          <p class="text-indigo-100/90 text-sm leading-relaxed mb-6">
-            Otomatisasi koreksi kunci jawaban, analisis tingkat kesukaran, daya pembeda butir soal, hingga pemetaan program remedial & pengayaan secara real-time.
-          </p>
         </div>
 
-        <!-- Mini Bento Preview Card inside Auth -->
-        <div class="relative z-10 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 space-y-3">
-          <div class="flex items-center justify-between text-xs">
-            <span class="font-semibold text-indigo-100">Akun Demo Siap Pakai (Klik untuk Isi Otomatis)</span>
-            <span id="mode-indicator-badge" class="px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 font-bold">Mode Preview</span>
+        <!-- Right Login Form (Hybrid Switcher) -->
+        <div class="lg:col-span-6 p-8 md:p-10 bg-white/90 flex flex-col justify-center">
+          <div class="mb-6">
+            <h2 class="text-2xl font-extrabold text-slate-900">Selamat Datang Kembali</h2>
+            <p class="text-sm text-slate-500 mt-1">Pilih peran akses Anda untuk masuk ke dashboard analitik.</p>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <button type="button" onclick="window.fillDemoCredentials('admin')" class="text-left p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition border border-white/15">
-              <div class="text-xs font-bold text-white flex items-center gap-1.5">
-                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-amber-300"></i> Login Admin Sekolah
-              </div>
-              <div class="text-[11px] text-indigo-100 truncate mt-0.5">admin@sekolah.sch.id / admin123</div>
+
+          <!-- Hybrid Role Tabs -->
+          <div class="grid grid-cols-2 p-1.5 bg-slate-100 rounded-full mb-6">
+            <button type="button" id="tab-role-guru" onclick="window.switchAuthRole('guru')"
+              class="py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md">
+              <i data-lucide="user-check" class="w-4 h-4"></i> Guru
             </button>
-            <button type="button" onclick="window.fillDemoCredentials('guru')" class="text-left p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition border border-white/15">
-              <div class="text-xs font-bold text-white flex items-center gap-1.5">
-                <i data-lucide="graduation-cap" class="w-3.5 h-3.5 text-emerald-300"></i> Login Guru Mapel
-              </div>
-              <div class="text-[11px] text-indigo-100 truncate mt-0.5">NIP: guru01 / pass: 123456</div>
+            <button type="button" id="tab-role-admin" onclick="window.switchAuthRole('admin')"
+              class="py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900">
+              <i data-lucide="shield" class="w-4 h-4"></i> Administrator
             </button>
           </div>
+
+          <form id="login-form" onsubmit="window.handleLogin(event)" class="space-y-4">
+            <div>
+              <label id="login-id-label" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                Username / NIP Guru
+              </label>
+              <div class="relative">
+                <i data-lucide="user" class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="login-identifier" required placeholder="Contoh: guru01"
+                  class="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                Kata Sandi
+              </label>
+              <div class="relative">
+                <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2"></i>
+                <input type="password" id="login-password" required placeholder="Masukkan kata sandi"
+                  class="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition" />
+              </div>
+            </div>
+
+            <div id="auth-helper-box"
+              class="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-100 text-xs text-indigo-900 flex items-start gap-2.5">
+              <i data-lucide="info" class="w-4 h-4 text-indigo-600 shrink-0 mt-0.5"></i>
+              <span id="auth-helper-text">
+                <strong>Mode Guru:</strong> Validasi langsung ke tabel <code>teachers</code> di database Supabase
+                menggunakan Username/NIP & Password.
+              </span>
+            </div>
+
+            <button type="submit" id="btn-submit-login"
+              class="w-full py-3.5 px-6 rounded-full text-white font-bold text-sm flowora-btn-primary flex items-center justify-center gap-2">
+              <span>Masuk ke Dashboard</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </form>
         </div>
+
       </div>
+    </div>
 
-      <!-- Right Login Form (Hybrid Switcher) -->
-      <div class="lg:col-span-6 p-8 md:p-10 bg-white/90 flex flex-col justify-center">
-        <div class="mb-6">
-          <h2 class="text-2xl font-extrabold text-slate-900">Selamat Datang Kembali</h2>
-          <p class="text-sm text-slate-500 mt-1">Pilih peran akses Anda untuk masuk ke dashboard analitik.</p>
-        </div>
+    <!-- ==================== VIEW 2: MAIN APPLICATION WORKSPACE ==================== -->
+    <div id="app-view" class="hidden w-full h-full flex flex-col lg:flex-row overflow-hidden">
 
-        <!-- Hybrid Role Tabs -->
-        <div class="grid grid-cols-2 p-1.5 bg-slate-100 rounded-full mb-6">
-          <button type="button" id="tab-role-guru" onclick="window.switchAuthRole('guru')" class="py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md">
-            <i data-lucide="user-check" class="w-4 h-4"></i> Guru Mata Pelajaran
-          </button>
-          <button type="button" id="tab-role-admin" onclick="window.switchAuthRole('admin')" class="py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900">
-            <i data-lucide="shield" class="w-4 h-4"></i> Administrator
-          </button>
-        </div>
-
-        <form id="login-form" onsubmit="window.handleLogin(event)" class="space-y-4">
-          <div>
-            <label id="login-id-label" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-              Username / NIP Guru
-            </label>
-            <div class="relative">
-              <i data-lucide="user" class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2"></i>
-              <input type="text" id="login-identifier" required placeholder="Contoh: guru01"
-                class="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition" />
+      <!-- DESKTOP LEFT SIDEBAR (Fixed Sidebar) -->
+      <aside class="desktop-sidebar no-print w-72 h-full glass-sidebar flex-col justify-between p-5 shrink-0 z-20">
+        <div>
+          <!-- Brand Logo -->
+          <div class="flex items-center justify-between px-2 mb-8">
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-md shadow-indigo-500/30">
+                F
+              </div>
+              <div>
+                <div class="font-extrabold text-lg leading-none text-slate-900">Flowora</div>
+                <div class="text-[11px] font-semibold text-indigo-600 mt-0.5">EduAnalytics Pro</div>
+              </div>
             </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-              Kata Sandi
-            </label>
-            <div class="relative">
-              <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2"></i>
-              <input type="password" id="login-password" required placeholder="Masukkan kata sandi"
-                class="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition" />
-            </div>
-          </div>
-
-          <div id="auth-helper-box" class="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-100 text-xs text-indigo-900 flex items-start gap-2.5">
-            <i data-lucide="info" class="w-4 h-4 text-indigo-600 shrink-0 mt-0.5"></i>
-            <span id="auth-helper-text">
-              <strong>Mode Guru:</strong> Validasi langsung ke tabel <code>teachers</code> di database Supabase menggunakan Username/NIP & Password.
+            <span id="sidebar-role-badge"
+              class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+              GURU
             </span>
           </div>
 
-          <button type="submit" id="btn-submit-login" class="w-full py-3.5 px-6 rounded-full text-white font-bold text-sm flowora-btn-primary flex items-center justify-center gap-2">
-            <span>Masuk ke Dashboard</span>
-            <i data-lucide="arrow-right" class="w-4 h-4"></i>
-          </button>
-        </form>
-      </div>
+          <!-- Navigation Menu List -->
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 mb-2">Menu Analitik</div>
+          <nav id="desktop-nav-list" class="space-y-1.5">
+            <!-- Populated dynamically by JS -->
+          </nav>
+        </div>
 
-    </div>
-  </div>
-
-  <!-- ==================== VIEW 2: MAIN APPLICATION WORKSPACE ==================== -->
-  <div id="app-view" class="hidden w-full h-full flex flex-col lg:flex-row overflow-hidden">
-
-    <!-- DESKTOP LEFT SIDEBAR (Fixed Sidebar) -->
-    <aside class="desktop-sidebar no-print w-72 h-full glass-sidebar flex-col justify-between p-5 shrink-0 z-20">
-      <div>
-        <!-- Brand Logo -->
-        <div class="flex items-center justify-between px-2 mb-8">
+        <!-- User Profile & Logout Card -->
+        <div class="p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-3">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-md shadow-indigo-500/30">
+            <div id="user-avatar-circle"
+              class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 text-white font-bold text-sm flex items-center justify-center shrink-0">
+              GU
+            </div>
+            <div class="min-w-0 flex-1">
+              <div id="user-display-name" class="text-xs font-bold text-slate-900 truncate">Budi Santoso, S.Pd</div>
+              <div id="user-display-sub" class="text-[11px] text-slate-500 truncate">Matematika Wajib</div>
+            </div>
+          </div>
+          <button type="button" onclick="window.handleLogout()"
+            class="w-full py-2 px-3 rounded-full bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-bold transition flex items-center justify-center gap-1.5">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Keluar Sesi
+          </button>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT CONTAINER -->
+      <div class="flex-1 h-full flex flex-col overflow-hidden">
+
+        <!-- Top Glass Header -->
+        <header
+          class="no-print h-16 md:h-20 px-4 md:px-8 glass-surface border-b border-slate-200/80 flex items-center justify-between gap-4 shrink-0 z-10">
+          <div class="flex items-center gap-3 min-w-0">
+            <div
+              class="lg:hidden w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-base shrink-0">
               F
             </div>
-            <div>
-              <div class="font-extrabold text-lg leading-none text-slate-900">Flowora</div>
-              <div class="text-[11px] font-semibold text-indigo-600 mt-0.5">EduAnalytics Pro</div>
+            <div class="min-w-0">
+              <h1 id="page-header-title" class="text-base md:text-xl font-extrabold text-slate-900 truncate">Dashboard
+                Analitik</h1>
+              <p id="page-header-subtitle" class="text-xs text-slate-500 hidden sm:block truncate">Ringkasan ketuntasan
+                klasikal dan performa ulangan siswa</p>
             </div>
           </div>
-          <span id="sidebar-role-badge" class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
-            GURU
+
+          <!-- Global Exam Filter & Quick Actions -->
+          <div class="flex items-center gap-2.5 md:gap-4">
+            <div
+              class="hidden md:flex items-center gap-2 bg-slate-100/90 border border-slate-200/80 px-3.5 py-2 rounded-full">
+              <i data-lucide="book-open-check" class="w-4 h-4 text-indigo-600"></i>
+              <span class="text-xs font-semibold text-slate-500">Ulangan Aktif:</span>
+              <select id="global-exam-selector" onchange="window.handleChangeActiveExam(this.value)"
+                class="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer pr-2">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+
+            <button type="button" onclick="window.navigateMenu('input_nilai')"
+              class="flowora-btn-primary text-white text-xs font-bold px-4 py-2.5 rounded-full flex items-center gap-1.5">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span class="hidden sm:inline">Input Nilai Siswa</span>
+            </button>
+
+            <button type="button" onclick="window.handleLogout()"
+              class="lg:hidden p-2.5 rounded-full bg-slate-100 text-slate-600 hover:text-rose-600" title="Keluar">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </header>
+
+        <!-- Mobile Active Exam Selector Bar -->
+        <div
+          class="no-print md:hidden px-4 py-2 bg-indigo-50/90 border-b border-indigo-100 flex items-center justify-between gap-2">
+          <span class="text-[11px] font-bold text-indigo-800 flex items-center gap-1">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i> Paket Ulangan:
           </span>
+          <select id="mobile-exam-selector" onchange="window.handleChangeActiveExam(this.value)"
+            class="bg-white border border-indigo-200 rounded-full px-3 py-1 text-xs font-bold text-slate-800 focus:outline-none max-w-[220px] truncate">
+          </select>
         </div>
 
-        <!-- Navigation Menu List -->
-        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 mb-2">Menu Analitik</div>
-        <nav id="desktop-nav-list" class="space-y-1.5">
-          <!-- Populated dynamically by JS -->
-        </nav>
+        <!-- Scrollable Dynamic Section Content -->
+        <main id="main-content-container"
+          class="main-scroll-area flex-1 overflow-y-auto custom-scroll p-4 md:p-8 space-y-6">
+          <!-- Rendered dynamically by renderCurrentMenu() -->
+        </main>
+
       </div>
 
-      <!-- User Profile & Logout Card -->
-      <div class="p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-3">
-        <div class="flex items-center gap-3">
-          <div id="user-avatar-circle" class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 text-white font-bold text-sm flex items-center justify-center shrink-0">
-            GU
-          </div>
-          <div class="min-w-0 flex-1">
-            <div id="user-display-name" class="text-xs font-bold text-slate-900 truncate">Budi Santoso, S.Pd</div>
-            <div id="user-display-sub" class="text-[11px] text-slate-500 truncate">Matematika Wajib</div>
-          </div>
-        </div>
-        <button type="button" onclick="window.handleLogout()" class="w-full py-2 px-3 rounded-full bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-bold transition flex items-center justify-center gap-1.5">
-          <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Keluar Sesi
-        </button>
-      </div>
-    </aside>
-
-    <!-- MAIN CONTENT CONTAINER -->
-    <div class="flex-1 h-full flex flex-col overflow-hidden">
-
-      <!-- Top Glass Header -->
-      <header class="no-print h-16 md:h-20 px-4 md:px-8 glass-surface border-b border-slate-200/80 flex items-center justify-between gap-4 shrink-0 z-10">
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="lg:hidden w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-base shrink-0">
-            F
-          </div>
-          <div class="min-w-0">
-            <h1 id="page-header-title" class="text-base md:text-xl font-extrabold text-slate-900 truncate">Dashboard Analitik</h1>
-            <p id="page-header-subtitle" class="text-xs text-slate-500 hidden sm:block truncate">Ringkasan ketuntasan klasikal dan performa ulangan siswa</p>
-          </div>
-        </div>
-
-        <!-- Global Exam Filter & Quick Actions -->
-        <div class="flex items-center gap-2.5 md:gap-4">
-          <div class="hidden md:flex items-center gap-2 bg-slate-100/90 border border-slate-200/80 px-3.5 py-2 rounded-full">
-            <i data-lucide="book-open-check" class="w-4 h-4 text-indigo-600"></i>
-            <span class="text-xs font-semibold text-slate-500">Ulangan Aktif:</span>
-            <select id="global-exam-selector" onchange="window.handleChangeActiveExam(this.value)" class="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer pr-2">
-              <!-- Populated dynamically -->
-            </select>
-          </div>
-
-          <button type="button" onclick="window.navigateMenu('input_nilai')" class="flowora-btn-primary text-white text-xs font-bold px-4 py-2.5 rounded-full flex items-center gap-1.5">
-            <i data-lucide="plus-circle" class="w-4 h-4"></i>
-            <span class="hidden sm:inline">Input Nilai Siswa</span>
-          </button>
-
-          <button type="button" onclick="window.handleLogout()" class="lg:hidden p-2.5 rounded-full bg-slate-100 text-slate-600 hover:text-rose-600" title="Keluar">
-            <i data-lucide="log-out" class="w-4 h-4"></i>
-          </button>
-        </div>
-      </header>
-
-      <!-- Mobile Active Exam Selector Bar -->
-      <div class="no-print md:hidden px-4 py-2 bg-indigo-50/90 border-b border-indigo-100 flex items-center justify-between gap-2">
-        <span class="text-[11px] font-bold text-indigo-800 flex items-center gap-1">
-          <i data-lucide="layers" class="w-3.5 h-3.5"></i> Paket Ulangan:
-        </span>
-        <select id="mobile-exam-selector" onchange="window.handleChangeActiveExam(this.value)" class="bg-white border border-indigo-200 rounded-full px-3 py-1 text-xs font-bold text-slate-800 focus:outline-none max-w-[220px] truncate">
-        </select>
-      </div>
-
-      <!-- Scrollable Dynamic Section Content -->
-      <main id="main-content-container" class="main-scroll-area flex-1 overflow-y-auto custom-scroll p-4 md:p-8 space-y-6">
-        <!-- Rendered dynamically by renderCurrentMenu() -->
-      </main>
+      <!-- MOBILE FLOATING BOTTOM NAVIGATION BAR -->
+      <nav id="mobile-nav-list"
+        class="mobile-bottom-nav no-print fixed bottom-3 left-3 right-3 h-16 glass-surface rounded-full shadow-2xl border border-slate-200/90 px-2 items-center justify-around z-30">
+        <!-- Populated dynamically by JS -->
+      </nav>
 
     </div>
 
-    <!-- MOBILE FLOATING BOTTOM NAVIGATION BAR -->
-    <nav id="mobile-nav-list" class="mobile-bottom-nav no-print fixed bottom-3 left-3 right-3 h-16 glass-surface rounded-full shadow-2xl border border-slate-200/90 px-2 items-center justify-around z-30">
-      <!-- Populated dynamically by JS -->
-    </nav>
-
-  </div>
-
-  <!-- ==================== GLOBAL MODAL DIALOG ==================== -->
-  <div id="custom-modal-backdrop" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="w-full max-w-lg glass-surface bg-white rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-100 animate-fadeIn">
-      <div class="flex items-center justify-between mb-4">
-        <h3 id="modal-title" class="text-lg font-extrabold text-slate-900">Konfirmasi</h3>
-        <button type="button" onclick="window.closeModal()" class="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-      <div id="modal-body" class="text-sm text-slate-600 space-y-4"></div>
-      <div id="modal-footer" class="mt-6 flex items-center justify-end gap-3">
-        <button type="button" onclick="window.closeModal()" class="px-5 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
-          Batal
-        </button>
-        <button type="button" id="modal-confirm-btn" class="px-5 py-2.5 rounded-full flowora-btn-primary text-white text-xs font-bold transition">
-          Ya, Lanjutkan
-        </button>
+    <!-- ==================== GLOBAL MODAL DIALOG ==================== -->
+    <div id="custom-modal-backdrop"
+      class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div
+        class="w-full max-w-lg glass-surface bg-white rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-100 animate-fadeIn">
+        <div class="flex items-center justify-between mb-4">
+          <h3 id="modal-title" class="text-lg font-extrabold text-slate-900">Konfirmasi</h3>
+          <button type="button" onclick="window.closeModal()"
+            class="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div id="modal-body" class="text-sm text-slate-600 space-y-4"></div>
+        <div id="modal-footer" class="mt-6 flex items-center justify-end gap-3">
+          <button type="button" onclick="window.closeModal()"
+            class="px-5 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+            Batal
+          </button>
+          <button type="button" id="modal-confirm-btn"
+            class="px-5 py-2.5 rounded-full flowora-btn-primary text-white text-xs font-bold transition">
+            Ya, Lanjutkan
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- ==================== GLOBAL TOAST NOTIFICATION ==================== -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 space-y-2.5 pointer-events-none"></div>
+
   </div>
 
-  <!-- ==================== GLOBAL TOAST NOTIFICATION ==================== -->
-  <div id="toast-container" class="fixed top-5 right-5 z-50 space-y-2.5 pointer-events-none"></div>
+  <!-- ==================== APPLICATION MODULE SCRIPT ==================== -->
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-</div>
+    // KONFIGURASI APLIKASI
+    const IS_PREVIEW = false; // Set false JIKA SUDAH TERHUBUNG KE SUPABASE
+    // PASTE SUPABASE URL & ANON KEY ANDA DI SINI
+    const SUPABASE_URL = "https://razildwckekwirqemxnx.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhemlsZHdja2Vrd2lycWVteG54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0MDYwNzgsImV4cCI6MjEwOTk4MjA3OH0.E2Jr2P1_sRYyxOeKa5iLPNjRR0llh3JX0wVhT9zwfTw";
 
-<!-- ==================== APPLICATION MODULE SCRIPT ==================== -->
-<script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    let supabase = null;
+    if (!IS_PREVIEW && SUPABASE_URL !== "URL_SUPABASE_ANDA" && SUPABASE_ANON_KEY !== "ANON_KEY_ANDA") {
+      supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
 
-  // KONFIGURASI APLIKASI
-  const IS_PREVIEW = false; // Set false JIKA SUDAH TERHUBUNG KE SUPABASE
-  // PASTE SUPABASE URL & ANON KEY ANDA DI SINI
-  const SUPABASE_URL = "https://razildwckekwirqemxnx.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhemlsZHdja2Vrd2lycWVteG54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0MDYwNzgsImV4cCI6MjEwOTk4MjA3OH0.E2Jr2P1_sRYyxOeKa5iLPNjRR0llh3JX0wVhT9zwfTw";
-
-  let supabase = null;
-  if (!IS_PREVIEW && SUPABASE_URL !== "URL_SUPABASE_ANDA" && SUPABASE_ANON_KEY !== "ANON_KEY_ANDA") {
-    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
-
-  // ==================== 1-FILE PWA SERVICE WORKER (BLOB) ====================
-  function registerSingleFilePWA() {
-    if ('serviceWorker' in navigator) {
-      const swCode = `
+    // ==================== 1-FILE PWA SERVICE WORKER (BLOB) ====================
+    function registerSingleFilePWA() {
+      if ('serviceWorker' in navigator) {
+        const swCode = `
         const CACHE_NAME = 'flowora-eduanalytics-v1';
         self.addEventListener('install', (event) => {
           self.skipWaiting();
@@ -433,460 +459,434 @@
           );
         });
       `;
-      try {
-        const blob = new Blob([swCode], { type: 'application/javascript' });
-        const swUrl = URL.createObjectURL(blob);
-        navigator.serviceWorker.register(swUrl).catch(() => {});
-      } catch (e) {
-        // Ignore SW restriction in sandboxed iframe
-      }
-    }
-  }
-
-  // ==================== STATE MANAGEMENT & INITIAL DUMMY DATA ====================
-  const state = {
-    authRoleTab: 'guru', // 'guru' | 'admin'
-    currentUser: null,   // { id, role, full_name, username, subject, class_assigned }
-    activeMenu: 'dashboard',
-    activeExamId: null,
-    teachers: [],
-    classes: [],
-    exams: [],
-    examResults: []
-  };
-
-  const INITIAL_SEED_DATA = {
-    teachers: [
-      {
-        id: '11111111-1111-4111-8111-111111111101',
-        username: 'guru01',
-        password: '123456',
-        full_name: 'Budi Santoso, S.Pd., M.Si.',
-        subject: 'Matematika Wajib',
-        class_assigned: 'X-MIPA 1, X-MIPA 2'
-      },
-      {
-        id: '11111111-1111-4111-8111-111111111102',
-        username: 'guru02',
-        password: '123456',
-        full_name: 'Siti Aminah, M.Pd.',
-        subject: 'Biologi',
-        class_assigned: 'XI-MIPA 1'
-      },
-      {
-        id: '11111111-1111-4111-8111-111111111103',
-        username: 'guru03',
-        password: '123456',
-        full_name: 'Rizky Pratama, S.Kom.',
-        subject: 'Informatika',
-        class_assigned: 'X-MIPA 1, XI-MIPA 1'
-      }
-    ],
-    classes: [
-      {
-        id: '22222222-2222-4222-8222-222222222201',
-        class_name: 'X-MIPA 1',
-        homeroom_teacher: 'Budi Santoso, S.Pd., M.Si.',
-        student_count: 32
-      },
-      {
-        id: '22222222-2222-4222-8222-222222222202',
-        class_name: 'X-MIPA 2',
-        homeroom_teacher: 'Dra. Ratna Dewi',
-        student_count: 30
-      },
-      {
-        id: '22222222-2222-4222-8222-222222222203',
-        class_name: 'XI-MIPA 1',
-        homeroom_teacher: 'Siti Aminah, M.Pd.',
-        student_count: 34
-      }
-    ],
-    exams: [
-      {
-        id: '33333333-3333-4333-8333-333333333301',
-        teacher_id: '11111111-1111-4111-8111-111111111101',
-        title: 'UH 1: Fungsi Eksponen & Logaritma',
-        subject: 'Matematika Wajib',
-        class_name: 'X-MIPA 1',
-        kkm: 75,
-        total_questions: 10,
-        answer_key: 'ABCDABCDAE',
-        exam_date: '2025-02-14'
-      },
-      {
-        id: '33333333-3333-4333-8333-333333333302',
-        teacher_id: '11111111-1111-4111-8111-111111111102',
-        title: 'PTS Genap: Sistem Respirasi & Ekskresi',
-        subject: 'Biologi',
-        class_name: 'XI-MIPA 1',
-        kkm: 78,
-        total_questions: 10,
-        answer_key: 'BCDEABCDEA',
-        exam_date: '2025-02-18'
-      }
-    ],
-    examResults: [
-      // Results for Exam 1 (Key: ABCDABCDAE, KKM: 75)
-      { id: '44444444-4444-4444-8444-444444444401', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Aditya Pratama', student_nis: '102401', student_answers: 'ABCDABCDAE', correct_count: 10, score: 100, is_passed: true, notes: 'Sangat memuaskan, siap materi pengayaan olimpiade.' },
-      { id: '44444444-4444-4444-8444-444444444402', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Bella Saphira', student_nis: '102402', student_answers: 'ABCDABCDAA', correct_count: 9, score: 90, is_passed: true, notes: 'Tuntas dengan sangat baik.' },
-      { id: '44444444-4444-4444-8444-444444444403', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Citra Kirana', student_nis: '102403', student_answers: 'ABCDABCCAE', correct_count: 9, score: 90, is_passed: true, notes: 'Teliti pada sifat logaritma.' },
-      { id: '44444444-4444-4444-8444-444444444404', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Dimas Anggara', student_nis: '102404', student_answers: 'ABCDABDDAA', correct_count: 8, score: 80, is_passed: true, notes: 'Tuntas KKM.' },
-      { id: '44444444-4444-4444-8444-444444444405', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Eka Putri Maharani', student_nis: '102405', student_answers: 'ABCCABCAAA', correct_count: 8, score: 80, is_passed: true, notes: 'Tuntas KKM.' },
-      { id: '44444444-4444-4444-8444-444444444406', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Fajar Nugraha', student_nis: '102406', student_answers: 'ABCAABCCAA', correct_count: 7, score: 70, is_passed: false, notes: 'Remedial indikator persamaan logaritma (Soal No 8-10).' },
-      { id: '44444444-4444-4444-8444-444444444407', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Gilang Ramadhan', student_nis: '102407', student_answers: 'ABBAABCCDD', correct_count: 6, score: 60, is_passed: false, notes: 'Perlu bimbingan tutor sebaya.' },
-      { id: '44444444-4444-4444-8444-444444444408', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Hana Saraswati', student_nis: '102408', student_answers: 'AACAABBCDD', correct_count: 5, score: 50, is_passed: false, notes: 'Wajib mengikuti pembelajaran ulang.' },
-      // Results for Exam 2 (Key: BCDEABCDEA, KKM: 78)
-      { id: '44444444-4444-4444-8444-444444444409', exam_id: '33333333-3333-4333-8333-333333333302', student_name: 'Indra Lesmana', student_nis: '112401', student_answers: 'BCDEABCDEA', correct_count: 10, score: 100, is_passed: true, notes: 'Penguasaan konsep sempurna.' },
-      { id: '44444444-4444-4444-8444-444444444410', exam_id: '33333333-3333-4333-8333-333333333302', student_name: 'Jihan Audy', student_nis: '112402', student_answers: 'BCDEABCDEE', correct_count: 9, score: 90, is_passed: true, notes: 'Tuntas KKM.' },
-      { id: '44444444-4444-4444-8444-444444444411', exam_id: '33333333-3333-4333-8333-333333333302', student_name: 'Kevin Sanjaya', student_nis: '112403', student_answers: 'BCDAABCCEE', correct_count: 6, score: 60, is_passed: false, notes: 'Remedial mekanisme pembentukan urin.' }
-    ]
-  };
-
-  // ==================== AUTO SETUP DATABASE (HYBRID / SUPABASE) ====================
-  async function autoSetupDatabase() {
-    const badge = document.getElementById('mode-indicator-badge');
-    if (IS_PREVIEW || !supabase) {
-      // Load in-memory dummy data ONLY for preview mode
-      state.teachers = structuredClone(INITIAL_SEED_DATA.teachers);
-      state.classes = structuredClone(INITIAL_SEED_DATA.classes);
-      state.exams = structuredClone(INITIAL_SEED_DATA.exams);
-      state.examResults = structuredClone(INITIAL_SEED_DATA.examResults);
-      state.activeExamId = state.exams[0]?.id || null;
-      if (badge) {
-        badge.textContent = 'Mode Preview Aktif';
-        badge.className = 'px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-200 font-bold';
-      }
-      return;
-    }
-
-    if (badge) {
-      badge.textContent = 'Live Supabase Terhubung';
-      badge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 font-bold';
-    }
-
-    try {
-      // Cek apakah tabel teachers di Supabase masih kosong
-      const { data: existingTeachers, error: tErr } = await supabase.from('teachers').select('id').limit(1);
-      if (tErr) throw tErr;
-
-      if (!existingTeachers || existingTeachers.length === 0) {
-        // Suntikkan akun Guru awal otomatis agar Guru langsung bisa login pertama kali
-        await supabase.from('teachers').insert(INITIAL_SEED_DATA.teachers);
-        await supabase.from('classes').insert(INITIAL_SEED_DATA.classes);
-        showToast('Akun Guru & Kelas awal berhasil dibuat otomatis di Supabase!', 'success');
-      }
-
-      await fetchAllSupabaseData();
-    } catch (err) {
-      console.error('Supabase AutoSetup Error:', err);
-      showToast('Pastikan Anda sudah menjalankan script SQL di Supabase SQL Editor.', 'warning');
-    }
-  }
-
-  async function fetchAllSupabaseData() {
-    if (IS_PREVIEW || !supabase) return;
-    const [tRes, cRes, eRes, rRes] = await Promise.all([
-      supabase.from('teachers').select('*').order('created_at', { ascending: true }),
-      supabase.from('classes').select('*').order('class_name', { ascending: true }),
-      supabase.from('exams').select('*').order('exam_date', { ascending: false }),
-      supabase.from('exam_results').select('*').order('student_name', { ascending: true })
-    ]);
-    if (tRes.data) state.teachers = tRes.data;
-    if (cRes.data) state.classes = cRes.data;
-    if (eRes.data) state.exams = eRes.data;
-    if (rRes.data) state.examResults = rRes.data;
-    if (!state.activeExamId && state.exams.length > 0) {
-      state.activeExamId = state.exams[0].id;
-    }
-  }
-
-  // ==================== UI HELPERS: TOAST & MODAL (NO ALERT/CONFIRM) ====================
-  function showToast(message, type = 'info') {
-    const container = document.getElementById('toast-container');
-    const colors = {
-      success: 'bg-emerald-600 text-white border-emerald-500',
-      warning: 'bg-amber-500 text-white border-amber-400',
-      danger: 'bg-rose-600 text-white border-rose-500',
-      info: 'bg-indigo-600 text-white border-indigo-500'
-    };
-    const icons = {
-      success: 'check-circle-2',
-      warning: 'alert-triangle',
-      danger: 'x-circle',
-      info: 'sparkles'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold transition-all duration-300 ${colors[type] || colors.info}`;
-    toast.innerHTML = `
-      <i data-lucide="${icons[type] || 'info'}" class="w-4 h-4 shrink-0"></i>
-      <span>${message}</span>
-    `;
-    container.appendChild(toast);
-    lucide.createIcons();
-
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateX(20px)';
-      setTimeout(() => toast.remove(), 300);
-    }, 3200);
-  }
-
-  function openConfirmModal(title, bodyHtml, onConfirm, confirmText = 'Ya, Lanjutkan') {
-    const backdrop = document.getElementById('custom-modal-backdrop');
-    document.getElementById('modal-title').textContent = title;
-    document.getElementById('modal-body').innerHTML = bodyHtml;
-    const confirmBtn = document.getElementById('modal-confirm-btn');
-    confirmBtn.textContent = confirmText;
-    confirmBtn.onclick = async () => {
-      await onConfirm();
-      closeModal();
-    };
-    backdrop.classList.remove('hidden');
-    lucide.createIcons();
-  }
-
-  function closeModal() {
-    document.getElementById('custom-modal-backdrop').classList.add('hidden');
-  }
-  window.closeModal = closeModal;
-
-  // ==================== AUTHENTICATION & HYBRID LOGIN ====================
-  window.switchAuthRole = function(role) {
-    state.authRoleTab = role;
-    const tabGuru = document.getElementById('tab-role-guru');
-    const tabAdmin = document.getElementById('tab-role-admin');
-    const idLabel = document.getElementById('login-id-label');
-    const idInput = document.getElementById('login-identifier');
-    const helperText = document.getElementById('auth-helper-text');
-
-    if (role === 'guru') {
-      tabGuru.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md';
-      tabAdmin.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
-      idLabel.textContent = 'Username / NIP Guru';
-      idInput.type = 'text';
-      idInput.placeholder = 'Contoh: guru01';
-      helperText.innerHTML = '<strong>Mode Guru:</strong> Validasi langsung ke tabel <code>teachers</code> di database Supabase menggunakan Username/NIP & Password.';
-    } else {
-      tabAdmin.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md';
-      tabGuru.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
-      idLabel.textContent = 'Email Administrator (Supabase Auth)';
-      idInput.type = 'email';
-      idInput.placeholder = 'admin@sekolah.sch.id';
-      helperText.innerHTML = '<strong>Mode Admin:</strong> Masuk menggunakan <strong>Supabase Authentication</strong> (Email & Password) untuk akses penuh kurikulum.';
-    }
-  };
-
-  window.fillDemoCredentials = function(role) {
-    window.switchAuthRole(role);
-    const idInput = document.getElementById('login-identifier');
-    const passInput = document.getElementById('login-password');
-    if (role === 'admin') {
-      idInput.value = 'admin@sekolah.sch.id';
-      passInput.value = 'admin123';
-    } else {
-      idInput.value = 'guru01';
-      passInput.value = '123456';
-    }
-    showToast(`Kredensial demo ${role.toUpperCase()} terisi otomatis. Klik Masuk!`, 'info');
-  };
-
-  window.handleLogin = async function(e) {
-    e.preventDefault();
-    const identifier = document.getElementById('login-identifier').value.trim();
-    const password = document.getElementById('login-password').value.trim();
-
-    if (state.authRoleTab === 'admin') {
-      // Admin Login via Supabase Auth
-      if (IS_PREVIEW || !supabase) {
-        if (identifier.toLowerCase() === 'admin@sekolah.sch.id' && password === 'admin123') {
-          state.currentUser = {
-            id: 'admin-preview-uid',
-            role: 'admin',
-            full_name: 'Administrator Kurikulum',
-            username: identifier,
-            subject: 'Semua Mata Pelajaran',
-            class_assigned: 'Seluruh Kelas'
-          };
-          enterWorkspace();
-          showToast('Berhasil masuk sebagai Administrator Sekolah!', 'success');
-        } else {
-          showToast('Email atau Password Admin tidak sesuai (Demo: admin@sekolah.sch.id / admin123).', 'danger');
+        try {
+          const blob = new Blob([swCode], { type: 'application/javascript' });
+          const swUrl = URL.createObjectURL(blob);
+          navigator.serviceWorker.register(swUrl).catch(() => { });
+        } catch (e) {
+          // Ignore SW restriction in sandboxed iframe
         }
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: identifier,
-          password: password
-        });
-        if (error || !data.user) {
-          showToast('Gagal login Supabase Auth: ' + (error?.message || 'Akun tidak ditemukan'), 'danger');
-          return;
-        }
-        state.currentUser = {
-          id: data.user.id,
-          role: 'admin',
-          full_name: 'Administrator Kurikulum',
-          username: data.user.email,
-          subject: 'Semua Mata Pelajaran',
-          class_assigned: 'Seluruh Kelas'
-        };
-        await fetchAllSupabaseData();
-        enterWorkspace();
-        showToast('Login Supabase Auth Admin berhasil!', 'success');
       }
-    } else {
-      // Teacher Login via Database Table `teachers` Validation
-      let matchedTeacher = null;
-      if (IS_PREVIEW || !supabase) {
-        matchedTeacher = state.teachers.find(
-          t => t.username.toLowerCase() === identifier.toLowerCase() && t.password === password
-        );
-      } else {
-        const { data, error } = await supabase
-          .from('teachers')
-          .select('*')
-          .eq('username', identifier)
-          .eq('password', password)
-          .maybeSingle();
-        if (!error && data) matchedTeacher = data;
-      }
+    }
 
-      if (!matchedTeacher) {
-        showToast('Username/NIP atau Password Guru salah!', 'danger');
+    // ==================== STATE MANAGEMENT & INITIAL DUMMY DATA ====================
+    const state = {
+      authRoleTab: 'guru', // 'guru' | 'admin'
+      currentUser: null,   // { id, role, full_name, username, subject, class_assigned }
+      activeMenu: 'dashboard',
+      activeExamId: null,
+      teachers: [],
+      classes: [],
+      exams: [],
+      examResults: []
+    };
+
+    const INITIAL_SEED_DATA = {
+      teachers: [
+        {
+          id: '11111111-1111-4111-8111-111111111101',
+          username: 'guru01',
+          password: '123456',
+          full_name: 'Budi Santoso, S.Pd., M.Si.',
+          subject: 'Matematika Wajib',
+          class_assigned: 'X-MIPA 1, X-MIPA 2'
+        },
+        {
+          id: '11111111-1111-4111-8111-111111111102',
+          username: 'guru02',
+          password: '123456',
+          full_name: 'Siti Aminah, M.Pd.',
+          subject: 'Biologi',
+          class_assigned: 'XI-MIPA 1'
+        },
+        {
+          id: '11111111-1111-4111-8111-111111111103',
+          username: 'guru03',
+          password: '123456',
+          full_name: 'Rizky Pratama, S.Kom.',
+          subject: 'Informatika',
+          class_assigned: 'X-MIPA 1, XI-MIPA 1'
+        }
+      ],
+      classes: [
+        {
+          id: '22222222-2222-4222-8222-222222222201',
+          class_name: 'X-MIPA 1',
+          homeroom_teacher: 'Budi Santoso, S.Pd., M.Si.',
+          student_count: 32
+        },
+        {
+          id: '22222222-2222-4222-8222-222222222202',
+          class_name: 'X-MIPA 2',
+          homeroom_teacher: 'Dra. Ratna Dewi',
+          student_count: 30
+        },
+        {
+          id: '22222222-2222-4222-8222-222222222203',
+          class_name: 'XI-MIPA 1',
+          homeroom_teacher: 'Siti Aminah, M.Pd.',
+          student_count: 34
+        }
+      ],
+      exams: [
+        {
+          id: '33333333-3333-4333-8333-333333333301',
+          teacher_id: '11111111-1111-4111-8111-111111111101',
+          title: 'UH 1: Fungsi Eksponen & Logaritma',
+          subject: 'Matematika Wajib',
+          class_name: 'X-MIPA 1',
+          kkm: 75,
+          total_questions: 10,
+          answer_key: 'ABCDABCDAE',
+          exam_date: '2025-02-14'
+        },
+        {
+          id: '33333333-3333-4333-8333-333333333302',
+          teacher_id: '11111111-1111-4111-8111-111111111102',
+          title: 'PTS Genap: Sistem Respirasi & Ekskresi',
+          subject: 'Biologi',
+          class_name: 'XI-MIPA 1',
+          kkm: 78,
+          total_questions: 10,
+          answer_key: 'BCDEABCDEA',
+          exam_date: '2025-02-18'
+        }
+      ],
+      examResults: [
+        // Results for Exam 1 (Key: ABCDABCDAE, KKM: 75)
+        { id: '44444444-4444-4444-8444-444444444401', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Aditya Pratama', student_nis: '102401', student_answers: 'ABCDABCDAE', correct_count: 10, score: 100, is_passed: true, notes: 'Sangat memuaskan, siap materi pengayaan olimpiade.' },
+        { id: '44444444-4444-4444-8444-444444444402', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Bella Saphira', student_nis: '102402', student_answers: 'ABCDABCDAA', correct_count: 9, score: 90, is_passed: true, notes: 'Tuntas dengan sangat baik.' },
+        { id: '44444444-4444-4444-8444-444444444403', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Citra Kirana', student_nis: '102403', student_answers: 'ABCDABCCAE', correct_count: 9, score: 90, is_passed: true, notes: 'Teliti pada sifat logaritma.' },
+        { id: '44444444-4444-4444-8444-444444444404', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Dimas Anggara', student_nis: '102404', student_answers: 'ABCDABDDAA', correct_count: 8, score: 80, is_passed: true, notes: 'Tuntas KKM.' },
+        { id: '44444444-4444-4444-8444-444444444405', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Eka Putri Maharani', student_nis: '102405', student_answers: 'ABCCABCAAA', correct_count: 8, score: 80, is_passed: true, notes: 'Tuntas KKM.' },
+        { id: '44444444-4444-4444-8444-444444444406', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Fajar Nugraha', student_nis: '102406', student_answers: 'ABCAABCCAA', correct_count: 7, score: 70, is_passed: false, notes: 'Remedial indikator persamaan logaritma (Soal No 8-10).' },
+        { id: '44444444-4444-4444-8444-444444444407', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Gilang Ramadhan', student_nis: '102407', student_answers: 'ABBAABCCDD', correct_count: 6, score: 60, is_passed: false, notes: 'Perlu bimbingan tutor sebaya.' },
+        { id: '44444444-4444-4444-8444-444444444408', exam_id: '33333333-3333-4333-8333-333333333301', student_name: 'Hana Saraswati', student_nis: '102408', student_answers: 'AACAABBCDD', correct_count: 5, score: 50, is_passed: false, notes: 'Wajib mengikuti pembelajaran ulang.' },
+        // Results for Exam 2 (Key: BCDEABCDEA, KKM: 78)
+        { id: '44444444-4444-4444-8444-444444444409', exam_id: '33333333-3333-4333-8333-333333333302', student_name: 'Indra Lesmana', student_nis: '112401', student_answers: 'BCDEABCDEA', correct_count: 10, score: 100, is_passed: true, notes: 'Penguasaan konsep sempurna.' },
+        { id: '44444444-4444-4444-8444-444444444410', exam_id: '33333333-3333-4333-8333-333333333302', student_name: 'Jihan Audy', student_nis: '112402', student_answers: 'BCDEABCDEE', correct_count: 9, score: 90, is_passed: true, notes: 'Tuntas KKM.' },
+        { id: '44444444-4444-4444-8444-444444444411', exam_id: '33333333-3333-4333-8333-333333333302', student_name: 'Kevin Sanjaya', student_nis: '112403', student_answers: 'BCDAABCCEE', correct_count: 6, score: 60, is_passed: false, notes: 'Remedial mekanisme pembentukan urin.' }
+      ]
+    };
+
+    // ==================== AUTO SETUP DATABASE (HYBRID / SUPABASE) ====================
+    async function autoSetupDatabase() {
+      if (IS_PREVIEW || !supabase) {
+        // Load in-memory dummy data ONLY for preview mode
+        state.teachers = structuredClone(INITIAL_SEED_DATA.teachers);
+        state.classes = structuredClone(INITIAL_SEED_DATA.classes);
+        state.exams = structuredClone(INITIAL_SEED_DATA.exams);
+        state.examResults = structuredClone(INITIAL_SEED_DATA.examResults);
+        state.activeExamId = state.exams[0]?.id || null;
         return;
       }
 
-      state.currentUser = {
-        id: matchedTeacher.id,
-        role: 'guru',
-        full_name: matchedTeacher.full_name,
-        username: matchedTeacher.username,
-        subject: matchedTeacher.subject,
-        class_assigned: matchedTeacher.class_assigned
+      try {
+        // Cek apakah tabel teachers di Supabase masih kosong
+        const { data: existingTeachers, error: tErr } = await supabase.from('teachers').select('id').limit(1);
+        if (tErr) throw tErr;
+
+        if (!existingTeachers || existingTeachers.length === 0) {
+          // Suntikkan akun Guru awal otomatis agar Guru langsung bisa login pertama kali
+          await supabase.from('teachers').insert(INITIAL_SEED_DATA.teachers);
+          await supabase.from('classes').insert(INITIAL_SEED_DATA.classes);
+          showToast('Akun Guru & Kelas awal berhasil dibuat otomatis di Supabase!', 'success');
+        }
+
+        await fetchAllSupabaseData();
+      } catch (err) {
+        console.error('Supabase AutoSetup Error:', err);
+        showToast('Pastikan Anda sudah menjalankan script SQL di Supabase SQL Editor.', 'warning');
+      }
+    }
+
+    async function fetchAllSupabaseData() {
+      if (IS_PREVIEW || !supabase) return;
+      const [tRes, cRes, eRes, rRes] = await Promise.all([
+        supabase.from('teachers').select('*').order('created_at', { ascending: true }),
+        supabase.from('classes').select('*').order('class_name', { ascending: true }),
+        supabase.from('exams').select('*').order('exam_date', { ascending: false }),
+        supabase.from('exam_results').select('*').order('student_name', { ascending: true })
+      ]);
+      if (tRes.data) state.teachers = tRes.data;
+      if (cRes.data) state.classes = cRes.data;
+      if (eRes.data) state.exams = eRes.data;
+      if (rRes.data) state.examResults = rRes.data;
+      if (!state.activeExamId && state.exams.length > 0) {
+        state.activeExamId = state.exams[0].id;
+      }
+    }
+
+    // ==================== UI HELPERS: TOAST & MODAL (NO ALERT/CONFIRM) ====================
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const colors = {
+        success: 'bg-emerald-600 text-white border-emerald-500',
+        warning: 'bg-amber-500 text-white border-amber-400',
+        danger: 'bg-rose-600 text-white border-rose-500',
+        info: 'bg-indigo-600 text-white border-indigo-500'
       };
-      await fetchAllSupabaseData();
-      enterWorkspace();
-      showToast(`Selamat datang, ${matchedTeacher.full_name}!`, 'success');
-    }
-  };
+      const icons = {
+        success: 'check-circle-2',
+        warning: 'alert-triangle',
+        danger: 'x-circle',
+        info: 'sparkles'
+      };
 
-  window.handleLogout = async function() {
-    if (!IS_PREVIEW && supabase && state.currentUser?.role === 'admin') {
-      await supabase.auth.signOut();
-    }
-    state.currentUser = null;
-    state.activeMenu = 'dashboard';
-    document.getElementById('app-view').classList.add('hidden');
-    document.getElementById('auth-view').classList.remove('hidden');
-    showToast('Anda telah keluar dari sesi aplikasi.', 'info');
-  };
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold transition-all duration-300 ${colors[type] || colors.info}`;
+      toast.innerHTML = `
+      <i data-lucide="${icons[type] || 'info'}" class="w-4 h-4 shrink-0"></i>
+      <span>${message}</span>
+    `;
+      container.appendChild(toast);
+      lucide.createIcons();
 
-  function enterWorkspace() {
-    document.getElementById('auth-view').classList.add('hidden');
-    document.getElementById('app-view').classList.remove('hidden');
-
-    // Update User Info in Sidebar
-    const u = state.currentUser;
-    const initials = u.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-    document.getElementById('user-avatar-circle').textContent = initials;
-    document.getElementById('user-display-name').textContent = u.full_name;
-    document.getElementById('user-display-sub').textContent = `${u.subject} • ${u.class_assigned}`;
-
-    const roleBadge = document.getElementById('sidebar-role-badge');
-    if (u.role === 'admin') {
-      roleBadge.textContent = 'ADMIN';
-      roleBadge.className = 'px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200';
-    } else {
-      roleBadge.textContent = 'GURU';
-      roleBadge.className = 'px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200';
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(20px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
     }
 
-    populateExamSelectors();
-    renderNavigationMenus();
-    renderCurrentMenu();
-  }
-
-  // ==================== NAVIGATION & EXAM SELECTORS ====================
-  const MENU_CONFIG = [
-    { id: 'dashboard', label: 'Dashboard Analitik', shortLabel: 'Dashboard', icon: 'layout-dashboard', subtitle: 'Ringkasan performa ulangan, ketuntasan KKM, dan grafik klasikal', roles: ['admin', 'guru'] },
-    { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, KKM, jumlah butir soal, dan kunci jawaban', roles: ['admin', 'guru'] },
-    { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban pilihan ganda dan perhitungan nilai siswa', roles: ['admin', 'guru'] },
-    { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Indeks tingkat kesukaran (P), daya pembeda (D), dan kualitas opsi pengecoh', roles: ['admin', 'guru'] },
-    { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['admin', 'guru'] },
-    { id: 'manajemen_guru', label: 'Data Guru & Kelas', shortLabel: 'Guru/Kelas', icon: 'users-round', subtitle: 'Manajemen akun login guru mata pelajaran dan master kelas sekolah', roles: ['admin'] }
-  ];
-
-  function populateExamSelectors() {
-    const desktopSelect = document.getElementById('global-exam-selector');
-    const mobileSelect = document.getElementById('mobile-exam-selector');
-    if (!state.activeExamId && state.exams.length > 0) {
-      state.activeExamId = state.exams[0].id;
+    function openConfirmModal(title, bodyHtml, onConfirm, confirmText = 'Ya, Lanjutkan') {
+      const backdrop = document.getElementById('custom-modal-backdrop');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-body').innerHTML = bodyHtml;
+      const confirmBtn = document.getElementById('modal-confirm-btn');
+      confirmBtn.textContent = confirmText;
+      confirmBtn.onclick = async () => {
+        await onConfirm();
+        closeModal();
+      };
+      backdrop.classList.remove('hidden');
+      lucide.createIcons();
     }
 
-    const optionsHtml = state.exams.length === 0
-      ? '<option value="">Belum ada ulangan</option>'
-      : state.exams.map(ex => `<option value="${ex.id}" ${ex.id === state.activeExamId ? 'selected' : ''}>${ex.title} (${ex.class_name})</option>`).join('');
-
-    if (desktopSelect) desktopSelect.innerHTML = optionsHtml;
-    if (mobileSelect) mobileSelect.innerHTML = optionsHtml;
-  }
-
-  window.handleChangeActiveExam = function(examId) {
-    state.activeExamId = examId;
-    populateExamSelectors();
-    renderCurrentMenu();
-    const activeExam = getActiveExam();
-    if (activeExam) {
-      showToast(`Paket ulangan aktif: ${activeExam.title}`, 'info');
+    function closeModal() {
+      document.getElementById('custom-modal-backdrop').classList.add('hidden');
     }
-  };
+    window.closeModal = closeModal;
 
-  function getActiveExam() {
-    return state.exams.find(e => e.id === state.activeExamId) || state.exams[0] || null;
-  }
+    // ==================== AUTHENTICATION & HYBRID LOGIN ====================
+    window.switchAuthRole = function (role) {
+      state.authRoleTab = role;
+      const tabGuru = document.getElementById('tab-role-guru');
+      const tabAdmin = document.getElementById('tab-role-admin');
+      const idLabel = document.getElementById('login-id-label');
+      const idInput = document.getElementById('login-identifier');
+      const helperText = document.getElementById('auth-helper-text');
 
-  window.navigateMenu = function(menuId) {
-    const target = MENU_CONFIG.find(m => m.id === menuId);
-    if (!target) return;
-    if (!target.roles.includes(state.currentUser?.role)) {
-      showToast('Menu ini khusus untuk Administrator Kurikulum.', 'warning');
-      return;
+      if (role === 'guru') {
+        tabGuru.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md';
+        tabAdmin.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
+        idLabel.textContent = 'Username / NIP Guru';
+        idInput.type = 'text';
+        idInput.placeholder = 'Contoh: guru01';
+        helperText.innerHTML = '<strong>Mode Guru:</strong> Validasi langsung ke tabel <code>teachers</code> di database Supabase menggunakan Username/NIP & Password.';
+      } else {
+        tabAdmin.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md';
+        tabGuru.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
+        idLabel.textContent = 'Email Administrator (Supabase Auth)';
+        idInput.type = 'email';
+        idInput.placeholder = 'admin@sekolah.sch.id';
+        helperText.innerHTML = '<strong>Mode Admin:</strong> Masuk menggunakan <strong>Supabase Authentication</strong> (Email & Password) untuk akses penuh kurikulum.';
+      }
+    };
+
+    window.handleLogin = async function (e) {
+      e.preventDefault();
+      const identifier = document.getElementById('login-identifier').value.trim();
+      const password = document.getElementById('login-password').value.trim();
+
+      if (state.authRoleTab === 'admin') {
+        // Admin Login via Supabase Auth
+        if (IS_PREVIEW || !supabase) {
+          if (identifier.toLowerCase() === 'admin@sekolah.sch.id' && password === 'admin123') {
+            state.currentUser = {
+              id: 'admin-preview-uid',
+              role: 'admin',
+              full_name: 'Administrator Kurikulum',
+              username: identifier,
+              subject: 'Semua Mata Pelajaran',
+              class_assigned: 'Seluruh Kelas'
+            };
+            enterWorkspace();
+            showToast('Berhasil masuk sebagai Administrator Sekolah!', 'success');
+          } else {
+            showToast('Email atau Password Admin tidak sesuai.', 'danger');
+          }
+        } else {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: identifier,
+            password: password
+          });
+          if (error || !data.user) {
+            showToast('Gagal login Supabase Auth: ' + (error?.message || 'Akun tidak ditemukan'), 'danger');
+            return;
+          }
+          state.currentUser = {
+            id: data.user.id,
+            role: 'admin',
+            full_name: 'Administrator Kurikulum',
+            username: data.user.email,
+            subject: 'Semua Mata Pelajaran',
+            class_assigned: 'Seluruh Kelas'
+          };
+          await fetchAllSupabaseData();
+          enterWorkspace();
+          showToast('Login Supabase Auth Admin berhasil!', 'success');
+        }
+      } else {
+        // Teacher Login via Database Table `teachers` Validation
+        let matchedTeacher = null;
+        if (IS_PREVIEW || !supabase) {
+          matchedTeacher = state.teachers.find(
+            t => t.username.toLowerCase() === identifier.toLowerCase() && t.password === password
+          );
+        } else {
+          const { data, error } = await supabase
+            .from('teachers')
+            .select('*')
+            .eq('username', identifier)
+            .eq('password', password)
+            .maybeSingle();
+          if (!error && data) matchedTeacher = data;
+        }
+
+        if (!matchedTeacher) {
+          showToast('Username/NIP atau Password Guru salah!', 'danger');
+          return;
+        }
+
+        state.currentUser = {
+          id: matchedTeacher.id,
+          role: 'guru',
+          full_name: matchedTeacher.full_name,
+          username: matchedTeacher.username,
+          subject: matchedTeacher.subject,
+          class_assigned: matchedTeacher.class_assigned
+        };
+        await fetchAllSupabaseData();
+        enterWorkspace();
+        showToast(`Selamat datang, ${matchedTeacher.full_name}!`, 'success');
+      }
+    };
+
+    window.handleLogout = async function () {
+      if (!IS_PREVIEW && supabase && state.currentUser?.role === 'admin') {
+        await supabase.auth.signOut();
+      }
+      state.currentUser = null;
+      state.activeMenu = 'dashboard';
+      document.getElementById('app-view').classList.add('hidden');
+      document.getElementById('auth-view').classList.remove('hidden');
+      showToast('Anda telah keluar dari sesi aplikasi.', 'info');
+    };
+
+    function enterWorkspace() {
+      document.getElementById('auth-view').classList.add('hidden');
+      document.getElementById('app-view').classList.remove('hidden');
+
+      // Update User Info in Sidebar
+      const u = state.currentUser;
+      const initials = u.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      document.getElementById('user-avatar-circle').textContent = initials;
+      document.getElementById('user-display-name').textContent = u.full_name;
+      document.getElementById('user-display-sub').textContent = `${u.subject} • ${u.class_assigned}`;
+
+      const roleBadge = document.getElementById('sidebar-role-badge');
+      if (u.role === 'admin') {
+        roleBadge.textContent = 'ADMIN';
+        roleBadge.className = 'px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200';
+      } else {
+        roleBadge.textContent = 'GURU';
+        roleBadge.className = 'px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200';
+      }
+
+      populateExamSelectors();
+      renderNavigationMenus();
+      renderCurrentMenu();
     }
-    state.activeMenu = menuId;
-    renderNavigationMenus();
-    renderCurrentMenu();
-  };
 
-  function renderNavigationMenus() {
-    const role = state.currentUser?.role || 'guru';
-    const allowedMenus = MENU_CONFIG.filter(m => m.roles.includes(role));
+    // ==================== NAVIGATION & EXAM SELECTORS ====================
+    const MENU_CONFIG = [
+      { id: 'dashboard', label: 'Dashboard Analitik', shortLabel: 'Dashboard', icon: 'layout-dashboard', subtitle: 'Ringkasan performa ulangan, ketuntasan KKM, dan grafik klasikal', roles: ['admin', 'guru'] },
+      { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, KKM, jumlah butir soal, dan kunci jawaban', roles: ['admin', 'guru'] },
+      { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban pilihan ganda dan perhitungan nilai siswa', roles: ['admin', 'guru'] },
+      { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Indeks tingkat kesukaran (P), daya pembeda (D), dan kualitas opsi pengecoh', roles: ['admin', 'guru'] },
+      { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['admin', 'guru'] },
+      { id: 'manajemen_guru', label: 'Data Guru & Kelas', shortLabel: 'Guru/Kelas', icon: 'users-round', subtitle: 'Manajemen akun login guru mata pelajaran dan master kelas sekolah', roles: ['admin'] }
+    ];
 
-    // Desktop Sidebar
-    const desktopNav = document.getElementById('desktop-nav-list');
-    desktopNav.innerHTML = allowedMenus.map(m => {
-      const isActive = state.activeMenu === m.id;
-      return `
+    function populateExamSelectors() {
+      const desktopSelect = document.getElementById('global-exam-selector');
+      const mobileSelect = document.getElementById('mobile-exam-selector');
+      if (!state.activeExamId && state.exams.length > 0) {
+        state.activeExamId = state.exams[0].id;
+      }
+
+      const optionsHtml = state.exams.length === 0
+        ? '<option value="">Belum ada ulangan</option>'
+        : state.exams.map(ex => `<option value="${ex.id}" ${ex.id === state.activeExamId ? 'selected' : ''}>${ex.title} (${ex.class_name})</option>`).join('');
+
+      if (desktopSelect) desktopSelect.innerHTML = optionsHtml;
+      if (mobileSelect) mobileSelect.innerHTML = optionsHtml;
+    }
+
+    window.handleChangeActiveExam = function (examId) {
+      state.activeExamId = examId;
+      populateExamSelectors();
+      renderCurrentMenu();
+      const activeExam = getActiveExam();
+      if (activeExam) {
+        showToast(`Paket ulangan aktif: ${activeExam.title}`, 'info');
+      }
+    };
+
+    function getActiveExam() {
+      return state.exams.find(e => e.id === state.activeExamId) || state.exams[0] || null;
+    }
+
+    window.navigateMenu = function (menuId) {
+      const target = MENU_CONFIG.find(m => m.id === menuId);
+      if (!target) return;
+      if (!target.roles.includes(state.currentUser?.role)) {
+        showToast('Menu ini khusus untuk Administrator Kurikulum.', 'warning');
+        return;
+      }
+      state.activeMenu = menuId;
+      renderNavigationMenus();
+      renderCurrentMenu();
+    };
+
+    function renderNavigationMenus() {
+      const role = state.currentUser?.role || 'guru';
+      const allowedMenus = MENU_CONFIG.filter(m => m.roles.includes(role));
+
+      // Desktop Sidebar
+      const desktopNav = document.getElementById('desktop-nav-list');
+      desktopNav.innerHTML = allowedMenus.map(m => {
+        const isActive = state.activeMenu === m.id;
+        return `
         <button type="button" onclick="window.navigateMenu('${m.id}')"
-          class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-            isActive
-              ? 'flowora-btn-primary text-white shadow-md'
-              : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+          class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${isActive
+            ? 'flowora-btn-primary text-white shadow-md'
+            : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
           }">
           <i data-lucide="${m.icon}" class="w-4 h-4 shrink-0"></i>
           <span class="truncate">${m.label}</span>
         </button>
       `;
-    }).join('');
+      }).join('');
 
-    // Mobile Bottom Nav
-    const mobileNav = document.getElementById('mobile-nav-list');
-    mobileNav.innerHTML = allowedMenus.map(m => {
-      const isActive = state.activeMenu === m.id;
-      return `
+      // Mobile Bottom Nav
+      const mobileNav = document.getElementById('mobile-nav-list');
+      mobileNav.innerHTML = allowedMenus.map(m => {
+        const isActive = state.activeMenu === m.id;
+        return `
         <button type="button" onclick="window.navigateMenu('${m.id}')"
-          class="flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${
-            isActive ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-700 font-semibold'
+          class="flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${isActive ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-700 font-semibold'
           }">
           <div class="${isActive ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}">
             <i data-lucide="${m.icon}" class="w-4 h-4"></i>
@@ -894,216 +894,216 @@
           <span class="text-[10px] mt-0.5 truncate max-w-[64px]">${m.shortLabel}</span>
         </button>
       `;
-    }).join('');
+      }).join('');
 
-    const currentMeta = MENU_CONFIG.find(m => m.id === state.activeMenu);
-    if (currentMeta) {
-      document.getElementById('page-header-title').textContent = currentMeta.label;
-      document.getElementById('page-header-subtitle').textContent = currentMeta.subtitle;
+      const currentMeta = MENU_CONFIG.find(m => m.id === state.activeMenu);
+      if (currentMeta) {
+        document.getElementById('page-header-title').textContent = currentMeta.label;
+        document.getElementById('page-header-subtitle').textContent = currentMeta.subtitle;
+      }
+
+      lucide.createIcons();
     }
 
-    lucide.createIcons();
-  }
+    // ==================== STATISTICAL & ITEM ANALYSIS ENGINE ====================
+    function computeExamStatistics(exam) {
+      if (!exam) {
+        return {
+          results: [],
+          totalStudents: 0,
+          avgScore: 0,
+          highestScore: 0,
+          lowestScore: 0,
+          passedCount: 0,
+          remedialCount: 0,
+          classicalMastery: 0,
+          itemAnalysis: []
+        };
+      }
 
-  // ==================== STATISTICAL & ITEM ANALYSIS ENGINE ====================
-  function computeExamStatistics(exam) {
-    if (!exam) {
+      const results = state.examResults
+        .filter(r => r.exam_id === exam.id)
+        .slice()
+        .sort((a, b) => Number(b.score) - Number(a.score));
+
+      const totalStudents = results.length;
+      if (totalStudents === 0) {
+        return {
+          results: [],
+          totalStudents: 0,
+          avgScore: 0,
+          highestScore: 0,
+          lowestScore: 0,
+          passedCount: 0,
+          remedialCount: 0,
+          classicalMastery: 0,
+          itemAnalysis: []
+        };
+      }
+
+      const scores = results.map(r => Number(r.score));
+      const sumScores = scores.reduce((acc, s) => acc + s, 0);
+      const avgScore = +(sumScores / totalStudents).toFixed(1);
+      const highestScore = Math.max(...scores);
+      const lowestScore = Math.min(...scores);
+      const passedCount = results.filter(r => Number(r.score) >= Number(exam.kkm)).length;
+      const remedialCount = totalStudents - passedCount;
+      const classicalMastery = Math.round((passedCount / totalStudents) * 100);
+
+      // Split Upper Group (Kelompok Atas) and Lower Group (Kelompok Bawah) for Daya Pembeda (D)
+      const halfSize = Math.max(1, Math.floor(totalStudents / 2));
+      const upperGroup = results.slice(0, halfSize);
+      const lowerGroup = results.slice(totalStudents - halfSize);
+
+      const keyChars = (exam.answer_key || '').toUpperCase().split('');
+      const numQ = Number(exam.total_questions) || keyChars.length;
+
+      const itemAnalysis = [];
+      for (let i = 0; i < numQ; i++) {
+        const keyChar = keyChars[i] || 'A';
+        let correctTotal = 0;
+        let upperCorrect = 0;
+        let lowerCorrect = 0;
+        const optionCounts = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+
+        results.forEach(r => {
+          const ans = ((r.student_answers || '')[i] || '').toUpperCase();
+          if (optionCounts[ans] !== undefined) optionCounts[ans]++;
+          if (ans === keyChar) correctTotal++;
+        });
+
+        upperGroup.forEach(r => {
+          const ans = ((r.student_answers || '')[i] || '').toUpperCase();
+          if (ans === keyChar) upperCorrect++;
+        });
+
+        lowerGroup.forEach(r => {
+          const ans = ((r.student_answers || '')[i] || '').toUpperCase();
+          if (ans === keyChar) lowerCorrect++;
+        });
+
+        // Indeks Tingkat Kesukaran (P = B / JS)
+        const pIndex = +(correctTotal / totalStudents).toFixed(2);
+        let difficultyLabel = 'Sedang';
+        let difficultyBadge = 'bg-blue-50 text-blue-600 border-blue-200';
+        if (pIndex > 0.70) {
+          difficultyLabel = 'Mudah';
+          difficultyBadge = 'bg-emerald-50 text-emerald-600 border-emerald-200';
+        } else if (pIndex < 0.30) {
+          difficultyLabel = 'Sukar';
+          difficultyBadge = 'bg-rose-50 text-rose-600 border-rose-200';
+        }
+
+        // Indeks Daya Pembeda (D = PA - PB)
+        const pA = upperCorrect / upperGroup.length;
+        const pB = lowerCorrect / lowerGroup.length;
+        const dIndex = +(pA - pB).toFixed(2);
+
+        let discrimLabel = 'Cukup';
+        let discrimBadge = 'bg-amber-50 text-amber-600 border-amber-200';
+        if (dIndex >= 0.40) {
+          discrimLabel = 'Sangat Baik';
+          discrimBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        } else if (dIndex >= 0.30) {
+          discrimLabel = 'Baik';
+          discrimBadge = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+        } else if (dIndex < 0.20) {
+          discrimLabel = 'Jelek';
+          discrimBadge = 'bg-rose-50 text-rose-700 border-rose-200';
+        }
+
+        // Keputusan Butir Soal
+        let statusAction = 'Diterima (Bank Soal)';
+        let statusColor = 'bg-emerald-100 text-emerald-800';
+        if (dIndex < 0.10) {
+          statusAction = 'Dibuang / Ganti';
+          statusColor = 'bg-rose-100 text-rose-800';
+        } else if (dIndex < 0.25 || pIndex > 0.90 || pIndex < 0.15) {
+          statusAction = 'Perlu Revisi';
+          statusColor = 'bg-amber-100 text-amber-800';
+        }
+
+        itemAnalysis.push({
+          number: i + 1,
+          key: keyChar,
+          correctCount: correctTotal,
+          correctPercent: Math.round((correctTotal / totalStudents) * 100),
+          pIndex,
+          difficultyLabel,
+          difficultyBadge,
+          dIndex,
+          discrimLabel,
+          discrimBadge,
+          optionCounts,
+          statusAction,
+          statusColor
+        });
+      }
+
       return {
-        results: [],
-        totalStudents: 0,
-        avgScore: 0,
-        highestScore: 0,
-        lowestScore: 0,
-        passedCount: 0,
-        remedialCount: 0,
-        classicalMastery: 0,
-        itemAnalysis: []
+        results,
+        totalStudents,
+        avgScore,
+        highestScore,
+        lowestScore,
+        passedCount,
+        remedialCount,
+        classicalMastery,
+        itemAnalysis
       };
     }
 
-    const results = state.examResults
-      .filter(r => r.exam_id === exam.id)
-      .slice()
-      .sort((a, b) => Number(b.score) - Number(a.score));
+    // ==================== VIEW RENDERER ROUTER ====================
+    function renderCurrentMenu() {
+      const container = document.getElementById('main-content-container');
+      const exam = getActiveExam();
+      const stats = computeExamStatistics(exam);
 
-    const totalStudents = results.length;
-    if (totalStudents === 0) {
-      return {
-        results: [],
-        totalStudents: 0,
-        avgScore: 0,
-        highestScore: 0,
-        lowestScore: 0,
-        passedCount: 0,
-        remedialCount: 0,
-        classicalMastery: 0,
-        itemAnalysis: []
-      };
-    }
-
-    const scores = results.map(r => Number(r.score));
-    const sumScores = scores.reduce((acc, s) => acc + s, 0);
-    const avgScore = +(sumScores / totalStudents).toFixed(1);
-    const highestScore = Math.max(...scores);
-    const lowestScore = Math.min(...scores);
-    const passedCount = results.filter(r => Number(r.score) >= Number(exam.kkm)).length;
-    const remedialCount = totalStudents - passedCount;
-    const classicalMastery = Math.round((passedCount / totalStudents) * 100);
-
-    // Split Upper Group (Kelompok Atas) and Lower Group (Kelompok Bawah) for Daya Pembeda (D)
-    const halfSize = Math.max(1, Math.floor(totalStudents / 2));
-    const upperGroup = results.slice(0, halfSize);
-    const lowerGroup = results.slice(totalStudents - halfSize);
-
-    const keyChars = (exam.answer_key || '').toUpperCase().split('');
-    const numQ = Number(exam.total_questions) || keyChars.length;
-
-    const itemAnalysis = [];
-    for (let i = 0; i < numQ; i++) {
-      const keyChar = keyChars[i] || 'A';
-      let correctTotal = 0;
-      let upperCorrect = 0;
-      let lowerCorrect = 0;
-      const optionCounts = { A: 0, B: 0, C: 0, D: 0, E: 0 };
-
-      results.forEach(r => {
-        const ans = ((r.student_answers || '')[i] || '').toUpperCase();
-        if (optionCounts[ans] !== undefined) optionCounts[ans]++;
-        if (ans === keyChar) correctTotal++;
-      });
-
-      upperGroup.forEach(r => {
-        const ans = ((r.student_answers || '')[i] || '').toUpperCase();
-        if (ans === keyChar) upperCorrect++;
-      });
-
-      lowerGroup.forEach(r => {
-        const ans = ((r.student_answers || '')[i] || '').toUpperCase();
-        if (ans === keyChar) lowerCorrect++;
-      });
-
-      // Indeks Tingkat Kesukaran (P = B / JS)
-      const pIndex = +(correctTotal / totalStudents).toFixed(2);
-      let difficultyLabel = 'Sedang';
-      let difficultyBadge = 'bg-blue-50 text-blue-600 border-blue-200';
-      if (pIndex > 0.70) {
-        difficultyLabel = 'Mudah';
-        difficultyBadge = 'bg-emerald-50 text-emerald-600 border-emerald-200';
-      } else if (pIndex < 0.30) {
-        difficultyLabel = 'Sukar';
-        difficultyBadge = 'bg-rose-50 text-rose-600 border-rose-200';
+      switch (state.activeMenu) {
+        case 'dashboard':
+          container.innerHTML = renderDashboardView(exam, stats);
+          break;
+        case 'manajemen_ulangan':
+          container.innerHTML = renderManajemenUlanganView();
+          break;
+        case 'input_nilai':
+          container.innerHTML = renderInputNilaiView(exam, stats);
+          break;
+        case 'analisis_butir':
+          container.innerHTML = renderAnalisisButirView(exam, stats);
+          break;
+        case 'remedial_pengayaan':
+          container.innerHTML = renderRemedialPengayaanView(exam, stats);
+          break;
+        case 'manajemen_guru':
+          container.innerHTML = renderManajemenGuruView();
+          break;
+        default:
+          container.innerHTML = renderDashboardView(exam, stats);
       }
 
-      // Indeks Daya Pembeda (D = PA - PB)
-      const pA = upperCorrect / upperGroup.length;
-      const pB = lowerCorrect / lowerGroup.length;
-      const dIndex = +(pA - pB).toFixed(2);
+      lucide.createIcons();
+    }
 
-      let discrimLabel = 'Cukup';
-      let discrimBadge = 'bg-amber-50 text-amber-600 border-amber-200';
-      if (dIndex >= 0.40) {
-        discrimLabel = 'Sangat Baik';
-        discrimBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      } else if (dIndex >= 0.30) {
-        discrimLabel = 'Baik';
-        discrimBadge = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-      } else if (dIndex < 0.20) {
-        discrimLabel = 'Jelek';
-        discrimBadge = 'bg-rose-50 text-rose-700 border-rose-200';
-      }
+    // ==================== 1. DASHBOARD ANALITIK (FLOWORA BENTO STYLE) ====================
+    function renderDashboardView(exam, stats) {
+      const totalExams = state.exams.length;
+      const strokeDash = `${stats.classicalMastery}, 100`;
 
-      // Keputusan Butir Soal
-      let statusAction = 'Diterima (Bank Soal)';
-      let statusColor = 'bg-emerald-100 text-emerald-800';
-      if (dIndex < 0.10) {
-        statusAction = 'Dibuang / Ganti';
-        statusColor = 'bg-rose-100 text-rose-800';
-      } else if (dIndex < 0.25 || pIndex > 0.90 || pIndex < 0.15) {
-        statusAction = 'Perlu Revisi';
-        statusColor = 'bg-amber-100 text-amber-800';
-      }
-
-      itemAnalysis.push({
-        number: i + 1,
-        key: keyChar,
-        correctCount: correctTotal,
-        correctPercent: Math.round((correctTotal / totalStudents) * 100),
-        pIndex,
-        difficultyLabel,
-        difficultyBadge,
-        dIndex,
-        discrimLabel,
-        discrimBadge,
-        optionCounts,
-        statusAction,
-        statusColor
+      // Calculate per-exam progress bars
+      const examSummaries = state.exams.map((ex, idx) => {
+        const s = computeExamStatistics(ex);
+        const colors = ['bg-indigo-600', 'bg-purple-600', 'bg-emerald-500', 'bg-amber-500'];
+        return {
+          ...ex,
+          avg: s.avgScore,
+          mastery: s.classicalMastery,
+          count: s.totalStudents,
+          barColor: colors[idx % colors.length]
+        };
       });
-    }
 
-    return {
-      results,
-      totalStudents,
-      avgScore,
-      highestScore,
-      lowestScore,
-      passedCount,
-      remedialCount,
-      classicalMastery,
-      itemAnalysis
-    };
-  }
-
-  // ==================== VIEW RENDERER ROUTER ====================
-  function renderCurrentMenu() {
-    const container = document.getElementById('main-content-container');
-    const exam = getActiveExam();
-    const stats = computeExamStatistics(exam);
-
-    switch (state.activeMenu) {
-      case 'dashboard':
-        container.innerHTML = renderDashboardView(exam, stats);
-        break;
-      case 'manajemen_ulangan':
-        container.innerHTML = renderManajemenUlanganView();
-        break;
-      case 'input_nilai':
-        container.innerHTML = renderInputNilaiView(exam, stats);
-        break;
-      case 'analisis_butir':
-        container.innerHTML = renderAnalisisButirView(exam, stats);
-        break;
-      case 'remedial_pengayaan':
-        container.innerHTML = renderRemedialPengayaanView(exam, stats);
-        break;
-      case 'manajemen_guru':
-        container.innerHTML = renderManajemenGuruView();
-        break;
-      default:
-        container.innerHTML = renderDashboardView(exam, stats);
-    }
-
-    lucide.createIcons();
-  }
-
-  // ==================== 1. DASHBOARD ANALITIK (FLOWORA BENTO STYLE) ====================
-  function renderDashboardView(exam, stats) {
-    const totalExams = state.exams.length;
-    const strokeDash = `${stats.classicalMastery}, 100`;
-
-    // Calculate per-exam progress bars
-    const examSummaries = state.exams.map((ex, idx) => {
-      const s = computeExamStatistics(ex);
-      const colors = ['bg-indigo-600', 'bg-purple-600', 'bg-emerald-500', 'bg-amber-500'];
-      return {
-        ...ex,
-        avg: s.avgScore,
-        mastery: s.classicalMastery,
-        count: s.totalStudents,
-        barColor: colors[idx % colors.length]
-      };
-    });
-
-    return `
+      return `
       <!-- Top Hero Banner & AI Summary Strip -->
       <div class="glass-surface rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 border border-indigo-100/80 relative overflow-hidden">
         <div class="absolute -right-12 -top-12 w-56 h-56 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
@@ -1116,9 +1116,9 @@
             Analisis Ketuntasan & Kualitas Soal <span class="flowora-gradient-text">${exam ? exam.class_name : 'Sekolah'}</span>
           </h2>
           <p class="text-xs md:text-sm text-slate-600 leading-relaxed">
-            ${exam 
-              ? `Menampilkan evaluasi aktif untuk <strong>${exam.title}</strong> (${exam.subject} • KKM ${exam.kkm}). Sebanyak <strong>${stats.passedCount} dari ${stats.totalStudents} siswa</strong> telah mencapai batas ketuntasan minimal.`
-              : 'Belum ada paket ulangan terpilih. Silakan buat paket ulangan baru untuk memulai analisis otomatis.'}
+            ${exam
+          ? `Menampilkan evaluasi aktif untuk <strong>${exam.title}</strong> (${exam.subject} • KKM ${exam.kkm}). Sebanyak <strong>${stats.passedCount} dari ${stats.totalStudents} siswa</strong> telah mencapai batas ketuntasan minimal.`
+          : 'Belum ada paket ulangan terpilih. Silakan buat paket ulangan baru untuk memulai analisis otomatis.'}
           </p>
         </div>
 
@@ -1335,13 +1335,13 @@
 
       </div>
     `;
-  }
+    }
 
-  // ==================== 2. MANAJEMEN ULANGAN & KUNCI JAWABAN ====================
-  function renderManajemenUlanganView() {
-    const classOptions = state.classes.map(c => `<option value="${c.class_name}">${c.class_name}</option>`).join('');
+    // ==================== 2. MANAJEMEN ULANGAN & KUNCI JAWABAN ====================
+    function renderManajemenUlanganView() {
+      const classOptions = state.classes.map(c => `<option value="${c.class_name}">${c.class_name}</option>`).join('');
 
-    return `
+      return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <!-- Form Buat Paket Ulangan Baru -->
@@ -1424,9 +1424,9 @@
 
           <div class="space-y-3">
             ${state.exams.map(ex => {
-              const s = computeExamStatistics(ex);
-              const isSelected = ex.id === state.activeExamId;
-              return `
+        const s = computeExamStatistics(ex);
+        const isSelected = ex.id === state.activeExamId;
+        return `
                 <div class="p-4 rounded-2xl border transition ${isSelected ? 'bg-indigo-50/70 border-indigo-300 shadow-sm' : 'bg-white border-slate-200/80 hover:border-slate-300'} flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div class="space-y-1.5">
                     <div class="flex items-center gap-2 flex-wrap">
@@ -1458,104 +1458,104 @@
                   </div>
                 </div>
               `;
-            }).join('')}
+      }).join('')}
           </div>
         </div>
 
       </div>
     `;
-  }
-
-  window.syncAnswerKeyLength = function() {
-    const totalInput = document.getElementById('exam-total-q');
-    const keyInput = document.getElementById('exam-answer-key');
-    const counter = document.getElementById('key-length-counter');
-    if (!totalInput || !keyInput || !counter) return;
-
-    const cleanKey = keyInput.value.toUpperCase().replace(/[^A-E]/g, '');
-    keyInput.value = cleanKey;
-    const targetLen = Number(totalInput.value) || 10;
-    counter.textContent = `${cleanKey.length} / ${targetLen} Karakter`;
-    counter.className = cleanKey.length === targetLen
-      ? 'text-[11px] font-extrabold text-emerald-600'
-      : 'text-[11px] font-extrabold text-rose-600';
-  };
-
-  window.handleSaveExam = async function(e) {
-    e.preventDefault();
-    const title = document.getElementById('exam-title').value.trim();
-    const subject = document.getElementById('exam-subject').value.trim();
-    const className = document.getElementById('exam-class').value;
-    const kkm = Number(document.getElementById('exam-kkm').value);
-    const totalQuestions = Number(document.getElementById('exam-total-q').value);
-    const examDate = document.getElementById('exam-date').value;
-    const answerKey = document.getElementById('exam-answer-key').value.toUpperCase().replace(/[^A-E]/g, '');
-
-    if (answerKey.length !== totalQuestions) {
-      showToast(`Panjang Kunci Jawaban (${answerKey.length}) harus sama dengan Jumlah Soal (${totalQuestions})!`, 'warning');
-      return;
     }
 
-    const newExam = {
-      id: crypto.randomUUID(),
-      teacher_id: state.currentUser?.role === 'guru' ? state.currentUser.id : (state.teachers[0]?.id || null),
-      title,
-      subject,
-      class_name: className,
-      kkm,
-      total_questions: totalQuestions,
-      answer_key: answerKey,
-      exam_date: examDate
+    window.syncAnswerKeyLength = function () {
+      const totalInput = document.getElementById('exam-total-q');
+      const keyInput = document.getElementById('exam-answer-key');
+      const counter = document.getElementById('key-length-counter');
+      if (!totalInput || !keyInput || !counter) return;
+
+      const cleanKey = keyInput.value.toUpperCase().replace(/[^A-E]/g, '');
+      keyInput.value = cleanKey;
+      const targetLen = Number(totalInput.value) || 10;
+      counter.textContent = `${cleanKey.length} / ${targetLen} Karakter`;
+      counter.className = cleanKey.length === targetLen
+        ? 'text-[11px] font-extrabold text-emerald-600'
+        : 'text-[11px] font-extrabold text-rose-600';
     };
 
-    if (!IS_PREVIEW && supabase) {
-      const { error } = await supabase.from('exams').insert([newExam]);
-      if (error) {
-        showToast('Gagal menyimpan ke Supabase: ' + error.message, 'danger');
+    window.handleSaveExam = async function (e) {
+      e.preventDefault();
+      const title = document.getElementById('exam-title').value.trim();
+      const subject = document.getElementById('exam-subject').value.trim();
+      const className = document.getElementById('exam-class').value;
+      const kkm = Number(document.getElementById('exam-kkm').value);
+      const totalQuestions = Number(document.getElementById('exam-total-q').value);
+      const examDate = document.getElementById('exam-date').value;
+      const answerKey = document.getElementById('exam-answer-key').value.toUpperCase().replace(/[^A-E]/g, '');
+
+      if (answerKey.length !== totalQuestions) {
+        showToast(`Panjang Kunci Jawaban (${answerKey.length}) harus sama dengan Jumlah Soal (${totalQuestions})!`, 'warning');
         return;
       }
-      await fetchAllSupabaseData();
-    } else {
-      state.exams.unshift(newExam);
-    }
 
-    state.activeExamId = newExam.id;
-    populateExamSelectors();
-    renderCurrentMenu();
-    showToast('Paket ulangan baru berhasil disimpan dan diaktifkan!', 'success');
-  };
+      const newExam = {
+        id: crypto.randomUUID(),
+        teacher_id: state.currentUser?.role === 'guru' ? state.currentUser.id : (state.teachers[0]?.id || null),
+        title,
+        subject,
+        class_name: className,
+        kkm,
+        total_questions: totalQuestions,
+        answer_key: answerKey,
+        exam_date: examDate
+      };
 
-  window.handleDeleteExam = function(examId) {
-    const target = state.exams.find(e => e.id === examId);
-    if (!target) return;
-
-    openConfirmModal(
-      'Hapus Paket Ulangan',
-      `<p>Apakah Anda yakin ingin menghapus paket ulangan <strong>${target.title}</strong> beserta seluruh data nilai siswa di dalamnya?</p>`,
-      async () => {
-        if (!IS_PREVIEW && supabase) {
-          await supabase.from('exams').delete().eq('id', examId);
-          await fetchAllSupabaseData();
-        } else {
-          state.exams = state.exams.filter(e => e.id !== examId);
-          state.examResults = state.examResults.filter(r => r.exam_id !== examId);
+      if (!IS_PREVIEW && supabase) {
+        const { error } = await supabase.from('exams').insert([newExam]);
+        if (error) {
+          showToast('Gagal menyimpan ke Supabase: ' + error.message, 'danger');
+          return;
         }
-        state.activeExamId = state.exams[0]?.id || null;
-        populateExamSelectors();
-        renderCurrentMenu();
-        showToast('Paket ulangan berhasil dihapus.', 'info');
-      },
-      'Ya, Hapus'
-    );
-  };
+        await fetchAllSupabaseData();
+      } else {
+        state.exams.unshift(newExam);
+      }
 
-  // ==================== 3. INPUT NILAI & JAWABAN SISWA ====================
-  function renderInputNilaiView(exam, stats) {
-    if (!exam) {
-      return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Silakan buat Paket Ulangan terlebih dahulu pada menu <strong>Paket Ulangan & Kunci</strong>.</div>`;
-    }
+      state.activeExamId = newExam.id;
+      populateExamSelectors();
+      renderCurrentMenu();
+      showToast('Paket ulangan baru berhasil disimpan dan diaktifkan!', 'success');
+    };
 
-    return `
+    window.handleDeleteExam = function (examId) {
+      const target = state.exams.find(e => e.id === examId);
+      if (!target) return;
+
+      openConfirmModal(
+        'Hapus Paket Ulangan',
+        `<p>Apakah Anda yakin ingin menghapus paket ulangan <strong>${target.title}</strong> beserta seluruh data nilai siswa di dalamnya?</p>`,
+        async () => {
+          if (!IS_PREVIEW && supabase) {
+            await supabase.from('exams').delete().eq('id', examId);
+            await fetchAllSupabaseData();
+          } else {
+            state.exams = state.exams.filter(e => e.id !== examId);
+            state.examResults = state.examResults.filter(r => r.exam_id !== examId);
+          }
+          state.activeExamId = state.exams[0]?.id || null;
+          populateExamSelectors();
+          renderCurrentMenu();
+          showToast('Paket ulangan berhasil dihapus.', 'info');
+        },
+        'Ya, Hapus'
+      );
+    };
+
+    // ==================== 3. INPUT NILAI & JAWABAN SISWA ====================
+    function renderInputNilaiView(exam, stats) {
+      if (!exam) {
+        return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Silakan buat Paket Ulangan terlebih dahulu pada menu <strong>Paket Ulangan & Kunci</strong>.</div>`;
+      }
+
+      return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <!-- Left Form: Input Lembar Jawaban Siswa -->
@@ -1658,14 +1658,14 @@
                 ${stats.results.length === 0 ? `
                   <tr><td colspan="6" class="py-8 text-center text-slate-400">Belum ada jawaban siswa yang diinput pada ulangan ini.</td></tr>
                 ` : stats.results.map(r => {
-                  const keyArr = exam.answer_key.split('');
-                  const ansBadges = keyArr.map((k, idx) => {
-                    const sAns = (r.student_answers[idx] || '-').toUpperCase();
-                    const isRight = sAns === k;
-                    return `<span class="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-mono font-bold ${isRight ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}" title="Soal #${idx+1}: Kunci ${k}, Jawab ${sAns}">${sAns}</span>`;
-                  }).join(' ');
+        const keyArr = exam.answer_key.split('');
+        const ansBadges = keyArr.map((k, idx) => {
+          const sAns = (r.student_answers[idx] || '-').toUpperCase();
+          const isRight = sAns === k;
+          return `<span class="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-mono font-bold ${isRight ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}" title="Soal #${idx + 1}: Kunci ${k}, Jawab ${sAns}">${sAns}</span>`;
+        }).join(' ');
 
-                  return `
+        return `
                     <tr class="hover:bg-slate-50/80 transition">
                       <td class="py-3 px-3">
                         <div class="font-bold text-slate-900">${r.student_name}</div>
@@ -1690,7 +1690,7 @@
                       </td>
                     </tr>
                   `;
-                }).join('')}
+      }).join('')}
               </tbody>
             </table>
           </div>
@@ -1698,123 +1698,123 @@
 
       </div>
     `;
-  }
-
-  window.fillRandomStudentAnswer = function() {
-    const exam = getActiveExam();
-    if (!exam) return;
-    const opts = ['A', 'B', 'C', 'D', 'E'];
-    const key = exam.answer_key.split('');
-    // 75% chance matching key for realistic test data
-    const generated = key.map(k => (Math.random() < 0.75 ? k : opts[Math.floor(Math.random() * opts.length)])).join('');
-    const ansInput = document.getElementById('student-answers');
-    if (ansInput) {
-      ansInput.value = generated;
-      window.previewLiveScore();
-    }
-  };
-
-  window.previewLiveScore = function() {
-    const exam = getActiveExam();
-    const ansInput = document.getElementById('student-answers');
-    const detailEl = document.getElementById('live-grade-detail');
-    const scoreEl = document.getElementById('live-grade-score');
-    if (!exam || !ansInput || !detailEl || !scoreEl) return;
-
-    const cleanAns = ansInput.value.toUpperCase().replace(/[^A-E]/g, '');
-    ansInput.value = cleanAns;
-
-    const key = exam.answer_key.toUpperCase();
-    let correct = 0;
-    for (let i = 0; i < key.length; i++) {
-      if (cleanAns[i] && cleanAns[i] === key[i]) correct++;
-    }
-    const score = Math.round((correct / key.length) * 100);
-    const passed = score >= exam.kkm;
-
-    detailEl.innerHTML = `Benar <strong>${correct}</strong> dari <strong>${key.length}</strong> soal • Status: <strong class="${passed ? 'text-emerald-600' : 'text-amber-600'}">${passed ? 'TUNTAS KKM' : 'PERLU REMEDIAL'}</strong>`;
-    scoreEl.textContent = score;
-    scoreEl.className = `text-2xl font-extrabold ${passed ? 'text-emerald-600' : 'text-amber-600'}`;
-  };
-
-  window.handleSaveStudentResult = async function(e) {
-    e.preventDefault();
-    const exam = getActiveExam();
-    if (!exam) return;
-
-    const studentName = document.getElementById('student-name').value.trim();
-    const studentNis = document.getElementById('student-nis').value.trim();
-    const studentAnswers = document.getElementById('student-answers').value.toUpperCase().replace(/[^A-E]/g, '');
-    const notes = document.getElementById('student-notes').value.trim();
-
-    if (studentAnswers.length !== Number(exam.total_questions)) {
-      showToast(`Jumlah jawaban siswa (${studentAnswers.length}) harus ${exam.total_questions} huruf!`, 'warning');
-      return;
     }
 
-    let correctCount = 0;
-    for (let i = 0; i < exam.answer_key.length; i++) {
-      if (studentAnswers[i] === exam.answer_key[i]) correctCount++;
-    }
-    const score = Math.round((correctCount / exam.total_questions) * 100);
-    const isPassed = score >= Number(exam.kkm);
-
-    const newResult = {
-      id: crypto.randomUUID(),
-      exam_id: exam.id,
-      student_name: studentName,
-      student_nis: studentNis,
-      student_answers: studentAnswers,
-      correct_count: correctCount,
-      score,
-      is_passed: isPassed,
-      notes: notes || (isPassed ? 'Tuntas KKM dengan baik.' : 'Perlu remedial pada butir soal yang salah.')
+    window.fillRandomStudentAnswer = function () {
+      const exam = getActiveExam();
+      if (!exam) return;
+      const opts = ['A', 'B', 'C', 'D', 'E'];
+      const key = exam.answer_key.split('');
+      // 75% chance matching key for realistic test data
+      const generated = key.map(k => (Math.random() < 0.75 ? k : opts[Math.floor(Math.random() * opts.length)])).join('');
+      const ansInput = document.getElementById('student-answers');
+      if (ansInput) {
+        ansInput.value = generated;
+        window.previewLiveScore();
+      }
     };
 
-    if (!IS_PREVIEW && supabase) {
-      const { error } = await supabase.from('exam_results').insert([newResult]);
-      if (error) {
-        showToast('Gagal menyimpan nilai ke Supabase: ' + error.message, 'danger');
+    window.previewLiveScore = function () {
+      const exam = getActiveExam();
+      const ansInput = document.getElementById('student-answers');
+      const detailEl = document.getElementById('live-grade-detail');
+      const scoreEl = document.getElementById('live-grade-score');
+      if (!exam || !ansInput || !detailEl || !scoreEl) return;
+
+      const cleanAns = ansInput.value.toUpperCase().replace(/[^A-E]/g, '');
+      ansInput.value = cleanAns;
+
+      const key = exam.answer_key.toUpperCase();
+      let correct = 0;
+      for (let i = 0; i < key.length; i++) {
+        if (cleanAns[i] && cleanAns[i] === key[i]) correct++;
+      }
+      const score = Math.round((correct / key.length) * 100);
+      const passed = score >= exam.kkm;
+
+      detailEl.innerHTML = `Benar <strong>${correct}</strong> dari <strong>${key.length}</strong> soal • Status: <strong class="${passed ? 'text-emerald-600' : 'text-amber-600'}">${passed ? 'TUNTAS KKM' : 'PERLU REMEDIAL'}</strong>`;
+      scoreEl.textContent = score;
+      scoreEl.className = `text-2xl font-extrabold ${passed ? 'text-emerald-600' : 'text-amber-600'}`;
+    };
+
+    window.handleSaveStudentResult = async function (e) {
+      e.preventDefault();
+      const exam = getActiveExam();
+      if (!exam) return;
+
+      const studentName = document.getElementById('student-name').value.trim();
+      const studentNis = document.getElementById('student-nis').value.trim();
+      const studentAnswers = document.getElementById('student-answers').value.toUpperCase().replace(/[^A-E]/g, '');
+      const notes = document.getElementById('student-notes').value.trim();
+
+      if (studentAnswers.length !== Number(exam.total_questions)) {
+        showToast(`Jumlah jawaban siswa (${studentAnswers.length}) harus ${exam.total_questions} huruf!`, 'warning');
         return;
       }
-      await fetchAllSupabaseData();
-    } else {
-      state.examResults.push(newResult);
-    }
 
-    renderCurrentMenu();
-    showToast(`Nilai ${studentName} (Skor: ${score}) berhasil disimpan!`, 'success');
-  };
+      let correctCount = 0;
+      for (let i = 0; i < exam.answer_key.length; i++) {
+        if (studentAnswers[i] === exam.answer_key[i]) correctCount++;
+      }
+      const score = Math.round((correctCount / exam.total_questions) * 100);
+      const isPassed = score >= Number(exam.kkm);
 
-  window.handleDeleteStudentResult = function(resultId) {
-    openConfirmModal(
-      'Hapus Data Nilai Siswa',
-      '<p>Apakah Anda yakin ingin menghapus data jawaban siswa ini dari analisis ulangan?</p>',
-      async () => {
-        if (!IS_PREVIEW && supabase) {
-          await supabase.from('exam_results').delete().eq('id', resultId);
-          await fetchAllSupabaseData();
-        } else {
-          state.examResults = state.examResults.filter(r => r.id !== resultId);
+      const newResult = {
+        id: crypto.randomUUID(),
+        exam_id: exam.id,
+        student_name: studentName,
+        student_nis: studentNis,
+        student_answers: studentAnswers,
+        correct_count: correctCount,
+        score,
+        is_passed: isPassed,
+        notes: notes || (isPassed ? 'Tuntas KKM dengan baik.' : 'Perlu remedial pada butir soal yang salah.')
+      };
+
+      if (!IS_PREVIEW && supabase) {
+        const { error } = await supabase.from('exam_results').insert([newResult]);
+        if (error) {
+          showToast('Gagal menyimpan nilai ke Supabase: ' + error.message, 'danger');
+          return;
         }
-        renderCurrentMenu();
-        showToast('Data jawaban siswa dihapus.', 'info');
-      },
-      'Ya, Hapus'
-    );
-  };
+        await fetchAllSupabaseData();
+      } else {
+        state.examResults.push(newResult);
+      }
 
-  // ==================== 4. ANALISIS BUTIR SOAL (ITEM ANALYSIS) ====================
-  function renderAnalisisButirView(exam, stats) {
-    if (!exam) {
-      return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Pilih paket ulangan terlebih dahulu.</div>`;
-    }
+      renderCurrentMenu();
+      showToast(`Nilai ${studentName} (Skor: ${score}) berhasil disimpan!`, 'success');
+    };
 
-    const acceptedCount = stats.itemAnalysis.filter(i => i.statusAction === 'Diterima (Bank Soal)').length;
-    const reviseCount = stats.itemAnalysis.filter(i => i.statusAction === 'Perlu Revisi').length;
-    const discardCount = stats.itemAnalysis.filter(i => i.statusAction === 'Dibuang / Ganti').length;
+    window.handleDeleteStudentResult = function (resultId) {
+      openConfirmModal(
+        'Hapus Data Nilai Siswa',
+        '<p>Apakah Anda yakin ingin menghapus data jawaban siswa ini dari analisis ulangan?</p>',
+        async () => {
+          if (!IS_PREVIEW && supabase) {
+            await supabase.from('exam_results').delete().eq('id', resultId);
+            await fetchAllSupabaseData();
+          } else {
+            state.examResults = state.examResults.filter(r => r.id !== resultId);
+          }
+          renderCurrentMenu();
+          showToast('Data jawaban siswa dihapus.', 'info');
+        },
+        'Ya, Hapus'
+      );
+    };
 
-    return `
+    // ==================== 4. ANALISIS BUTIR SOAL (ITEM ANALYSIS) ====================
+    function renderAnalisisButirView(exam, stats) {
+      if (!exam) {
+        return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Pilih paket ulangan terlebih dahulu.</div>`;
+      }
+
+      const acceptedCount = stats.itemAnalysis.filter(i => i.statusAction === 'Diterima (Bank Soal)').length;
+      const reviseCount = stats.itemAnalysis.filter(i => i.statusAction === 'Perlu Revisi').length;
+      const discardCount = stats.itemAnalysis.filter(i => i.statusAction === 'Dibuang / Ganti').length;
+
+      return `
       <!-- Summary Metrics Row for Item Quality -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="glass-surface rounded-3xl p-5 flex items-center justify-between border-l-4 border-l-emerald-500">
@@ -1908,11 +1908,11 @@
                   </td>
                   <td class="py-3.5 px-3 text-center font-mono text-[11px]">
                     <div class="inline-flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-xl">
-                      <span class="${item.key==='A'?'font-extrabold text-indigo-600':''}">A:${item.optionCounts.A}</span>•
-                      <span class="${item.key==='B'?'font-extrabold text-indigo-600':''}">B:${item.optionCounts.B}</span>•
-                      <span class="${item.key==='C'?'font-extrabold text-indigo-600':''}">C:${item.optionCounts.C}</span>•
-                      <span class="${item.key==='D'?'font-extrabold text-indigo-600':''}">D:${item.optionCounts.D}</span>•
-                      <span class="${item.key==='E'?'font-extrabold text-indigo-600':''}">E:${item.optionCounts.E}</span>
+                      <span class="${item.key === 'A' ? 'font-extrabold text-indigo-600' : ''}">A:${item.optionCounts.A}</span>•
+                      <span class="${item.key === 'B' ? 'font-extrabold text-indigo-600' : ''}">B:${item.optionCounts.B}</span>•
+                      <span class="${item.key === 'C' ? 'font-extrabold text-indigo-600' : ''}">C:${item.optionCounts.C}</span>•
+                      <span class="${item.key === 'D' ? 'font-extrabold text-indigo-600' : ''}">D:${item.optionCounts.D}</span>•
+                      <span class="${item.key === 'E' ? 'font-extrabold text-indigo-600' : ''}">E:${item.optionCounts.E}</span>
                     </div>
                   </td>
                   <td class="py-3.5 px-3 text-right">
@@ -1927,28 +1927,28 @@
         </div>
       </div>
     `;
-  }
-
-  // ==================== 5. PROGRAM REMEDIAL & PENGAYAAN ====================
-  function renderRemedialPengayaanView(exam, stats) {
-    if (!exam) {
-      return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Pilih paket ulangan terlebih dahulu.</div>`;
     }
 
-    const remedialStudents = stats.results.filter(r => Number(r.score) < Number(exam.kkm));
-    const enrichmentStudents = stats.results.filter(r => Number(r.score) >= Number(exam.kkm));
-
-    // Find failed item numbers for each remedial student
-    const getWeakQuestions = (ansStr) => {
-      const key = exam.answer_key.toUpperCase();
-      const missed = [];
-      for (let i = 0; i < key.length; i++) {
-        if ((ansStr[i] || '').toUpperCase() !== key[i]) missed.push(i + 1);
+    // ==================== 5. PROGRAM REMEDIAL & PENGAYAAN ====================
+    function renderRemedialPengayaanView(exam, stats) {
+      if (!exam) {
+        return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Pilih paket ulangan terlebih dahulu.</div>`;
       }
-      return missed.length > 0 ? `No. ${missed.join(', ')}` : '-';
-    };
 
-    return `
+      const remedialStudents = stats.results.filter(r => Number(r.score) < Number(exam.kkm));
+      const enrichmentStudents = stats.results.filter(r => Number(r.score) >= Number(exam.kkm));
+
+      // Find failed item numbers for each remedial student
+      const getWeakQuestions = (ansStr) => {
+        const key = exam.answer_key.toUpperCase();
+        const missed = [];
+        for (let i = 0; i < key.length; i++) {
+          if ((ansStr[i] || '').toUpperCase() !== key[i]) missed.push(i + 1);
+        }
+        return missed.length > 0 ? `No. ${missed.join(', ')}` : '-';
+      };
+
+      return `
       <!-- Header Action Bar -->
       <div class="glass-surface rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -2054,36 +2054,36 @@
 
       </div>
     `;
-  }
+    }
 
-  window.exportAnalysisCSV = function() {
-    const exam = getActiveExam();
-    if (!exam) return;
-    const stats = computeExamStatistics(exam);
+    window.exportAnalysisCSV = function () {
+      const exam = getActiveExam();
+      if (!exam) return;
+      const stats = computeExamStatistics(exam);
 
-    let csv = `Laporan Analisis Hasil Ulangan - ${exam.title} (${exam.class_name})\n`;
-    csv += `Mata Pelajaran,${exam.subject},KKM,${exam.kkm},Tanggal,${exam.exam_date}\n\n`;
-    csv += `NIS,Nama Siswa,Jawaban Siswa,Jumlah Benar,Nilai Akhir,Status Ketuntasan,Catatan\n`;
+      let csv = `Laporan Analisis Hasil Ulangan - ${exam.title} (${exam.class_name})\n`;
+      csv += `Mata Pelajaran,${exam.subject},KKM,${exam.kkm},Tanggal,${exam.exam_date}\n\n`;
+      csv += `NIS,Nama Siswa,Jawaban Siswa,Jumlah Benar,Nilai Akhir,Status Ketuntasan,Catatan\n`;
 
-    stats.results.forEach(r => {
-      const status = r.score >= exam.kkm ? 'TUNTAS' : 'REMEDIAL';
-      csv += `"${r.student_nis}","${r.student_name}","${r.student_answers}",${r.correct_count},${r.score},${status},"${r.notes || ''}"\n`;
-    });
+      stats.results.forEach(r => {
+        const status = r.score >= exam.kkm ? 'TUNTAS' : 'REMEDIAL';
+        csv += `"${r.student_nis}","${r.student_name}","${r.student_answers}",${r.correct_count},${r.score},${status},"${r.notes || ''}"\n`;
+      });
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Analisis_Ulangan_${exam.class_name}_${exam.title.replace(/\s+/g, '_')}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    showToast('File CSV Analisis Nilai berhasil diunduh!', 'success');
-  };
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Analisis_Ulangan_${exam.class_name}_${exam.title.replace(/\s+/g, '_')}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast('File CSV Analisis Nilai berhasil diunduh!', 'success');
+    };
 
-  // ==================== 6. MANAJEMEN GURU & KELAS (KHUSUS ADMIN) ====================
-  function renderManajemenGuruView() {
-    return `
+    // ==================== 6. MANAJEMEN GURU & KELAS (KHUSUS ADMIN) ====================
+    function renderManajemenGuruView() {
+      return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <!-- Form Tambah Akun Guru (Untuk Hybrid Login) -->
@@ -2214,102 +2214,103 @@
 
       </div>
     `;
-  }
-
-  window.handleSaveTeacher = async function(e) {
-    e.preventDefault();
-    const fullName = document.getElementById('t-fullname').value.trim();
-    const username = document.getElementById('t-username').value.trim();
-    const password = document.getElementById('t-password').value.trim();
-    const subject = document.getElementById('t-subject').value.trim();
-    const classAssigned = document.getElementById('t-classes').value.trim();
-
-    const newTeacher = {
-      id: crypto.randomUUID(),
-      full_name: fullName,
-      username,
-      password,
-      subject,
-      class_assigned: classAssigned
-    };
-
-    if (!IS_PREVIEW && supabase) {
-      const { error } = await supabase.from('teachers').insert([newTeacher]);
-      if (error) {
-        showToast('Gagal menambah guru: ' + error.message, 'danger');
-        return;
-      }
-      await fetchAllSupabaseData();
-    } else {
-      state.teachers.push(newTeacher);
     }
 
-    renderCurrentMenu();
-    showToast(`Akun Guru ${fullName} berhasil ditambahkan!`, 'success');
-  };
+    window.handleSaveTeacher = async function (e) {
+      e.preventDefault();
+      const fullName = document.getElementById('t-fullname').value.trim();
+      const username = document.getElementById('t-username').value.trim();
+      const password = document.getElementById('t-password').value.trim();
+      const subject = document.getElementById('t-subject').value.trim();
+      const classAssigned = document.getElementById('t-classes').value.trim();
 
-  window.handleDeleteTeacher = function(teacherId) {
-    openConfirmModal(
-      'Hapus Akun Guru',
-      '<p>Apakah Anda yakin ingin mencabut akses login guru ini?</p>',
-      async () => {
-        if (!IS_PREVIEW && supabase) {
-          await supabase.from('teachers').delete().eq('id', teacherId);
-          await fetchAllSupabaseData();
-        } else {
-          state.teachers = state.teachers.filter(t => t.id !== teacherId);
+      const newTeacher = {
+        id: crypto.randomUUID(),
+        full_name: fullName,
+        username,
+        password,
+        subject,
+        class_assigned: classAssigned
+      };
+
+      if (!IS_PREVIEW && supabase) {
+        const { error } = await supabase.from('teachers').insert([newTeacher]);
+        if (error) {
+          showToast('Gagal menambah guru: ' + error.message, 'danger');
+          return;
         }
-        renderCurrentMenu();
-        showToast('Akun guru berhasil dihapus.', 'info');
-      },
-      'Ya, Hapus'
-    );
-  };
+        await fetchAllSupabaseData();
+      } else {
+        state.teachers.push(newTeacher);
+      }
 
-  window.handleSaveClass = async function(e) {
-    e.preventDefault();
-    const className = document.getElementById('c-name').value.trim();
-    const homeroom = document.getElementById('c-homeroom').value.trim();
-
-    const newClass = {
-      id: crypto.randomUUID(),
-      class_name: className,
-      homeroom_teacher: homeroom,
-      student_count: 32
+      renderCurrentMenu();
+      showToast(`Akun Guru ${fullName} berhasil ditambahkan!`, 'success');
     };
 
-    if (!IS_PREVIEW && supabase) {
-      const { error } = await supabase.from('classes').insert([newClass]);
-      if (error) {
-        showToast('Gagal menyimpan kelas: ' + error.message, 'danger');
-        return;
+    window.handleDeleteTeacher = function (teacherId) {
+      openConfirmModal(
+        'Hapus Akun Guru',
+        '<p>Apakah Anda yakin ingin mencabut akses login guru ini?</p>',
+        async () => {
+          if (!IS_PREVIEW && supabase) {
+            await supabase.from('teachers').delete().eq('id', teacherId);
+            await fetchAllSupabaseData();
+          } else {
+            state.teachers = state.teachers.filter(t => t.id !== teacherId);
+          }
+          renderCurrentMenu();
+          showToast('Akun guru berhasil dihapus.', 'info');
+        },
+        'Ya, Hapus'
+      );
+    };
+
+    window.handleSaveClass = async function (e) {
+      e.preventDefault();
+      const className = document.getElementById('c-name').value.trim();
+      const homeroom = document.getElementById('c-homeroom').value.trim();
+
+      const newClass = {
+        id: crypto.randomUUID(),
+        class_name: className,
+        homeroom_teacher: homeroom,
+        student_count: 32
+      };
+
+      if (!IS_PREVIEW && supabase) {
+        const { error } = await supabase.from('classes').insert([newClass]);
+        if (error) {
+          showToast('Gagal menyimpan kelas: ' + error.message, 'danger');
+          return;
+        }
+        await fetchAllSupabaseData();
+      } else {
+        state.classes.push(newClass);
       }
-      await fetchAllSupabaseData();
-    } else {
-      state.classes.push(newClass);
-    }
 
-    renderCurrentMenu();
-    showToast(`Kelas ${className} berhasil ditambahkan!`, 'success');
-  };
+      renderCurrentMenu();
+      showToast(`Kelas ${className} berhasil ditambahkan!`, 'success');
+    };
 
-  window.handleDeleteClass = async function(classId) {
-    if (!IS_PREVIEW && supabase) {
-      await supabase.from('classes').delete().eq('id', classId);
-      await fetchAllSupabaseData();
-    } else {
-      state.classes = state.classes.filter(c => c.id !== classId);
-    }
-    renderCurrentMenu();
-    showToast('Data kelas dihapus.', 'info');
-  };
+    window.handleDeleteClass = async function (classId) {
+      if (!IS_PREVIEW && supabase) {
+        await supabase.from('classes').delete().eq('id', classId);
+        await fetchAllSupabaseData();
+      } else {
+        state.classes = state.classes.filter(c => c.id !== classId);
+      }
+      renderCurrentMenu();
+      showToast('Data kelas dihapus.', 'info');
+    };
 
-  // ==================== INITIALIZE APP ON LOAD ====================
-  window.addEventListener('DOMContentLoaded', async () => {
-    registerSingleFilePWA();
-    await autoSetupDatabase();
-    lucide.createIcons();
-  });
-</script>
+    // ==================== INITIALIZE APP ON LOAD ====================
+    window.addEventListener('DOMContentLoaded', async () => {
+      registerSingleFilePWA();
+      await autoSetupDatabase();
+      lucide.createIcons();
+    });
+  </script>
 </body>
+
 </html>
