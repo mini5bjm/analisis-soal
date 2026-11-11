@@ -24,6 +24,9 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
+  <!-- SheetJS (Excel .xlsx Template, Import & Ekspor) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -632,8 +635,21 @@
       SESSION: 'flowora_session_v1',
       CACHE: 'flowora_state_cache_v1',
       PENDING_SYNC: 'flowora_pending_sync_v1',
-      SUBJECTS: 'flowora_subjects_v1'
+      SUBJECTS: 'flowora_subjects_v1',
+      STUDENTS: 'flowora_students_v1'
     };
+
+    const GRADE_CLASS_OPTIONS = [
+      'Kelas 1',
+      'Kelas 2',
+      'Kelas 3',
+      'Kelas 4',
+      'Kelas 5',
+      'Kelas 6'
+    ];
+    const TEACHER_CLASS_OPTIONS = ['Semua Kelas', ...GRADE_CLASS_OPTIONS];
+    const TEACHER_JABATAN_OPTIONS = ['Wali Kelas', 'Guru Mapel'];
+    const TEACHER_ID_TYPES = ['NIP', 'NUPTK', 'PegID', 'NPK'];
 
     const EXAM_TITLE_OPTIONS = [
       'Sumatif Akhir Semester (SAS)',
@@ -718,8 +734,12 @@
       isSyncing: false,
       lastSyncedAt: null,
       hasSubjectsTable: null,
+      hasStudentsTable: null,
       deletedSubjectNames: [],
+      studentClassFilter: 'ALL',
+      studentSearchQuery: '',
       subjects: [],
+      students: [],
       teachers: [],
       classes: [],
       exams: [],
@@ -862,6 +882,7 @@
           exams: state.exams,
           examResults: state.examResults,
           subjects: state.subjects,
+          students: state.students,
           deletedSubjectNames: state.deletedSubjectNames,
           activeExamId: state.activeExamId
         }));
@@ -878,11 +899,28 @@
         if (Array.isArray(cached.exams)) state.exams = cached.exams;
         if (Array.isArray(cached.examResults)) state.examResults = cached.examResults;
         if (Array.isArray(cached.subjects)) state.subjects = cached.subjects;
+        if (Array.isArray(cached.students)) state.students = cached.students;
         if (Array.isArray(cached.deletedSubjectNames)) state.deletedSubjectNames = cached.deletedSubjectNames;
         if (cached.activeExamId) state.activeExamId = cached.activeExamId;
         return true;
       } catch (e) {
         return false;
+      }
+    }
+
+    function saveStudentsToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(state.students || []));
+      } catch (e) { }
+    }
+
+    function loadStudentsFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.STUDENTS);
+        const parsed = raw ? JSON.parse(raw) : null;
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
       }
     }
 
@@ -1214,6 +1252,137 @@
       saveCacheToStorage();
     }
 
+    // ==================== HELPERS: METADATA GURU, KELAS & EXCEL (.XLSX) ====================
+    function normalizeTeacherIdType(val) {
+      const str = String(val || '').trim().toLowerCase();
+      const matched = TEACHER_ID_TYPES.find(t => t.toLowerCase() === str);
+      if (matched) return matched;
+      if (str.includes('nuptk')) return 'NUPTK';
+      if (str.includes('peg')) return 'PegID';
+      if (str.includes('npk')) return 'NPK';
+      return 'NIP';
+    }
+
+    function normalizeTeacherJabatan(val) {
+      const str = String(val || '').trim().toLowerCase();
+      if (str.includes('wali')) return 'Wali Kelas';
+      return 'Guru Mapel';
+    }
+
+    function normalizeTeacherClass(val) {
+      const str = String(val || '').trim();
+      const lower = str.toLowerCase();
+      if (!str || lower.includes('semua') || lower.includes('seluruh')) return 'Semua Kelas';
+      const digitMatch = lower.match(/\b([1-6])\b/);
+      if (digitMatch) return `Kelas ${digitMatch[1]}`;
+      const matched = TEACHER_CLASS_OPTIONS.find(c => c.toLowerCase() === lower);
+      return matched || str;
+    }
+
+    function normalizeGradeClass(val) {
+      const str = String(val || '').trim();
+      const lower = str.toLowerCase();
+      const digitMatch = lower.match(/\b([1-6])\b/);
+      if (digitMatch) return `Kelas ${digitMatch[1]}`;
+      const matched = GRADE_CLASS_OPTIONS.find(c => c.toLowerCase() === lower);
+      return matched || (str || 'Kelas 1');
+    }
+
+    /** Encode kelas ampuan, jabatan, dan jenis ID di kolom class_assigned agar kompatibel penuh dengan tabel teachers Supabase. */
+    function encodeTeacherMeta(classAssigned, jabatan, idType) {
+      const cls = normalizeTeacherClass(classAssigned);
+      const jab = normalizeTeacherJabatan(jabatan);
+      const idT = normalizeTeacherIdType(idType);
+      return `${cls} | ${jab} | ${idT}`;
+    }
+
+    /** Decode kelas ampuan, jabatan, dan jenis ID dari object guru atau user aktif. */
+    function decodeTeacherMeta(teacher) {
+      const raw = String(teacher?.class_assigned || '').trim();
+      const parts = raw.split('|').map(p => p.trim()).filter(Boolean);
+      if (parts.length >= 3) {
+        return {
+          classAssigned: parts[0],
+          jabatan: normalizeTeacherJabatan(parts[1]),
+          idType: normalizeTeacherIdType(parts[2])
+        };
+      }
+      if (parts.length === 2) {
+        return {
+          classAssigned: parts[0],
+          jabatan: normalizeTeacherJabatan(parts[1]),
+          idType: 'NIP'
+        };
+      }
+      return {
+        classAssigned: raw || 'Semua Kelas',
+        jabatan: 'Guru Mapel',
+        idType: 'NIP'
+      };
+    }
+
+    function formatTeacherHeaderSub(user) {
+      if (!user) return '';
+      if (user.role === 'admin') return `${user.subject} • ${user.class_assigned}`;
+      const meta = decodeTeacherMeta(user);
+      return `${meta.jabatan} • ${meta.classAssigned} • ${user.subject || '-'}`;
+    }
+
+    function ensureXlsxLoaded() {
+      if (!window.XLSX) {
+        showToast('Library Excel (.xlsx) gagal dimuat. Pastikan koneksi internet aktif lalu refresh halaman.', 'danger');
+        return false;
+      }
+      return true;
+    }
+
+    /** Unduh workbook Excel (.xlsx) dengan lebar kolom otomatis dan dukungan sel bertipe teks. */
+    function downloadXlsxWorkbook(filename, sheets) {
+      if (!ensureXlsxLoaded()) return;
+      const wb = XLSX.utils.book_new();
+      sheets.forEach(({ name, aoa, colWidths = [], textCols = [] }) => {
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        if (colWidths.length > 0) {
+          ws['!cols'] = colWidths.map(w => ({ wch: w }));
+        }
+        if (textCols.length > 0) {
+          const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+          for (let r = range.s.r + 1; r <= range.e.r; r++) {
+            textCols.forEach(c => {
+              const addr = XLSX.utils.encode_cell({ r, c });
+              if (ws[addr]) {
+                ws[addr].t = 's';
+                ws[addr].v = String(ws[addr].v ?? '');
+              }
+            });
+          }
+        }
+        XLSX.utils.book_append_sheet(wb, ws, name);
+      });
+      XLSX.writeFile(wb, filename);
+    }
+
+    async function readXlsxFirstSheetRows(file) {
+      if (!ensureXlsxLoaded()) return null;
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const firstSheetName = wb.SheetNames[0];
+      if (!firstSheetName) return [];
+      const ws = wb.Sheets[firstSheetName];
+      return XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+    }
+
+    function pickExcelVal(row, aliases) {
+      const map = new Map();
+      Object.keys(row || {}).forEach(k => {
+        map.set(k.trim().toLowerCase().replace(/\s+/g, ' '), row[k]);
+      });
+      for (const alias of aliases) {
+        if (map.has(alias)) return String(map.get(alias) ?? '').trim();
+      }
+      return '';
+    }
+
     function getPendingSyncQueue() {
       try {
         const raw = localStorage.getItem(STORAGE_KEYS.PENDING_SYNC);
@@ -1356,6 +1525,7 @@
       for (let i = 0; i < queue.length; i++) {
         const op = queue[i];
         if (op.table === 'subjects' && state.hasSubjectsTable === false) continue;
+        if (op.table === 'students' && state.hasStudentsTable === false) continue;
         try {
           let res;
           if (op.action === 'upsert') {
@@ -1365,8 +1535,13 @@
           }
 
           if (res?.error) {
-            if (op.table === 'subjects' && /does not exist|schema cache|not find the table|PGRST205|42P01/i.test(res.error.message || res.error.code || '')) {
+            const isMissingTable = /does not exist|schema cache|not find the table|PGRST205|42P01/i.test(res.error.message || res.error.code || '');
+            if (isMissingTable && op.table === 'subjects') {
               state.hasSubjectsTable = false;
+              continue;
+            }
+            if (isMissingTable && op.table === 'students') {
+              state.hasStudentsTable = false;
               continue;
             }
             const isNetworkLike = !navigator.onLine || /fetch|network|timeout|load failed|offline|abort/i.test(res.error.message || '');
@@ -1390,8 +1565,12 @@
     function flushPendingSyncKeepalive() {
       saveSessionToStorage();
       saveCacheToStorage();
+      saveStudentsToStorage();
       if (IS_PREVIEW || !supabase) return;
-      const queue = getPendingSyncQueue();
+      const queue = getPendingSyncQueue().filter(op =>
+        !(op.table === 'subjects' && state.hasSubjectsTable === false) &&
+        !(op.table === 'students' && state.hasStudentsTable === false)
+      );
       if (queue.length === 0) return;
 
       const token = state.supabaseAccessToken || SUPABASE_ANON_KEY;
@@ -1593,6 +1772,14 @@
     }
 
     // ==================== AUTO SETUP DATABASE (HYBRID / SUPABASE) ====================
+    function ensureStudentsLoadedFromLocal() {
+      const localStudents = loadStudentsFromStorage();
+      if (state.students.length === 0 && localStudents.length > 0) {
+        state.students = localStudents;
+      }
+      saveStudentsToStorage();
+    }
+
     async function autoSetupDatabase() {
       if (IS_PREVIEW || !supabase) {
         // Load in-memory dummy data ONLY if no cached state exists
@@ -1600,6 +1787,7 @@
         if (state.classes.length === 0) state.classes = structuredClone(INITIAL_SEED_DATA.classes);
         if (state.exams.length === 0) state.exams = structuredClone(INITIAL_SEED_DATA.exams);
         if (state.examResults.length === 0) state.examResults = structuredClone(INITIAL_SEED_DATA.examResults);
+        ensureStudentsLoadedFromLocal();
         mergeSubjectsState();
         if (!state.activeExamId) state.activeExamId = state.exams[0]?.id || null;
         state.lastSyncedAt = new Date();
@@ -1619,7 +1807,7 @@
           // Suntikkan akun Guru awal otomatis agar Guru langsung bisa login pertama kali
           await supabase.from('teachers').insert(INITIAL_SEED_DATA.teachers);
           await supabase.from('classes').insert(INITIAL_SEED_DATA.classes);
-          showToast('Akun Guru & Kelas awal berhasil dibuat otomatis di Supabase!', 'success');
+          showToast('Akun Guru awal berhasil dibuat otomatis di Supabase!', 'success');
         }
 
         await fetchAllSupabaseData();
@@ -1628,6 +1816,7 @@
         updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
       } catch (err) {
         console.error('Supabase AutoSetup Error:', err);
+        ensureStudentsLoadedFromLocal();
         mergeSubjectsState();
         updateSyncBadge('pending');
         showToast('Gagal sinkronisasi ke Supabase. Cek koneksi atau script SQL.', 'warning');
@@ -1636,6 +1825,7 @@
 
     async function fetchAllSupabaseData() {
       if (IS_PREVIEW || !supabase) {
+        ensureStudentsLoadedFromLocal();
         mergeSubjectsState();
         return;
       }
@@ -1665,6 +1855,26 @@
         } catch (e) {
           state.hasSubjectsTable = false;
         }
+      }
+
+      if (state.hasStudentsTable !== false) {
+        try {
+          const stuRes = await supabase.from('students').select('*').order('class_name', { ascending: true }).order('full_name', { ascending: true });
+          if (stuRes.error) {
+            if (/does not exist|schema cache|not find the table|PGRST205|42P01/i.test(stuRes.error.message || stuRes.error.code || '')) {
+              state.hasStudentsTable = false;
+            }
+          } else if (Array.isArray(stuRes.data)) {
+            state.hasStudentsTable = true;
+            state.students = stuRes.data;
+            saveStudentsToStorage();
+          }
+        } catch (e) {
+          state.hasStudentsTable = false;
+        }
+      }
+      if (state.hasStudentsTable !== true) {
+        ensureStudentsLoadedFromLocal();
       }
 
       mergeSubjectsState({ dbSubjects });
@@ -1964,7 +2174,7 @@
       const initials = u.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
       document.getElementById('user-avatar-circle').textContent = initials;
       document.getElementById('user-display-name').textContent = u.full_name;
-      document.getElementById('user-display-sub').textContent = `${u.subject} • ${u.class_assigned}`;
+      document.getElementById('user-display-sub').textContent = formatTeacherHeaderSub(u);
 
       const roleBadge = document.getElementById('sidebar-role-badge');
       if (u.role === 'admin') {
@@ -1990,7 +2200,8 @@
       { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Indeks tingkat kesukaran (P), daya pembeda (D), dan kualitas butir soal', roles: ['admin', 'guru'] },
       { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['admin', 'guru'] },
       { id: 'manajemen_mapel', label: 'Mapel & Guru Pengampu', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Tambah mata pelajaran dan tentukan guru yang mengampu setiap mapel', roles: ['admin', 'guru'] },
-      { id: 'manajemen_guru', label: 'Data Guru & Kelas', shortLabel: 'Guru/Kelas', icon: 'users-round', subtitle: 'Manajemen akun login guru mata pelajaran dan master kelas sekolah', roles: ['admin'] }
+      { id: 'manajemen_siswa', label: 'Data Siswa', shortLabel: 'Siswa', icon: 'graduation-cap', subtitle: 'Kelola data siswa per kelas, NIS/NISN, serta template, import & ekspor Excel', roles: ['admin', 'guru'] },
+      { id: 'manajemen_guru', label: 'Data Guru', shortLabel: 'Guru', icon: 'users-round', subtitle: 'Manajemen akun guru, jenis ID, jabatan, kelas ampuan, serta template & ekspor Excel', roles: ['admin'] }
     ];
 
     function populateExamSelectors() {
@@ -2248,6 +2459,7 @@
       }
 
       return {
+        examMeta,
         results,
         totalStudents,
         avgScore,
@@ -2284,6 +2496,9 @@
           break;
         case 'manajemen_mapel':
           container.innerHTML = renderManajemenMapelView();
+          break;
+        case 'manajemen_siswa':
+          container.innerHTML = renderManajemenSiswaView();
           break;
         case 'manajemen_guru':
           container.innerHTML = renderManajemenGuruView();
@@ -2560,7 +2775,11 @@
     function renderManajemenUlanganView() {
       if (state.subjects.length === 0) mergeSubjectsState();
 
-      const classOptions = state.classes.map(c => `<option value="${escapeHtml(c.class_name)}">${escapeHtml(c.class_name)}</option>`).join('');
+      const teacherGrade = state.currentUser?.role === 'guru' ? decodeTeacherMeta(state.currentUser).classAssigned : '';
+      const defaultExamClass = GRADE_CLASS_OPTIONS.includes(teacherGrade) ? teacherGrade : GRADE_CLASS_OPTIONS[0];
+      const classOptions = GRADE_CLASS_OPTIONS.map(cls =>
+        `<option value="${escapeHtml(cls)}" ${cls === defaultExamClass ? 'selected' : ''}>${escapeHtml(cls)}</option>`
+      ).join('');
       const titleOptions = EXAM_TITLE_OPTIONS.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
       const qTypeOptions = Object.values(QUESTION_TYPES).map(qt => `<option value="${qt.id}">${qt.label}</option>`).join('');
 
@@ -2951,6 +3170,22 @@
           </div>
 
           <form onsubmit="window.handleSaveStudentResult(event)" class="space-y-4">
+            ${state.students.length > 0 ? (() => {
+        const matchingStudents = state.students.filter(stu => stu.class_name === exam.class_name);
+        const listToPick = matchingStudents.length > 0 ? matchingStudents : state.students;
+        return `
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700">Pilih Cepat dari Data Siswa</label>
+                  <button type="button" onclick="window.navigateMenu('manajemen_siswa')" class="text-[11px] font-bold text-indigo-600 hover:underline">Kelola Siswa</button>
+                </div>
+                <select onchange="window.pickStudentForInput(this.value)"
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-indigo-50/50 border border-indigo-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="">-- Pilih Siswa ${matchingStudents.length > 0 ? `(${escapeHtml(exam.class_name)})` : '(Semua Kelas)'} atau ketik manual --</option>
+                  ${listToPick.map(stu => `<option value="${stu.id}">${escapeHtml(stu.full_name)} • NIS: ${escapeHtml(stu.nis)} (${escapeHtml(stu.class_name)})</option>`).join('')}
+                </select>
+              </div>`;
+      })() : ''}
             <div class="grid grid-cols-3 gap-3">
               <div class="col-span-2">
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap Siswa</label>
@@ -3084,6 +3319,16 @@
       </div>
     `;
     }
+
+    window.pickStudentForInput = function (studentId) {
+      if (!studentId) return;
+      const stu = state.students.find(s => s.id === studentId);
+      if (!stu) return;
+      const nameEl = document.getElementById('student-name');
+      const nisEl = document.getElementById('student-nis');
+      if (nameEl) nameEl.value = stu.full_name || '';
+      if (nisEl) nisEl.value = stu.nis || '';
+    };
 
     window.fillRandomStudentAnswer = function () {
       const exam = getActiveExam();
@@ -3684,7 +3929,7 @@
           if (updatedMe) {
             state.currentUser.subject = buildTeacherSubjectString(updatedMe.id);
             const subEl = document.getElementById('user-display-sub');
-            if (subEl) subEl.textContent = `${state.currentUser.subject} • ${state.currentUser.class_assigned}`;
+            if (subEl) subEl.textContent = formatTeacherHeaderSub(state.currentUser);
           }
         }
 
@@ -3732,7 +3977,7 @@
       if (state.currentUser?.role === 'guru' && (state.currentUser.id === prevTeacherId || state.currentUser.id === cleanTeacherId)) {
         state.currentUser.subject = buildTeacherSubjectString(state.currentUser.id);
         const subEl = document.getElementById('user-display-sub');
-        if (subEl) subEl.textContent = `${state.currentUser.subject} • ${state.currentUser.class_assigned}`;
+        if (subEl) subEl.textContent = formatTeacherHeaderSub(state.currentUser);
       }
       saveSessionToStorage();
 
@@ -3768,7 +4013,7 @@
           if (state.currentUser?.role === 'guru' && state.currentUser.id === prevTeacherId) {
             state.currentUser.subject = buildTeacherSubjectString(state.currentUser.id);
             const subEl = document.getElementById('user-display-sub');
-            if (subEl) subEl.textContent = `${state.currentUser.subject} • ${state.currentUser.class_assigned}`;
+            if (subEl) subEl.textContent = formatTeacherHeaderSub(state.currentUser);
           }
           saveSessionToStorage();
 
@@ -3789,14 +4034,402 @@
       );
     };
 
-    // ==================== 7. MANAJEMEN GURU & KELAS (KHUSUS ADMIN) ====================
-    function renderManajemenGuruView() {
-      if (state.subjects.length === 0) mergeSubjectsState();
+    // ==================== 7. MANAJEMEN DATA SISWA ====================
+    function renderManajemenSiswaView() {
+      const classFilter = state.studentClassFilter || 'ALL';
+      const searchQ = (state.studentSearchQuery || '').trim().toLowerCase();
+
+      const filteredStudents = (state.students || [])
+        .filter(s => classFilter === 'ALL' || s.class_name === classFilter)
+        .filter(s => !searchQ || (s.full_name || '').toLowerCase().includes(searchQ) || (s.nis || '').toLowerCase().includes(searchQ))
+        .slice()
+        .sort((a, b) => (a.class_name || '').localeCompare(b.class_name || '') || (a.full_name || '').localeCompare(b.full_name || ''));
+
+      const teacherGrade = state.currentUser?.role === 'guru' ? decodeTeacherMeta(state.currentUser).classAssigned : '';
+      const defaultStuClass = GRADE_CLASS_OPTIONS.includes(teacherGrade) ? teacherGrade : GRADE_CLASS_OPTIONS[0];
+      const classOptionsHtml = GRADE_CLASS_OPTIONS.map(c =>
+        `<option value="${escapeHtml(c)}" ${c === defaultStuClass ? 'selected' : ''}>${escapeHtml(c)}</option>`
+      ).join('');
+      const filterOptionsHtml = `<option value="ALL" ${classFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
+        GRADE_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}" ${classFilter === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
 
       return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        <!-- Form Tambah Akun Guru (Untuk Hybrid Login) -->
+        <!-- Left Form: Tambah Data Siswa -->
+        <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Tambah Data Siswa</h3>
+              <p class="text-xs text-slate-500">Input peserta didik per kelas untuk mempermudah koreksi</p>
+            </div>
+          </div>
+
+          <form onsubmit="window.handleSaveStudent(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap Siswa</label>
+              <input type="text" id="stu-fullname" required placeholder="Contoh: Ahmad Fauzi"
+                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">NIS / NISN</label>
+                <input type="text" id="stu-nis" inputmode="numeric" required placeholder="Hanya Angka"
+                  oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Jenis Kelamin</label>
+                <select id="stu-gender" required
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="L">Laki-laki (L)</option>
+                  <option value="P">Perempuan (P)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">Kelas</label>
+              <select id="stu-class" required
+                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                ${classOptionsHtml}
+              </select>
+            </div>
+
+            <button type="submit" class="w-full py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+              <i data-lucide="user-plus" class="w-4 h-4"></i> Simpan Data Siswa
+            </button>
+          </form>
+        </div>
+
+        <!-- Right List: Daftar Data Siswa + Template/Import/Ekspor Excel -->
+        <div class="lg:col-span-7 glass-surface rounded-3xl p-6 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Daftar Data Siswa (${filteredStudents.length})</h3>
+              <p class="text-xs text-slate-500">Kelola daftar siswa atau impor massal via Excel (.xlsx)</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" onclick="window.handleDownloadStudentTemplate()"
+                class="px-3 py-2 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
+                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i> Template (.xlsx)
+              </button>
+              <button type="button" onclick="document.getElementById('import-siswa-file').click()"
+                class="px-3 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 border border-indigo-200/80 transition">
+                <i data-lucide="upload" class="w-3.5 h-3.5"></i> Import
+              </button>
+              <input type="file" id="import-siswa-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="window.handleImportStudentsXlsx(event)" />
+              <button type="button" onclick="window.handleExportStudentsXlsx()"
+                class="px-3 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i> Ekspor
+              </button>
+            </div>
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <select id="stu-filter-class" onchange="window.handleFilterStudents()"
+              class="px-3.5 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              ${filterOptionsHtml}
+            </select>
+            <input type="text" id="stu-search-input" value="${escapeHtml(state.studentSearchQuery || '')}" oninput="window.handleFilterStudents(this)"
+              placeholder="Cari nama siswa atau NIS/NISN..."
+              class="sm:col-span-2 px-4 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
+          <div class="overflow-x-auto custom-scroll">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
+                  <th class="py-3 px-3">NIS / NISN</th>
+                  <th class="py-3 px-3">Nama Lengkap</th>
+                  <th class="py-3 px-3 text-center">L/P</th>
+                  <th class="py-3 px-3 text-center">Kelas</th>
+                  <th class="py-3 px-3 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-xs">
+                ${filteredStudents.length === 0 ? `
+                  <tr><td colspan="5" class="py-10 text-center text-slate-400">Belum ada data siswa${classFilter !== 'ALL' ? ` di ${escapeHtml(classFilter)}` : ''}. Tambah manual atau klik <strong>Import</strong> Excel.</td></tr>
+                ` : filteredStudents.map(stu => `
+                  <tr class="hover:bg-slate-50/80 transition">
+                    <td class="py-3 px-3 font-mono font-bold text-indigo-700">${escapeHtml(stu.nis)}</td>
+                    <td class="py-3 px-3 font-bold text-slate-900">${escapeHtml(stu.full_name)}</td>
+                    <td class="py-3 px-3 text-center">
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${stu.gender === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-sky-100 text-sky-700'}">
+                        ${stu.gender === 'P' ? 'P' : 'L'}
+                      </span>
+                    </td>
+                    <td class="py-3 px-3 text-center">
+                      <span class="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">${escapeHtml(stu.class_name)}</span>
+                    </td>
+                    <td class="py-3 px-3 text-right">
+                      <button type="button" onclick="window.handleDeleteStudent('${stu.id}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    `;
+    }
+
+    window.handleFilterStudents = function (searchInputEl = null) {
+      const filterEl = document.getElementById('stu-filter-class');
+      const searchEl = searchInputEl || document.getElementById('stu-search-input');
+      const hadFocus = document.activeElement === searchEl;
+      const selStart = searchEl?.selectionStart ?? null;
+      if (filterEl) state.studentClassFilter = filterEl.value || 'ALL';
+      if (searchEl) state.studentSearchQuery = searchEl.value || '';
+      renderCurrentMenu();
+      if (hadFocus) {
+        const nextSearch = document.getElementById('stu-search-input');
+        if (nextSearch) {
+          nextSearch.focus();
+          if (selStart !== null) nextSearch.setSelectionRange(selStart, selStart);
+        }
+      }
+    };
+
+    window.handleSaveStudent = async function (e) {
+      e.preventDefault();
+      const fullName = document.getElementById('stu-fullname').value.trim();
+      const nis = document.getElementById('stu-nis').value.trim();
+      const gender = document.getElementById('stu-gender').value === 'P' ? 'P' : 'L';
+      const className = document.getElementById('stu-class').value;
+
+      if (!fullName || !nis) {
+        showToast('Nama lengkap dan NIS/NISN siswa wajib diisi.', 'warning');
+        return;
+      }
+
+      const duplicate = state.students.find(s => String(s.nis).trim() === nis);
+      if (duplicate) {
+        showToast(`NIS/NISN ${nis} sudah terdaftar atas nama ${duplicate.full_name}.`, 'warning');
+        return;
+      }
+
+      const newStudent = {
+        id: crypto.randomUUID(),
+        nis,
+        full_name: fullName,
+        gender,
+        class_name: className
+      };
+
+      const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
+      setButtonLoading(submitterBtn, true, 'Menyimpan...');
+      showActionOverlay({
+        stateType: 'loading',
+        title: 'Menyimpan Data Siswa...',
+        subtitle: 'Memperbarui daftar siswa & menyinkronkan data'
+      });
+
+      try {
+        state.students.push(newStudent);
+        saveStudentsToStorage();
+        saveCacheToStorage();
+
+        if (state.hasStudentsTable === true) {
+          enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'upsert', record: newStudent });
+          updateSyncBadge('syncing');
+          await flushPendingSyncToSupabase();
+          const pendingLeft = getPendingSyncQueue().length;
+          updateSyncBadge(pendingLeft > 0 ? 'pending' : 'synced');
+        }
+
+        renderCurrentMenu();
+        showActionOverlay({
+          stateType: 'success',
+          title: 'Data Siswa Tersimpan!',
+          subtitle: `${fullName} (${className}) berhasil ditambahkan`
+        });
+        await sleep(450);
+        await hideActionOverlay();
+        showToast(`Siswa "${fullName}" (${className}) berhasil disimpan!`, 'success');
+      } finally {
+        setButtonLoading(submitterBtn, false);
+      }
+    };
+
+    window.handleDeleteStudent = function (studentId) {
+      const target = state.students.find(s => s.id === studentId);
+      if (!target) return;
+
+      openConfirmModal(
+        'Hapus Data Siswa',
+        `<p>Apakah Anda yakin ingin menghapus data siswa <strong>${escapeHtml(target.full_name)}</strong> (${escapeHtml(target.class_name)})?</p>`,
+        async () => {
+          state.students = state.students.filter(s => s.id !== studentId);
+          saveStudentsToStorage();
+          saveCacheToStorage();
+          if (state.hasStudentsTable === true) {
+            enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'delete', recordId: studentId });
+            await flushPendingSyncToSupabase();
+            updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+          }
+          renderCurrentMenu();
+          showToast(`Data siswa "${target.full_name}" berhasil dihapus.`, 'info');
+        },
+        'Ya, Hapus'
+      );
+    };
+
+    window.handleDownloadStudentTemplate = function () {
+      downloadXlsxWorkbook('Template_Data_Siswa.xlsx', [
+        {
+          name: 'Data Siswa',
+          aoa: [
+            ['NIS / NISN', 'Nama Lengkap', 'Jenis Kelamin (L/P)', 'Kelas'],
+            ['102401', 'Ahmad Fauzi', 'L', 'Kelas 1'],
+            ['102402', 'Siti Aisyah', 'P', 'Kelas 1']
+          ],
+          colWidths: [18, 30, 22, 14],
+          textCols: [0]
+        },
+        {
+          name: 'Petunjuk',
+          aoa: [
+            ['Kolom', 'Keterangan / Pilihan Valid'],
+            ['NIS / NISN', 'Nomor induk siswa (angka)'],
+            ['Nama Lengkap', 'Nama lengkap siswa'],
+            ['Jenis Kelamin (L/P)', 'Isi L (Laki-laki) atau P (Perempuan)'],
+            ['Kelas', 'Isi salah satu: Kelas 1, Kelas 2, Kelas 3, Kelas 4, Kelas 5, atau Kelas 6']
+          ],
+          colWidths: [22, 60]
+        }
+      ]);
+      showToast('Template Excel Data Siswa berhasil diunduh!', 'success');
+    };
+
+    window.handleImportStudentsXlsx = async function (event) {
+      const file = event?.target?.files?.[0];
+      if (!file) return;
+      event.target.value = '';
+
+      try {
+        const rows = await readXlsxFirstSheetRows(file);
+        if (!rows || rows.length === 0) {
+          showToast('File Excel kosong atau tidak memiliki baris data.', 'warning');
+          return;
+        }
+
+        showActionOverlay({
+          stateType: 'loading',
+          title: 'Mengimpor Data Siswa...',
+          subtitle: `Memproses ${rows.length} baris dari Excel (.xlsx)`
+        });
+
+        let importedCount = 0;
+        let updatedCount = 0;
+        let skippedCount = 0;
+        const toSync = [];
+
+        rows.forEach(row => {
+          const fullName = pickExcelVal(row, ['nama lengkap', 'nama siswa', 'nama', 'full_name']);
+          const rawNis = pickExcelVal(row, ['nis / nisn', 'nis/nisn', 'nisn', 'nis', 'no induk']);
+          const rawGender = pickExcelVal(row, ['jenis kelamin (l/p)', 'jenis kelamin', 'jk', 'l/p', 'gender']);
+          const rawClass = pickExcelVal(row, ['kelas', 'class_name', 'class']);
+
+          const cleanNis = rawNis.replace(/[^0-9A-Za-z]/g, '').trim();
+          if (!fullName || !cleanNis) {
+            skippedCount++;
+            return;
+          }
+
+          const gender = /^p|perempuan|wanita/i.test(rawGender) ? 'P' : 'L';
+          const className = normalizeGradeClass(rawClass);
+
+          const existing = state.students.find(s => String(s.nis).trim() === cleanNis);
+          if (existing) {
+            existing.full_name = fullName;
+            existing.gender = gender;
+            existing.class_name = className;
+            toSync.push(existing);
+            updatedCount++;
+          } else {
+            const newStu = {
+              id: crypto.randomUUID(),
+              nis: cleanNis,
+              full_name: fullName,
+              gender,
+              class_name: className
+            };
+            state.students.push(newStu);
+            toSync.push(newStu);
+            importedCount++;
+          }
+        });
+
+        saveStudentsToStorage();
+        saveCacheToStorage();
+
+        if (state.hasStudentsTable === true && toSync.length > 0) {
+          toSync.forEach(rec => enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'upsert', record: rec }));
+          await flushPendingSyncToSupabase();
+          updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+        }
+
+        renderCurrentMenu();
+        showActionOverlay({
+          stateType: 'success',
+          title: 'Import Data Siswa Selesai!',
+          subtitle: `${importedCount} ditambahkan • ${updatedCount} diperbarui`
+        });
+        await sleep(550);
+        await hideActionOverlay();
+        showToast(`Import Siswa selesai: ${importedCount} baru, ${updatedCount} diperbarui${skippedCount > 0 ? `, ${skippedCount} dilewati` : ''}.`, 'success');
+      } catch (err) {
+        console.error('Import Siswa Error:', err);
+        await hideActionOverlay();
+        showToast('Gagal membaca file Excel siswa. Pastikan memakai format Template (.xlsx).', 'danger');
+      }
+    };
+
+    window.handleExportStudentsXlsx = function () {
+      const classFilter = state.studentClassFilter || 'ALL';
+      const list = (state.students || [])
+        .filter(s => classFilter === 'ALL' || s.class_name === classFilter)
+        .slice()
+        .sort((a, b) => (a.class_name || '').localeCompare(b.class_name || '') || (a.full_name || '').localeCompare(b.full_name || ''));
+
+      if (list.length === 0) {
+        showToast('Tidak ada data siswa untuk diekspor.', 'warning');
+        return;
+      }
+
+      const aoa = [
+        ['No', 'NIS / NISN', 'Nama Lengkap', 'Jenis Kelamin', 'Kelas'],
+        ...list.map((s, idx) => [idx + 1, String(s.nis || ''), s.full_name || '', s.gender === 'P' ? 'P' : 'L', s.class_name || ''])
+      ];
+      const dateStr = new Date().toISOString().slice(0, 10);
+      downloadXlsxWorkbook(`Data_Siswa_${classFilter === 'ALL' ? 'Semua' : classFilter.replace(/\s+/g, '_')}_${dateStr}.xlsx`, [
+        { name: 'Data Siswa', aoa, colWidths: [6, 18, 30, 16, 14], textCols: [1] }
+      ]);
+      showToast(`Berhasil mengekspor ${list.length} data siswa ke Excel!`, 'success');
+    };
+
+    // ==================== 8. MANAJEMEN DATA GURU (KHUSUS ADMIN) ====================
+    function renderManajemenGuruView() {
+      if (state.subjects.length === 0) mergeSubjectsState();
+
+      const idTypeOptions = TEACHER_ID_TYPES.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+      const jabatanOptions = TEACHER_JABATAN_OPTIONS.map(j => `<option value="${escapeHtml(j)}">${escapeHtml(j)}</option>`).join('');
+      const classAmpuanOptions = TEACHER_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+
+      return `
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Form Tambah Akun Guru -->
         <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center">
@@ -3804,7 +4437,7 @@
             </div>
             <div>
               <h3 class="text-base font-extrabold text-slate-900">Kelola Akun Login Guru</h3>
-              <p class="text-xs text-slate-500">Data ini digunakan Guru untuk login tanpa Supabase Auth</p>
+              <p class="text-xs text-slate-500">Nomor Identitas berfungsi sebagai ID login Guru</p>
             </div>
           </div>
 
@@ -3815,22 +4448,42 @@
                 class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Username / NIP Login</label>
-                <input type="text" id="t-username" required placeholder="guru04"
-                  class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Jenis ID</label>
+                <select id="t-id-type" required
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  ${idTypeOptions}
+                </select>
               </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Password Login</label>
-                <input type="text" id="t-password" required placeholder="123456"
+              <div class="sm:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Nomor Identitas</label>
+                <input type="text" id="t-id-number" inputmode="numeric" required placeholder="Hanya Angka"
+                  oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                   class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
             </div>
 
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Jabatan</label>
+                <select id="t-jabatan" required
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  ${jabatanOptions}
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Kelas Ampuan</label>
+                <select id="t-classes" required
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  ${classAmpuanOptions}
+                </select>
+              </div>
+            </div>
+
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Kelas Ampuan</label>
-              <input type="text" id="t-classes" required placeholder="Contoh: Kelas 4A, Kelas 5B"
+              <label class="block text-xs font-bold text-slate-700 mb-1">Password Login</label>
+              <input type="text" id="t-password" required placeholder="123456"
                 class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
@@ -3854,80 +4507,75 @@
               <i data-lucide="user-plus" class="w-4 h-4"></i> Tambah Akun Guru
             </button>
           </form>
-
-          <!-- Form Tambah Master Kelas -->
-          <div class="pt-5 border-t border-slate-200/80 space-y-3">
-            <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Tambah Master Kelas Baru</h4>
-            <form onsubmit="window.handleSaveClass(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <input type="text" id="c-name" required placeholder="Nama Kelas (XII-IPA 1)"
-                class="px-3.5 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold" />
-              <input type="text" id="c-homeroom" required placeholder="Nama Wali Kelas"
-                class="px-3.5 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold" />
-              <button type="submit" class="py-2 px-4 rounded-2xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-bold transition">
-                + Simpan Kelas
-              </button>
-            </form>
-          </div>
         </div>
 
-        <!-- Daftar Guru & Kelas -->
-        <div class="lg:col-span-7 space-y-6">
-          <div class="glass-surface rounded-3xl p-6 space-y-4">
-            <div class="flex items-center justify-between">
+        <!-- Daftar Akun Guru Aktif + Template/Import/Ekspor Excel -->
+        <div class="lg:col-span-7 glass-surface rounded-3xl p-6 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
               <h3 class="text-base font-extrabold text-slate-900">Daftar Akun Guru Aktif (${state.teachers.length})</h3>
-              <span class="text-xs font-semibold text-indigo-600">Tabel: teachers</span>
+              <p class="text-xs text-slate-500">Tabel tersinkron: <span class="font-semibold text-indigo-600">teachers</span></p>
             </div>
-
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse">
-                <thead>
-                  <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
-                    <th class="py-3 px-3">Nama Guru</th>
-                    <th class="py-3 px-3">Username / Password</th>
-                    <th class="py-3 px-3">Mapel & Kelas</th>
-                    <th class="py-3 px-3 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 text-xs">
-                  ${state.teachers.map(t => `
-                    <tr class="hover:bg-slate-50/80">
-                      <td class="py-3 px-3 font-bold text-slate-900">${t.full_name}</td>
-                      <td class="py-3 px-3 font-mono">
-                        <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold">${t.username}</span>
-                        <span class="text-slate-400 ml-1">pw: ${t.password}</span>
-                      </td>
-                      <td class="py-3 px-3">
-                        <div class="font-semibold text-slate-800">${t.subject}</div>
-                        <div class="text-[11px] text-slate-400">${t.class_assigned}</div>
-                      </td>
-                      <td class="py-3 px-3 text-right">
-                        <button type="button" onclick="window.handleDeleteTeacher('${t.id}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600">
-                          <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" onclick="window.handleDownloadTeacherTemplate()"
+                class="px-3 py-2 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
+                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i> Template (.xlsx)
+              </button>
+              <button type="button" onclick="document.getElementById('import-guru-file').click()"
+                class="px-3 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 border border-indigo-200/80 transition">
+                <i data-lucide="upload" class="w-3.5 h-3.5"></i> Import
+              </button>
+              <input type="file" id="import-guru-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="window.handleImportTeachersXlsx(event)" />
+              <button type="button" onclick="window.handleExportTeachersXlsx()"
+                class="px-3 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i> Ekspor
+              </button>
             </div>
           </div>
 
-          <!-- Master Kelas List -->
-          <div class="glass-surface rounded-3xl p-6 space-y-3">
-            <h3 class="text-sm font-extrabold text-slate-900">Daftar Master Kelas (${state.classes.length})</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              ${state.classes.map(c => `
-                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-                  <div>
-                    <div class="text-xs font-extrabold text-indigo-700">${c.class_name}</div>
-                    <div class="text-[11px] text-slate-500 truncate">${c.homeroom_teacher}</div>
-                  </div>
-                  <button type="button" onclick="window.handleDeleteClass('${c.id}')" class="text-slate-400 hover:text-rose-600">
-                    <i data-lucide="x" class="w-4 h-4"></i>
-                  </button>
-                </div>
-              `).join('')}
-            </div>
+          <div class="overflow-x-auto custom-scroll">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
+                  <th class="py-3 px-3">Nama & Jabatan</th>
+                  <th class="py-3 px-3">Identitas / Password</th>
+                  <th class="py-3 px-3">Mapel & Kelas</th>
+                  <th class="py-3 px-3 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-xs">
+                ${state.teachers.length === 0 ? `
+                  <tr><td colspan="4" class="py-10 text-center text-slate-400">Belum ada akun guru terdaftar. Tambah manual atau klik <strong>Import</strong> Excel.</td></tr>
+                ` : state.teachers.map(t => {
+        const tMeta = decodeTeacherMeta(t);
+        const jabBadgeCls = tMeta.jabatan === 'Wali Kelas'
+          ? 'bg-emerald-100 text-emerald-700'
+          : 'bg-purple-100 text-purple-700';
+        return `
+                  <tr class="hover:bg-slate-50/80">
+                    <td class="py-3 px-3">
+                      <div class="font-bold text-slate-900">${escapeHtml(t.full_name)}</div>
+                      <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${jabBadgeCls}">${escapeHtml(tMeta.jabatan)}</span>
+                    </td>
+                    <td class="py-3 px-3 font-mono">
+                      <div class="text-[10px] font-sans font-bold text-slate-400 uppercase">${escapeHtml(tMeta.idType)}</div>
+                      <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold">${escapeHtml(t.username)}</span>
+                      <div class="text-[11px] text-slate-400 mt-0.5">pw: ${escapeHtml(t.password)}</div>
+                    </td>
+                    <td class="py-3 px-3">
+                      <div class="font-semibold text-slate-800">${escapeHtml(t.subject)}</div>
+                      <div class="text-[11px] text-slate-500 font-semibold mt-0.5">${escapeHtml(tMeta.classAssigned)}</div>
+                    </td>
+                    <td class="py-3 px-3 text-right">
+                      <button type="button" onclick="window.handleDeleteTeacher('${t.id}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600" title="Hapus">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                      </button>
+                    </td>
+                  </tr>
+                `;
+      }).join('')}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -3938,24 +4586,36 @@
     window.handleSaveTeacher = async function (e) {
       e.preventDefault();
       const fullName = document.getElementById('t-fullname').value.trim();
-      const username = document.getElementById('t-username').value.trim();
+      const idType = document.getElementById('t-id-type').value;
+      const idNumber = document.getElementById('t-id-number').value.replace(/[^0-9]/g, '').trim();
+      const jabatan = document.getElementById('t-jabatan').value;
+      const classAmpuan = document.getElementById('t-classes').value;
       const password = document.getElementById('t-password').value.trim();
       const checkedSubjects = Array.from(document.querySelectorAll('input[name="t-subject-chk"]:checked')).map(cb => cb.value.trim()).filter(Boolean);
-      const classAssigned = document.getElementById('t-classes').value.trim();
 
+      if (!idNumber) {
+        showToast('Nomor Identitas wajib diisi dengan angka.', 'warning');
+        return;
+      }
+      if (state.teachers.some(t => String(t.username || '').trim() === idNumber)) {
+        showToast(`Nomor Identitas ${idNumber} sudah terdaftar! Gunakan nomor lain.`, 'warning');
+        return;
+      }
       if (checkedSubjects.length === 0) {
         showToast('Pilih minimal satu mata pelajaran yang diampu guru.', 'warning');
         return;
       }
 
       const subject = checkedSubjects.join(', ');
+      const classAssignedEncoded = encodeTeacherMeta(classAmpuan, jabatan, idType);
+
       const newTeacher = {
         id: crypto.randomUUID(),
         full_name: fullName,
-        username,
+        username: idNumber,
         password,
         subject,
-        class_assigned: classAssigned
+        class_assigned: classAssignedEncoded
       };
 
       const prevTeachersSnapshot = state.subjects.map(s => ({ id: s.id, teacher_id: s.teacher_id }));
@@ -4008,44 +4668,180 @@
       );
     };
 
-    window.handleSaveClass = async function (e) {
-      e.preventDefault();
-      const className = document.getElementById('c-name').value.trim();
-      const homeroom = document.getElementById('c-homeroom').value.trim();
-
-      const newClass = {
-        id: crypto.randomUUID(),
-        class_name: className,
-        homeroom_teacher: homeroom,
-        student_count: 32
-      };
-
-      const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
-      await saveRecordWithSync({
-        submitterBtn,
-        table: 'classes',
-        record: newClass,
-        overlayTitle: 'Menyimpan Master Kelas...',
-        overlaySuccessTitle: `Kelas ${className} Tersimpan!`,
-        toastMsg: `Kelas ${className} berhasil ditambahkan dan tersinkron!`,
-        onLocalApply: () => {
-          state.classes.push(newClass);
+    window.handleDownloadTeacherTemplate = function () {
+      downloadXlsxWorkbook('Template_Data_Guru.xlsx', [
+        {
+          name: 'Data Guru',
+          aoa: [
+            ['Nama Lengkap', 'Jenis ID', 'Nomor Identitas', 'Password Login', 'Jabatan', 'Kelas Ampuan', 'Mata Pelajaran'],
+            ['Hendra Wijaya, S.Pd.', 'NIP', '198705122015031002', '123456', 'Wali Kelas', 'Kelas 4', "Al Qur'an Hadis, Akidah Akhlak"],
+            ['Siti Aminah, M.Pd.', 'NUPTK', '1234567890123456', '123456', 'Guru Mapel', 'Semua Kelas', 'Bahasa Arab, Fikih']
+          ],
+          colWidths: [28, 12, 24, 16, 15, 16, 36],
+          textCols: [2, 3]
         },
-        onRollback: () => {
-          state.classes = state.classes.filter(c => c.id !== newClass.id);
+        {
+          name: 'Petunjuk',
+          aoa: [
+            ['Kolom', 'Keterangan / Pilihan Valid'],
+            ['Nama Lengkap', 'Nama lengkap beserta gelar guru'],
+            ['Jenis ID', 'Pilih salah satu: NIP, NUPTK, PegID, atau NPK'],
+            ['Nomor Identitas', 'Hanya angka — otomatis menjadi ID login Guru'],
+            ['Password Login', 'Kata sandi login akun Guru'],
+            ['Jabatan', 'Pilih salah satu: Wali Kelas atau Guru Mapel'],
+            ['Kelas Ampuan', 'Pilih: Semua Kelas, Kelas 1, Kelas 2, Kelas 3, Kelas 4, Kelas 5, atau Kelas 6'],
+            ['Mata Pelajaran', 'Jika lebih dari 1 mapel, pisahkan dengan tanda koma (,)']
+          ],
+          colWidths: [20, 62]
         }
-      });
+      ]);
+      showToast('Template Excel Data Guru berhasil diunduh!', 'success');
     };
 
-    window.handleDeleteClass = async function (classId) {
-      await deleteRecordWithSync({
-        table: 'classes',
-        recordId: classId,
-        onLocalDelete: () => {
-          state.classes = state.classes.filter(c => c.id !== classId);
-        },
-        toastMsg: 'Data kelas dihapus dan tersinkron.'
-      });
+    window.handleImportTeachersXlsx = async function (event) {
+      const file = event?.target?.files?.[0];
+      if (!file) return;
+      event.target.value = '';
+
+      try {
+        const rows = await readXlsxFirstSheetRows(file);
+        if (!rows || rows.length === 0) {
+          showToast('File Excel kosong atau tidak memiliki baris data.', 'warning');
+          return;
+        }
+
+        showActionOverlay({
+          stateType: 'loading',
+          title: 'Mengimpor Data Guru...',
+          subtitle: `Memproses ${rows.length} baris dan menyinkronkan ke Supabase`
+        });
+
+        let importedCount = 0;
+        let updatedCount = 0;
+        let skippedCount = 0;
+        const toSync = [];
+
+        rows.forEach(row => {
+          const fullName = pickExcelVal(row, ['nama lengkap', 'nama guru', 'nama lengkap & gelar guru', 'nama', 'full_name']);
+          const rawIdType = pickExcelVal(row, ['jenis id', 'id_type', 'tipe id']);
+          const rawIdNum = pickExcelVal(row, ['nomor identitas', 'no identitas', 'nip', 'username', 'id']);
+          const rawPassword = pickExcelVal(row, ['password login', 'password', 'kata sandi', 'pw']) || '123456';
+          const rawJabatan = pickExcelVal(row, ['jabatan', 'role', 'posisi']);
+          const rawClass = pickExcelVal(row, ['kelas ampuan', 'kelas', 'class_assigned']);
+          const rawSubject = pickExcelVal(row, ['mata pelajaran', 'mapel', 'subject']);
+
+          const idNumber = rawIdNum.replace(/[^0-9]/g, '').trim() || rawIdNum.trim();
+          if (!fullName || !idNumber) {
+            skippedCount++;
+            return;
+          }
+
+          const idType = normalizeTeacherIdType(rawIdType);
+          const jabatan = normalizeTeacherJabatan(rawJabatan);
+          const classAmpuan = normalizeTeacherClass(rawClass);
+          const encodedClass = encodeTeacherMeta(classAmpuan, jabatan, idType);
+          const subjList = parseTeacherSubjects(rawSubject);
+          const subjectStr = subjList.length > 0 ? subjList.join(', ') : '-';
+
+          let teacherRec = state.teachers.find(t => String(t.username || '').trim() === idNumber);
+          if (teacherRec) {
+            teacherRec.full_name = fullName;
+            teacherRec.password = rawPassword;
+            teacherRec.subject = subjectStr;
+            teacherRec.class_assigned = encodedClass;
+            updatedCount++;
+          } else {
+            teacherRec = {
+              id: crypto.randomUUID(),
+              full_name: fullName,
+              username: idNumber,
+              password: rawPassword,
+              subject: subjectStr,
+              class_assigned: encodedClass
+            };
+            state.teachers.push(teacherRec);
+            importedCount++;
+          }
+
+          subjList.forEach(subName => {
+            const lower = subName.toLowerCase();
+            state.deletedSubjectNames = state.deletedSubjectNames.filter(n => n.toLowerCase() !== lower);
+            let subjObj = state.subjects.find(s => s.name.toLowerCase() === lower);
+            if (!subjObj) {
+              subjObj = { id: crypto.randomUUID(), name: subName, teacher_id: teacherRec.id };
+              state.subjects.push(subjObj);
+            } else {
+              subjObj.teacher_id = teacherRec.id;
+            }
+          });
+
+          toSync.push(teacherRec);
+        });
+
+        saveSubjectsMetaToStorage();
+        toSync.forEach(rec => enqueuePendingSync({ id: crypto.randomUUID(), table: 'teachers', action: 'upsert', record: { ...rec } }));
+        saveCacheToStorage();
+
+        updateSyncBadge('syncing');
+        const flushRes = await flushPendingSyncToSupabase();
+        if (!IS_PREVIEW && supabase && getPendingSyncQueue().length === 0) {
+          try {
+            await fetchAllSupabaseData();
+            state.lastSyncedAt = new Date();
+          } catch (e) { }
+        }
+        saveCacheToStorage();
+        updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+        renderCurrentMenu();
+
+        if (flushRes.fatalError) {
+          await hideActionOverlay();
+          showToast('Import lokal berhasil, namun gagal sinkron ke Supabase: ' + flushRes.fatalError.message, 'danger');
+          return;
+        }
+
+        showActionOverlay({
+          stateType: 'success',
+          title: 'Import Data Guru Selesai!',
+          subtitle: `${importedCount} ditambahkan • ${updatedCount} diperbarui`
+        });
+        await sleep(550);
+        await hideActionOverlay();
+        showToast(`Import Guru selesai: ${importedCount} baru, ${updatedCount} diperbarui${skippedCount > 0 ? `, ${skippedCount} dilewati` : ''}.`, 'success');
+      } catch (err) {
+        console.error('Import Guru Error:', err);
+        await hideActionOverlay();
+        showToast('Gagal membaca file Excel guru. Pastikan memakai format Template (.xlsx).', 'danger');
+      }
+    };
+
+    window.handleExportTeachersXlsx = function () {
+      if (state.teachers.length === 0) {
+        showToast('Tidak ada data guru untuk diekspor.', 'warning');
+        return;
+      }
+
+      const aoa = [
+        ['No', 'Nama Lengkap', 'Jenis ID', 'Nomor Identitas', 'Password Login', 'Jabatan', 'Kelas Ampuan', 'Mata Pelajaran'],
+        ...state.teachers.map((t, idx) => {
+          const meta = decodeTeacherMeta(t);
+          return [
+            idx + 1,
+            t.full_name || '',
+            meta.idType,
+            String(t.username || ''),
+            String(t.password || ''),
+            meta.jabatan,
+            meta.classAssigned,
+            t.subject || '-'
+          ];
+        })
+      ];
+      const dateStr = new Date().toISOString().slice(0, 10);
+      downloadXlsxWorkbook(`Data_Guru_${dateStr}.xlsx`, [
+        { name: 'Data Guru', aoa, colWidths: [6, 28, 12, 24, 16, 15, 16, 36], textCols: [3, 4] }
+      ]);
+      showToast(`Berhasil mengekspor ${state.teachers.length} data guru ke Excel!`, 'success');
     };
 
     // ==================== LIFECYCLE HOOKS (REFRESH, CLOSE TAB, ONLINE) ====================
