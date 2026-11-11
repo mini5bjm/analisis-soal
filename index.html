@@ -272,13 +272,223 @@
     }
 
     .print-only-row,
-    .print-only-flex {
+    .print-only-flex,
+    #print-report-sheet {
       display: none !important;
     }
 
-    /* Print Styling for Official Exam Analysis Report */
+    /* Print Styling for Official Landscape Exam Report */
     @media print {
-      #flowora-app-root {
+      @page {
+        size: landscape;
+        margin: 10mm 12mm;
+      }
+
+      html,
+      body {
+        height: auto !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      body.printing-combined-report #flowora-app-root {
+        display: none !important;
+      }
+
+      body.printing-combined-report #print-report-sheet {
+        display: block !important;
+        width: 100% !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        font-size: 11px !important;
+        line-height: 1.4 !important;
+      }
+
+      .pr-kop {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 2px solid #1e293b;
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+      }
+
+      .pr-kop-school {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #4338ca;
+      }
+
+      .pr-kop-title {
+        font-size: 15px;
+        font-weight: 800;
+        color: #0f172a;
+        margin-top: 2px;
+      }
+
+      .pr-kop-date {
+        text-align: right;
+        font-size: 10px;
+        color: #475569;
+        white-space: nowrap;
+      }
+
+      .pr-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .pr-meta-box {
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 6px 10px;
+        background: #f8fafc;
+      }
+
+      .pr-meta-label {
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+      }
+
+      .pr-meta-value {
+        font-size: 11px;
+        font-weight: 800;
+        color: #0f172a;
+        margin-top: 1px;
+      }
+
+      .pr-summary-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #eef2ff;
+        font-size: 10px;
+        color: #1e293b;
+        margin-bottom: 12px;
+      }
+
+      .pr-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+
+      .pr-section-title {
+        font-size: 12.5px;
+        font-weight: 800;
+        color: #0f172a;
+      }
+
+      .pr-pill-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .pr-pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 9999px;
+        font-size: 9.5px;
+        font-weight: 800;
+        border: 1px solid #cbd5e1;
+      }
+
+      .pr-pill-emerald { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+      .pr-pill-amber { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+      .pr-pill-rose { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
+      .pr-pill-indigo { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
+      .pr-pill-slate { background: #f1f5f9; color: #334155; border-color: #cbd5e1; }
+
+      .pr-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 12px;
+      }
+
+      .pr-table thead {
+        display: table-header-group;
+      }
+
+      .pr-table tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      .pr-table th {
+        background: #f1f5f9;
+        color: #334155;
+        font-size: 9.5px;
+        font-weight: 800;
+        text-transform: uppercase;
+        padding: 6px 7px;
+        border: 1px solid #cbd5e1;
+        text-align: left;
+      }
+
+      .pr-table td {
+        padding: 5px 7px;
+        border: 1px solid #cbd5e1;
+        font-size: 10px;
+        color: #0f172a;
+        vertical-align: middle;
+      }
+
+      .pr-bar-track {
+        width: 100%;
+        height: 5px;
+        background: #e2e8f0;
+        border-radius: 9999px;
+        overflow: hidden;
+        margin-top: 3px;
+      }
+
+      .pr-bar-fill {
+        height: 100%;
+        background: #4f46e5;
+        border-radius: 9999px;
+      }
+
+      .pr-section-break {
+        page-break-before: always;
+        break-before: page;
+      }
+
+      .pr-block-title {
+        font-size: 11.5px;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 10px 0 6px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      #flowora-app-root,
+      #app-view,
+      #app-view > div,
+      .main-scroll-area {
         position: static !important;
         height: auto !important;
         overflow: visible !important;
@@ -298,8 +508,6 @@
       }
 
       .main-scroll-area {
-        overflow: visible !important;
-        height: auto !important;
         padding: 0 !important;
       }
 
@@ -648,6 +856,9 @@
     <div id="toast-container" class="fixed top-5 right-5 z-50 space-y-2.5 pointer-events-none"></div>
 
   </div>
+
+  <!-- Dedicated Combined Landscape Print Container -->
+  <div id="print-report-sheet" aria-hidden="true"></div>
 
   <!-- ==================== APPLICATION MODULE SCRIPT ==================== -->
   <script type="module">
@@ -5249,6 +5460,310 @@
       );
     };
 
+    function formatExamClassLabel(className) {
+      const raw = String(className || '').trim();
+      if (!raw) return '-';
+      return /^kelas\b/i.test(raw) ? raw : `Kelas ${raw}`;
+    }
+
+    function getExamTeacher(exam) {
+      if (!exam) return null;
+      return state.teachers.find(t => t.id === exam.teacher_id) || getSubjectTeacher(exam.subject) || null;
+    }
+
+    function formatWeakQuestionsLabel(exam, examMeta, rawStudentAns) {
+      const graded = scoreStudentResponse(exam, rawStudentAns);
+      const missed = graded.itemResults.filter(item => !item.isCorrect);
+      if (missed.length === 0) return '-';
+      return examMeta.isMultiType
+        ? missed.map(item => `#${item.number} (${item.sectionShort})`).join(', ')
+        : `No. ${missed.map(item => item.number).join(', ')}`;
+    }
+
+    function buildCombinedReportHtml(exam, stats) {
+      const examMeta = stats.examMeta || decodeExamMeta(exam);
+      const qType = examMeta.questionType;
+      const isNumType = isNumericQuestionType(qType);
+      const isMulti = examMeta.isMultiType;
+      const teacherName = getExamTeacher(exam)?.full_name || '-';
+      const classLabel = formatExamClassLabel(exam.class_name);
+      const qTypeSummary = examMeta.sections.map(s => {
+        const w = !isNumericQuestionType(s.questionType) && s.scorePerItem !== 1 ? ` @${s.scorePerItem}` : '';
+        return isMulti ? `${s.typeMeta.shortLabel} (${s.count}${w})` : `${s.typeMeta.label}${w}`;
+      }).join(' + ');
+
+      const acceptedCount = stats.itemAnalysis.filter(i => i.statusAction === 'Diterima (Bank Soal)').length;
+      const reviseCount = stats.itemAnalysis.filter(i => i.statusAction === 'Perlu Revisi').length;
+      const discardCount = stats.itemAnalysis.filter(i => i.statusAction === 'Dibuang / Ganti').length;
+
+      const distHeaderLabel = isMulti
+        ? 'Sebaran / Rata Skor'
+        : (isNumType ? 'Rata-rata / Bobot Maks' : (qType === 'BS' ? 'Sebaran Jawaban (B/S)' : 'Sebaran Opsi (A/B/C/D/E)'));
+
+      const printDateStr = new Date().toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      });
+
+      const itemRowsHtml = stats.itemAnalysis.length === 0
+        ? `<tr><td colspan="7" style="text-align:center; padding:18px; color:#64748b;">Belum ada data jawaban siswa untuk dianalisis.</td></tr>`
+        : stats.itemAnalysis.map(item => {
+          const itemType = item.questionType || qType;
+          const itemTypeMeta = QUESTION_TYPES[itemType] || QUESTION_TYPES.PG;
+          const itemIsNum = isNumericQuestionType(itemType);
+
+          let distText = '';
+          if (itemIsNum) {
+            distText = `Rata ${item.meanScore} / Maks ${item.maxScore}`;
+          } else if (itemType === 'BS') {
+            distText = `B:${item.optionCounts.B} • S:${item.optionCounts.S}`;
+          } else {
+            distText = `A:${item.optionCounts.A} • B:${item.optionCounts.B} • C:${item.optionCounts.C} • D:${item.optionCounts.D} • E:${item.optionCounts.E}`;
+          }
+
+          const diffPillCls = item.difficultyLabel === 'Mudah'
+            ? 'pr-pill-emerald'
+            : (item.difficultyLabel === 'Sedang' ? 'pr-pill-indigo' : 'pr-pill-amber');
+          const discPillCls = (item.discrimLabel === 'Sangat Baik' || item.discrimLabel === 'Baik')
+            ? 'pr-pill-emerald'
+            : (item.discrimLabel === 'Cukup' ? 'pr-pill-amber' : 'pr-pill-rose');
+          const statusPillCls = item.statusAction === 'Diterima (Bank Soal)'
+            ? 'pr-pill-emerald'
+            : (item.statusAction === 'Perlu Revisi' ? 'pr-pill-amber' : 'pr-pill-rose');
+
+          return `
+            <tr>
+              <td style="font-weight:800; white-space:nowrap;">
+                Butir #${item.number}
+                ${isMulti ? `<div style="font-size:9px; font-weight:700; color:#4338ca;">${escapeHtml(item.sectionShort || itemTypeMeta.shortLabel)} #${item.sectionNumber || item.number}</div>` : ''}
+              </td>
+              <td style="text-align:center; font-family:monospace; font-weight:800;">
+                <span class="pr-pill pr-pill-indigo">${escapeHtml(String(item.key))}</span>
+              </td>
+              <td style="min-width:130px;">
+                <div style="display:flex; justify-content:space-between; font-size:9.5px; font-weight:700;">
+                  <span>${escapeHtml(item.metricSummary)}</span>
+                  <span style="color:#4338ca;">${item.correctPercent}%</span>
+                </div>
+                <div class="pr-bar-track"><div class="pr-bar-fill" style="width:${item.correctPercent}%"></div></div>
+              </td>
+              <td style="text-align:center;">
+                <div style="font-weight:800;">${item.pIndex}</div>
+                <span class="pr-pill ${diffPillCls}">${escapeHtml(item.difficultyLabel)}</span>
+              </td>
+              <td style="text-align:center;">
+                <div style="font-weight:800;">${item.dIndex}</div>
+                <span class="pr-pill ${discPillCls}">${escapeHtml(item.discrimLabel)}</span>
+              </td>
+              <td style="text-align:center; font-family:monospace; font-size:9.5px;">${escapeHtml(distText)}</td>
+              <td style="text-align:right; white-space:nowrap;">
+                <span class="pr-pill ${statusPillCls}">${escapeHtml(item.statusAction)}</span>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+      const remedialStudents = stats.results.filter(r => Number(r.score) < Number(exam.kkm));
+      const enrichmentStudents = stats.results.filter(r => Number(r.score) >= Number(exam.kkm));
+
+      const remedialRowsHtml = remedialStudents.length === 0
+        ? `<tr><td colspan="5" style="text-align:center; padding:16px; color:#047857; font-weight:700;">Luar biasa! Seluruh siswa pada kelas ini telah TUNTAS mencapai batas KKM (${exam.kkm}).</td></tr>`
+        : remedialStudents.map((r, idx) => `
+            <tr>
+              <td style="text-align:center; font-weight:700; width:32px;">${idx + 1}</td>
+              <td>
+                <div style="font-weight:800;">${escapeHtml(r.student_name)}</div>
+                <div style="font-size:9px; color:#64748b;">NIS: ${escapeHtml(r.student_nis)}</div>
+              </td>
+              <td style="text-align:center; width:64px;">
+                <span class="pr-pill pr-pill-rose">${r.score}</span>
+              </td>
+              <td style="font-family:monospace; font-size:9.5px; font-weight:700; color:#be123c;">
+                ${escapeHtml(formatWeakQuestionsLabel(exam, examMeta, r.student_answers))}
+              </td>
+              <td>
+                <div style="font-weight:700; color:#0f172a;">${r.score < 55 ? 'Pembelajaran Ulang & Tes Ulang' : 'Bimbingan Tutor Sebaya'}</div>
+                ${r.notes ? `<div style="font-size:9px; color:#475569;">${escapeHtml(r.notes)}</div>` : ''}
+              </td>
+            </tr>
+          `).join('');
+
+      const enrichmentRowsHtml = enrichmentStudents.length === 0
+        ? `<tr><td colspan="4" style="text-align:center; padding:16px; color:#64748b;">Belum ada siswa yang mencapai batas KKM (${exam.kkm}).</td></tr>`
+        : enrichmentStudents.map((r, idx) => `
+            <tr>
+              <td style="text-align:center; font-weight:700; width:32px;">${idx + 1}</td>
+              <td>
+                <div style="font-weight:800;">${escapeHtml(r.student_name)}</div>
+                <div style="font-size:9px; color:#64748b;">NIS: ${escapeHtml(r.student_nis)}</div>
+              </td>
+              <td style="text-align:center; width:64px;">
+                <span class="pr-pill pr-pill-emerald">${r.score}</span>
+              </td>
+              <td style="font-weight:600; color:#047857;">
+                ${r.score >= 90 ? 'Tutor Sebaya & Eksplorasi Soal Olimpiade/HOTS' : 'Eksplorasi Materi Lanjutan & Pendalaman Konsep'}
+              </td>
+            </tr>
+          `).join('');
+
+      const reportHeaderHtml = `
+        <div class="pr-kop">
+          <div>
+            <div class="pr-kop-school">SIHASUL • MIS. Nurul Islam Km. 5</div>
+            <div class="pr-kop-title">LAPORAN ANALISIS BUTIR SOAL, REMEDIAL &amp; PENGAYAAN</div>
+          </div>
+          <div class="pr-kop-date">
+            <div>Tanggal Ujian: <strong>${escapeHtml(exam.exam_date || '-')}</strong></div>
+            <div>Dicetak: ${escapeHtml(printDateStr)}</div>
+          </div>
+        </div>
+
+        <div class="pr-meta-grid">
+          <div class="pr-meta-box">
+            <div class="pr-meta-label">Judul Soal / Penilaian</div>
+            <div class="pr-meta-value">${escapeHtml(exam.title)}</div>
+          </div>
+          <div class="pr-meta-box">
+            <div class="pr-meta-label">Mata Pelajaran</div>
+            <div class="pr-meta-value">${escapeHtml(exam.subject)}</div>
+          </div>
+          <div class="pr-meta-box">
+            <div class="pr-meta-label">Tingkat / Rombel</div>
+            <div class="pr-meta-value">${escapeHtml(classLabel)}</div>
+          </div>
+          <div class="pr-meta-box">
+            <div class="pr-meta-label">Nama Guru</div>
+            <div class="pr-meta-value">${escapeHtml(teacherName)}</div>
+          </div>
+        </div>
+
+        <div class="pr-summary-bar">
+          <span><strong>Jenis Soal:</strong> ${escapeHtml(qTypeSummary)} (${exam.total_questions} Soal${examMeta.hasWeightedScore ? ` • Bobot Total ${examMeta.maxTotalScore}` : ''})</span>
+          <span><strong>KKM:</strong> ${exam.kkm} &nbsp;|&nbsp; <strong>Peserta:</strong> ${stats.totalStudents} Siswa &nbsp;|&nbsp; <strong>Rata-rata:</strong> ${stats.averageScore} &nbsp;|&nbsp; <strong>Ketuntasan Klasikal:</strong> ${stats.classicalMastery}% (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)</span>
+        </div>
+      `;
+
+      return `
+        <div>
+          ${reportHeaderHtml}
+
+          <div class="pr-section-header">
+            <div class="pr-section-title">A. Analisis Kualitas Butir Soal</div>
+            <div class="pr-pill-row">
+              <span class="pr-pill pr-pill-emerald">Diterima (Bank Soal): ${acceptedCount} Soal</span>
+              <span class="pr-pill pr-pill-amber">Perlu Revisi: ${reviseCount} Soal</span>
+              <span class="pr-pill pr-pill-rose">Dibuang / Diganti: ${discardCount} Soal</span>
+            </div>
+          </div>
+
+          <table class="pr-table">
+            <thead>
+              <tr>
+                <th style="width:82px;">No Soal</th>
+                <th style="text-align:center; width:72px;">${isMulti ? 'Kunci/Bobot' : (isNumType ? 'Bobot' : 'Kunci')}</th>
+                <th style="width:150px;">${isMulti ? 'Ketuntasan / Penguasaan' : (isNumType ? 'Penguasaan (%)' : 'Ketuntasan (%)')}</th>
+                <th style="text-align:center; width:100px;">Kesukaran (P)</th>
+                <th style="text-align:center; width:110px;">Daya Pembeda (D)</th>
+                <th style="text-align:center;">${escapeHtml(distHeaderLabel)}</th>
+                <th style="text-align:right; width:138px;">Rekomendasi Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemRowsHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pr-section-break">
+          <div class="pr-kop" style="margin-bottom:8px;">
+            <div>
+              <div class="pr-kop-school">SIHASUL • MIS. Nurul Islam Km. 5</div>
+              <div class="pr-kop-title">B. PROGRAM TINDAK LANJUT: REMEDIAL &amp; PENGAYAAN</div>
+            </div>
+            <div class="pr-kop-date">
+              <div><strong>${escapeHtml(exam.title)}</strong> • ${escapeHtml(exam.subject)} • ${escapeHtml(classLabel)}</div>
+              <div>Guru: <strong>${escapeHtml(teacherName)}</strong> • KKM: <strong>${exam.kkm}</strong></div>
+            </div>
+          </div>
+
+          <div class="pr-block-title">
+            <span>1. Daftar Peserta Program Remedial (Nilai &lt; ${exam.kkm})</span>
+            <span class="pr-pill pr-pill-amber">${remedialStudents.length} Siswa</span>
+          </div>
+          <table class="pr-table">
+            <thead>
+              <tr>
+                <th style="text-align:center; width:36px;">No</th>
+                <th style="width:200px;">Nama Siswa &amp; NIS</th>
+                <th style="text-align:center; width:68px;">Nilai Awal</th>
+                <th>Indikator Soal Belum Tuntas</th>
+                <th style="width:235px;">Bentuk Tindak Lanjut &amp; Catatan</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${remedialRowsHtml}
+            </tbody>
+          </table>
+
+          <div class="pr-block-title" style="margin-top:12px;">
+            <span>2. Daftar Peserta Program Pengayaan (Nilai &ge; ${exam.kkm})</span>
+            <span class="pr-pill pr-pill-emerald">${enrichmentStudents.length} Siswa</span>
+          </div>
+          <table class="pr-table">
+            <thead>
+              <tr>
+                <th style="text-align:center; width:36px;">No</th>
+                <th style="width:240px;">Nama Siswa &amp; NIS</th>
+                <th style="text-align:center; width:68px;">Nilai Akhir</th>
+                <th>Rekomendasi Program Pengayaan</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${enrichmentRowsHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    window.printCombinedReport = function () {
+      const exam = getActiveExam();
+      if (!exam) {
+        showToast('Pilih paket ulangan terlebih dahulu untuk mencetak laporan.', 'warning');
+        return;
+      }
+      const sheet = document.getElementById('print-report-sheet');
+      if (!sheet) {
+        window.print();
+        return;
+      }
+      const stats = computeExamStatistics(exam);
+      sheet.innerHTML = buildCombinedReportHtml(exam, stats);
+      document.body.classList.add('printing-combined-report');
+      void sheet.offsetHeight;
+      window.print();
+    };
+
+    window.addEventListener('beforeprint', () => {
+      if (document.body.classList.contains('printing-combined-report')) return;
+      if (state.currentUser && (state.activeMenu === 'analisis_butir' || state.activeMenu === 'remedial_pengayaan')) {
+        const exam = getActiveExam();
+        const sheet = document.getElementById('print-report-sheet');
+        if (exam && sheet) {
+          const stats = computeExamStatistics(exam);
+          sheet.innerHTML = buildCombinedReportHtml(exam, stats);
+          document.body.classList.add('printing-combined-report');
+        }
+      }
+    });
+
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('printing-combined-report');
+      const sheet = document.getElementById('print-report-sheet');
+      if (sheet) sheet.innerHTML = '';
+    });
+
     // ==================== 4. ANALISIS BUTIR SOAL (ITEM ANALYSIS) ====================
     function renderAnalisisButirView(exam, stats) {
       if (!exam) {
@@ -5259,6 +5774,8 @@
       const qType = examMeta.questionType;
       const isNumType = isNumericQuestionType(qType);
       const isMulti = examMeta.isMultiType;
+      const teacherName = getExamTeacher(exam)?.full_name || '-';
+      const classLabel = formatExamClassLabel(exam.class_name);
       const acceptedCount = stats.itemAnalysis.filter(i => i.statusAction === 'Diterima (Bank Soal)').length;
       const reviseCount = stats.itemAnalysis.filter(i => i.statusAction === 'Perlu Revisi').length;
       const discardCount = stats.itemAnalysis.filter(i => i.statusAction === 'Dibuang / Ganti').length;
@@ -5316,10 +5833,19 @@
               <h3 class="text-base font-extrabold text-slate-900">Tabel Analisis Kualitas Butir Soal (${escapeHtml(exam.title)})</h3>
               ${headerBadgesHtml}
             </div>
-            <p class="text-xs text-slate-500">Menghitung Tingkat Kesukaran (P), Daya Pembeda Kelompok Atas-Bawah (D), dan Distribusi Jawaban</p>
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600 mt-1">
+              <span>Mapel: <strong class="text-indigo-700">${escapeHtml(exam.subject)}</strong></span>
+              <span>•</span>
+              <span class="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200/70">${escapeHtml(classLabel)}</span>
+              <span>•</span>
+              <span>Guru: <strong class="text-slate-900">${escapeHtml(teacherName)}</strong></span>
+              <span>•</span>
+              <span>KKM: <strong class="text-slate-900">${exam.kkm}</strong></span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">Menghitung Tingkat Kesukaran (P), Daya Pembeda Kelompok Atas-Bawah (D), dan Distribusi Jawaban</p>
           </div>
-          <button type="button" onclick="window.print()" class="no-print px-4 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 w-fit">
-            <i data-lucide="printer" class="w-4 h-4"></i> Cetak Analisis Butir
+          <button type="button" onclick="window.printCombinedReport()" class="no-print px-4 py-2.5 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5 w-fit shrink-0" title="Cetak 1 file Landscape berisi Analisis Butir, Remedial, dan Pengayaan">
+            <i data-lucide="printer" class="w-4 h-4"></i> Cetak Laporan Lengkap (PDF)
           </button>
         </div>
 
@@ -5432,31 +5958,34 @@
       }
 
       const examMeta = stats.examMeta || decodeExamMeta(exam);
+      const teacherName = getExamTeacher(exam)?.full_name || '-';
+      const classLabel = formatExamClassLabel(exam.class_name);
       const remedialStudents = stats.results.filter(r => Number(r.score) < Number(exam.kkm));
       const enrichmentStudents = stats.results.filter(r => Number(r.score) >= Number(exam.kkm));
-
-      const getWeakQuestions = (ansStr) => {
-        const graded = scoreStudentResponse(exam, ansStr);
-        const missed = graded.itemResults.filter(item => !item.isCorrect);
-        if (missed.length === 0) return '-';
-        return examMeta.isMultiType
-          ? missed.map(item => `#${item.number} (${item.sectionShort})`).join(', ')
-          : `No. ${missed.map(item => item.number).join(', ')}`;
-      };
 
       return `
       <!-- Header Action Bar -->
       <div class="glass-surface rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h3 class="text-lg font-extrabold text-slate-900">Program Tindak Lanjut: Remedial & Pengayaan</h3>
-          <p class="text-xs text-slate-500">${exam.title} • Kelas ${exam.class_name} • Batas KKM: <strong>${exam.kkm}</strong></p>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600 mt-1">
+            <span>Judul Soal: <strong class="text-slate-900">${escapeHtml(exam.title)}</strong></span>
+            <span>•</span>
+            <span>Mapel: <strong class="text-indigo-700">${escapeHtml(exam.subject)}</strong></span>
+            <span>•</span>
+            <span class="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200/70">${escapeHtml(classLabel)}</span>
+            <span>•</span>
+            <span>Guru: <strong class="text-slate-900">${escapeHtml(teacherName)}</strong></span>
+            <span>•</span>
+            <span>Batas KKM: <strong class="text-slate-900">${exam.kkm}</strong></span>
+          </div>
         </div>
         <div class="no-print flex flex-wrap items-center gap-2.5">
           <button type="button" onclick="window.exportAnalysisCSV()" class="px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
             <i data-lucide="download" class="w-4 h-4"></i> Export CSV / Excel
           </button>
-          <button type="button" onclick="window.print()" class="px-4 py-2.5 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5">
-            <i data-lucide="printer" class="w-4 h-4"></i> Cetak Laporan Resmi
+          <button type="button" onclick="window.printCombinedReport()" class="px-4 py-2.5 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5" title="Cetak 1 file Landscape berisi Analisis Butir, Remedial, dan Pengayaan">
+            <i data-lucide="printer" class="w-4 h-4"></i> Cetak Laporan Lengkap (PDF)
           </button>
         </div>
       </div>
@@ -5499,18 +6028,18 @@
           return `
                   <tr class="${isOnPage ? 'hover:bg-amber-50/30' : 'print-only-row hover:bg-amber-50/30'}">
                     <td class="py-3 px-3">
-                      <div class="font-bold text-slate-900">${r.student_name}</div>
-                      <div class="text-[11px] text-slate-400">NIS: ${r.student_nis}</div>
+                      <div class="font-bold text-slate-900">${escapeHtml(r.student_name)}</div>
+                      <div class="text-[11px] text-slate-400">NIS: ${escapeHtml(r.student_nis)}</div>
                     </td>
                     <td class="py-3 px-3 text-center">
                       <span class="px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 font-extrabold">${r.score}</span>
                     </td>
                     <td class="py-3 px-3 font-mono text-[11px] text-rose-600 font-bold">
-                      ${getWeakQuestions(r.student_answers)}
+                      ${escapeHtml(formatWeakQuestionsLabel(exam, examMeta, r.student_answers))}
                     </td>
                     <td class="py-3 px-3 text-slate-600">
                       <div class="font-semibold text-slate-800">${r.score < 55 ? 'Pembelajaran Ulang & Tes Ulang' : 'Bimbingan Tutor Sebaya'}</div>
-                      <div class="text-[11px] text-slate-400">${r.notes || ''}</div>
+                      <div class="text-[11px] text-slate-400">${escapeHtml(r.notes || '')}</div>
                     </td>
                   </tr>
                 `;
@@ -5549,7 +6078,7 @@
           return `
               <div class="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 items-center justify-between gap-3 ${isOnPage ? 'flex' : 'print-only-flex'}">
                 <div>
-                  <div class="text-xs font-bold text-slate-900">${r.student_name} <span class="text-slate-400 font-normal">(${r.student_nis})</span></div>
+                  <div class="text-xs font-bold text-slate-900">${escapeHtml(r.student_name)} <span class="text-slate-400 font-normal">(${escapeHtml(r.student_nis)})</span></div>
                   <div class="text-[11px] text-emerald-700 font-medium mt-0.5">
                     ${r.score >= 90 ? 'Rekomendasi: Tutor Sebaya & Soal Olimpiade/HOTS' : 'Rekomendasi: Eksplorasi Materi Lanjutan'}
                   </div>
@@ -5575,14 +6104,16 @@
       if (!exam) return;
       const stats = computeExamStatistics(exam);
       const examMeta = stats.examMeta || decodeExamMeta(exam);
+      const teacherName = getExamTeacher(exam)?.full_name || '-';
+      const classLabel = formatExamClassLabel(exam.class_name);
       const showPointsCol = examMeta.hasWeightedScore || examMeta.isMultiType;
       const qTypeSummary = examMeta.sections.map(s => {
         const w = !isNumericQuestionType(s.questionType) && s.scorePerItem !== 1 ? ` @${s.scorePerItem}` : '';
         return examMeta.isMultiType ? `${s.typeMeta.shortLabel} (${s.count}${w})` : `${s.typeMeta.label}${w}`;
       }).join(' + ');
 
-      let csv = `Laporan Analisis Hasil Ulangan - ${exam.title} (${exam.class_name})\n`;
-      csv += `Mata Pelajaran,"${exam.subject}",Jenis Soal,"${qTypeSummary}",KKM,${exam.kkm},Tanggal,${exam.exam_date}\n\n`;
+      let csv = `Laporan Analisis Hasil Ulangan - ${exam.title} (${classLabel})\n`;
+      csv += `Mata Pelajaran,"${exam.subject}",Nama Guru,"${teacherName}",Jenis Soal,"${qTypeSummary}",KKM,${exam.kkm},Tanggal,${exam.exam_date}\n\n`;
       csv += showPointsCol
         ? `NIS,Nama Siswa,Rincian Jawaban / Skor,Total Poin,Butir Tuntas,Nilai Akhir,Status Ketuntasan,Catatan\n`
         : `NIS,Nama Siswa,Jawaban Siswa,Jumlah Benar,Nilai Akhir,Status Ketuntasan,Catatan\n`;
