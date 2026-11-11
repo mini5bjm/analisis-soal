@@ -4,11 +4,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Flowora EduAnalytics — Sistem Analisis Hasil Ulangan</title>
+  <title>SIHASUL — Sistem Analisis Hasil Ulangan</title>
 
   <!-- PWA Manifest Data URI (1-File Standard) -->
   <link rel="manifest"
-    href='data:application/manifest+json,{"name":"Flowora EduAnalytics - Analisis Ulangan","short_name":"EduAnalytics","start_url":".","display":"standalone","background_color":"#F8FAFC","theme_color":"#4F46E5","icons":[{"src":"https://placehold.co/192x192/4F46E5/ffffff?text=FA","sizes":"192x192","type":"image/png"},{"src":"https://placehold.co/512x512/4F46E5/ffffff?text=FA","sizes":"512x512","type":"image/png"}]}' />
+    href='data:application/manifest+json,{"name":"SIHASUL — Sistem Analisis Hasil Ulangan","short_name":"SIHASUL","start_url":".","display":"standalone","background_color":"#F8FAFC","theme_color":"#4F46E5","icons":[{"src":"https://placehold.co/192x192/4F46E5/ffffff?text=SH","sizes":"192x192","type":"image/png"},{"src":"https://placehold.co/512x512/4F46E5/ffffff?text=SH","sizes":"512x512","type":"image/png"}]}' />
   <meta name="theme-color" content="#4F46E5" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
 
@@ -332,15 +332,17 @@
             <div
               class="inline-flex items-center gap-2.5 bg-white/15 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide mb-6 border border-white/20">
               <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              SMART EXAM ANALYTICS PLATFORM
+              SISTEM ANALISIS HASIL ULANGAN
             </div>
             <div class="flex items-center gap-3 mb-4">
               <div
-                class="w-11 h-11 rounded-2xl bg-white text-indigo-600 flex items-center justify-center font-extrabold text-xl shadow-lg">
-                F
+                class="w-11 h-11 rounded-2xl bg-white text-indigo-600 flex items-center justify-center font-extrabold text-lg tracking-tight shadow-lg">
+                SH
               </div>
-              <span class="text-2xl font-extrabold tracking-tight">Flowora <span
-                  class="font-medium text-indigo-200">Edu</span></span>
+              <div>
+                <div class="text-2xl font-extrabold tracking-tight leading-none">SIHASUL</div>
+                <div class="text-xs font-medium text-indigo-200 mt-1">Analisis Hasil Ulangan</div>
+              </div>
             </div>
             <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-4">
               Satu Platform.<br />Analisis Ulangan Tanpa Batas.
@@ -429,12 +431,12 @@
           <div class="flex items-center justify-between px-2 mb-8">
             <div class="flex items-center gap-3">
               <div
-                class="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-md shadow-indigo-500/30">
-                F
+                class="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-base tracking-tight shadow-md shadow-indigo-500/30">
+                SH
               </div>
               <div>
-                <div class="font-extrabold text-lg leading-none text-slate-900">Flowora</div>
-                <div class="text-[11px] font-semibold text-indigo-600 mt-0.5">EduAnalytics Pro</div>
+                <div class="font-extrabold text-lg leading-none text-slate-900">SIHASUL</div>
+                <div class="text-[11px] font-semibold text-indigo-600 mt-0.5">Analisis Hasil Ulangan</div>
               </div>
             </div>
             <span id="sidebar-role-badge"
@@ -462,10 +464,16 @@
               <div id="user-display-sub" class="text-[11px] text-slate-500 truncate">Matematika Wajib</div>
             </div>
           </div>
-          <button type="button" id="btn-logout-desktop" onclick="window.handleLogout()"
-            class="w-full py-2 px-3 rounded-full bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-bold transition flex items-center justify-center gap-1.5">
-            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Keluar Sesi
-          </button>
+          <div class="space-y-2">
+            <button type="button" id="btn-return-admin-desktop" onclick="window.handleReturnToAdmin()"
+              class="hidden w-full py-2 px-3 rounded-full bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 text-xs font-bold transition items-center justify-center gap-1.5">
+              <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i> Kembali ke Admin
+            </button>
+            <button type="button" id="btn-logout-desktop" onclick="window.handleLogout()"
+              class="w-full py-2 px-3 rounded-full bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Keluar Sesi
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -477,8 +485,8 @@
           class="no-print h-16 md:h-20 px-4 md:px-8 glass-surface border-b border-slate-200/80 flex items-center justify-between gap-4 shrink-0 z-10">
           <div class="flex items-center gap-3 min-w-0">
             <div
-              class="lg:hidden w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-base shrink-0">
-              F
+              class="lg:hidden w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-sm tracking-tight shrink-0">
+              SH
             </div>
             <div class="min-w-0">
               <h1 id="page-header-title" class="text-base md:text-xl font-extrabold text-slate-900 truncate">Dashboard</h1>
@@ -505,6 +513,13 @@
                 <!-- Populated dynamically -->
               </select>
             </div>
+
+            <button type="button" id="btn-return-admin-header" onclick="window.handleReturnToAdmin()"
+              class="hidden items-center gap-1.5 px-3 py-2 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-[11px] font-bold transition shrink-0"
+              title="Kembali ke akun Administrator">
+              <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline">Kembali ke Admin</span>
+            </button>
 
             <button type="button" id="btn-logout-mobile" onclick="window.handleLogout()"
               class="lg:hidden p-2.5 rounded-full bg-slate-100 text-slate-600 hover:text-rose-600 transition" title="Keluar">
@@ -765,6 +780,7 @@
     const state = {
       authRoleTab: 'guru', // 'guru' | 'admin'
       currentUser: null,   // { id, role, full_name, username, subject, class_assigned }
+      impersonatedByAdmin: null, // Menyimpan profil Admin asal saat beralih langsung ke akun Guru
       activeMenu: 'dashboard',
       activeExamId: null,
       supabaseAccessToken: null,
@@ -902,6 +918,7 @@
         }
         localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
           currentUser: state.currentUser,
+          impersonatedByAdmin: state.impersonatedByAdmin || null,
           activeMenu: state.activeMenu,
           activeExamId: state.activeExamId,
           savedAt: Date.now()
@@ -1592,7 +1609,7 @@
 
     function formatTeacherHeaderSub(user) {
       if (!user) return '';
-      if (user.role === 'admin') return `${user.subject} • ${user.class_assigned}`;
+      if (user.role === 'admin') return 'MIS. Nurul Islam Km. 5';
       const meta = decodeTeacherMeta(user);
       return `${meta.jabatan} • ${meta.classAssigned} • ${user.subject || '-'}`;
     }
@@ -2324,7 +2341,7 @@
         idLabel.textContent = 'Username Admin';
         idInput.type = 'email';
         idInput.placeholder = 'Masukkan username admin';
-        helperText.innerHTML = '<strong>Mode Admin:</strong> Masuk menggunakan <strong>Supabase Authentication</strong> (Email & Password) untuk akses penuh kurikulum.';
+        helperText.innerHTML = '<strong>Mode Admin:</strong> Masuk menggunakan <strong>Supabase Authentication</strong> (Email & Password) untuk akses penuh administrator.';
       }
     };
 
@@ -2371,10 +2388,10 @@
               state.currentUser = {
                 id: 'admin-preview-uid',
                 role: 'admin',
-                full_name: 'Administrator Kurikulum',
+                full_name: 'Administrator',
                 username: identifier,
-                subject: 'Semua Mata Pelajaran',
-                class_assigned: 'Seluruh Kelas'
+                subject: 'MIS. Nurul Islam Km. 5',
+                class_assigned: 'Semua Kelas'
               };
             } else {
               triggerAuthShake();
@@ -2395,10 +2412,10 @@
             state.currentUser = {
               id: data.user.id,
               role: 'admin',
-              full_name: 'Administrator Kurikulum',
+              full_name: 'Administrator',
               username: data.user.email,
-              subject: 'Semua Mata Pelajaran',
-              class_assigned: 'Seluruh Kelas'
+              subject: 'MIS. Nurul Islam Km. 5',
+              class_assigned: 'Semua Kelas'
             };
           }
         } else {
@@ -2442,6 +2459,7 @@
         }
 
         // Animasi Login + Sinkronisasi Otomatis ke Supabase
+        state.impersonatedByAdmin = null;
         saveSessionToStorage();
         showActionOverlay({
           stateType: 'loading',
@@ -2481,13 +2499,14 @@
         // Sinkronkan terlebih dahulu sebelum signOut agar sesi & token tetap valid saat upload ke Supabase
         await syncWithSupabase({ reason: 'logout' });
 
-        if (!IS_PREVIEW && supabase && state.currentUser?.role === 'admin') {
+        if (!IS_PREVIEW && supabase && (state.currentUser?.role === 'admin' || state.impersonatedByAdmin)) {
           await supabase.auth.signOut();
         }
       } catch (e) {
         console.warn('Logout sync warning:', e);
       } finally {
         state.currentUser = null;
+        state.impersonatedByAdmin = null;
         state.activeMenu = 'dashboard';
         state.supabaseAccessToken = null;
         clearSessionFromStorage();
@@ -2495,6 +2514,7 @@
         const passInput = document.getElementById('login-password');
         if (passInput) passInput.value = '';
         setLoginPasswordVisibility(false);
+        updateImpersonationUI();
 
         showActionOverlay({
           stateType: 'logout-done',
@@ -2512,6 +2532,125 @@
         if (mobileBtn) mobileBtn.disabled = false;
         showToast('Data tersinkron ke Supabase & Anda telah keluar dari sesi.', 'info');
       }
+    };
+
+    function updateImpersonationUI() {
+      const isSwitched = Boolean(state.impersonatedByAdmin && state.currentUser?.role === 'guru');
+      const desktopBtn = document.getElementById('btn-return-admin-desktop');
+      const headerBtn = document.getElementById('btn-return-admin-header');
+
+      if (desktopBtn) {
+        desktopBtn.classList.toggle('hidden', !isSwitched);
+        desktopBtn.classList.toggle('flex', isSwitched);
+      }
+      if (headerBtn) {
+        headerBtn.classList.toggle('hidden', !isSwitched);
+        headerBtn.classList.toggle('inline-flex', isSwitched);
+      }
+    }
+
+    window.handleSwitchToTeacher = async function (teacherId) {
+      if (state.currentUser?.role !== 'admin' && !state.impersonatedByAdmin) {
+        showToast('Fitur beralih akun hanya tersedia untuk Administrator.', 'warning');
+        return;
+      }
+
+      const teacher = state.teachers.find(t => t.id === teacherId);
+      if (!teacher) {
+        showToast('Data guru tidak ditemukan.', 'danger');
+        return;
+      }
+
+      closeFormModal({ resetEditState: false });
+      showActionOverlay({
+        stateType: 'loading',
+        title: 'Beralih ke Akun Guru...',
+        subtitle: `Membuka workspace ${teacher.full_name}`
+      });
+
+      try {
+        await flushPendingSyncToSupabase();
+      } catch (e) { }
+
+      if (state.currentUser?.role === 'admin') {
+        state.impersonatedByAdmin = { ...state.currentUser };
+      }
+
+      state.currentUser = {
+        id: teacher.id,
+        role: 'guru',
+        full_name: teacher.full_name,
+        username: teacher.username,
+        subject: teacher.subject,
+        class_assigned: teacher.class_assigned
+      };
+      state.activeMenu = 'dashboard';
+      state.editingSubjectId = null;
+      state.editingStudentId = null;
+      state.editingTeacherId = null;
+      saveSessionToStorage();
+
+      await sleep(320);
+      showActionOverlay({
+        stateType: 'success',
+        title: 'Berhasil Beralih Akun!',
+        subtitle: `${teacher.full_name} • Masuk sebagai Guru`
+      });
+      await sleep(380);
+      await enterWorkspace({ animate: true });
+      await hideActionOverlay();
+      showToast(`Berhasil beralih ke akun ${teacher.full_name}.`, 'success');
+    };
+
+    window.handleReturnToAdmin = async function () {
+      if (!state.impersonatedByAdmin) return;
+
+      showActionOverlay({
+        stateType: 'loading',
+        title: 'Kembali ke Akun Admin...',
+        subtitle: `Memulihkan sesi ${state.impersonatedByAdmin.full_name}`
+      });
+
+      if (!IS_PREVIEW && supabase) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.user) {
+            state.currentUser = null;
+            state.impersonatedByAdmin = null;
+            state.activeMenu = 'dashboard';
+            clearSessionFromStorage();
+            updateImpersonationUI();
+            await switchViewAnimated(
+              document.getElementById('app-view'),
+              document.getElementById('auth-view')
+            );
+            await hideActionOverlay();
+            showToast('Sesi Supabase Auth Admin telah berakhir, silakan masuk kembali.', 'warning');
+            return;
+          }
+          state.supabaseAccessToken = session.access_token || null;
+        } catch (e) { }
+      }
+
+      closeFormModal({ resetEditState: false });
+      state.currentUser = { ...state.impersonatedByAdmin };
+      state.impersonatedByAdmin = null;
+      state.activeMenu = 'manajemen_guru';
+      state.editingSubjectId = null;
+      state.editingStudentId = null;
+      state.editingTeacherId = null;
+      saveSessionToStorage();
+
+      await sleep(320);
+      showActionOverlay({
+        stateType: 'success',
+        title: 'Kembali ke Admin!',
+        subtitle: `${state.currentUser.full_name} • MIS. Nurul Islam Km. 5`
+      });
+      await sleep(380);
+      await enterWorkspace({ animate: true });
+      await hideActionOverlay();
+      showToast(`Kembali ke akun ${state.currentUser.full_name}.`, 'info');
     };
 
     async function enterWorkspace({ animate = true, fromRefresh = false } = {}) {
@@ -2532,20 +2671,26 @@
 
       // Update User Info in Sidebar
       const u = state.currentUser;
+      const isSwitched = Boolean(state.impersonatedByAdmin && u.role === 'guru');
       const initials = u.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
       document.getElementById('user-avatar-circle').textContent = initials;
       document.getElementById('user-display-name').textContent = u.full_name;
-      document.getElementById('user-display-sub').textContent = formatTeacherHeaderSub(u);
+      document.getElementById('user-display-sub').textContent = isSwitched
+        ? `${formatTeacherHeaderSub(u)} • Mode Admin`
+        : formatTeacherHeaderSub(u);
 
       const roleBadge = document.getElementById('sidebar-role-badge');
       if (u.role === 'admin') {
         roleBadge.textContent = 'ADMIN';
         roleBadge.className = 'px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200';
       } else {
-        roleBadge.textContent = 'GURU';
-        roleBadge.className = 'px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200';
+        roleBadge.textContent = isSwitched ? 'MODE GURU' : 'GURU';
+        roleBadge.className = isSwitched
+          ? 'px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200'
+          : 'px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200';
       }
 
+      updateImpersonationUI();
       mergeSubjectsState();
       populateExamSelectors();
       renderNavigationMenus();
@@ -2697,7 +2842,7 @@
       const target = MENU_CONFIG.find(m => m.id === menuId);
       if (!target) return;
       if (!target.roles.includes(state.currentUser?.role)) {
-        showToast('Menu ini khusus untuk Administrator Kurikulum.', 'warning');
+        showToast('Menu ini khusus untuk Administrator.', 'warning');
         return;
       }
       closeFormModal({ resetEditState: false });
@@ -3007,7 +3152,7 @@
         <div class="space-y-2 max-w-2xl relative z-10">
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200/60 text-indigo-700 text-xs font-bold">
             <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
-            FLOWORA INTELLIGENT ANALYTICS
+            SISTEM ANALISIS HASIL ULANGAN
           </div>
           <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
             Analisis Ketuntasan & Kualitas Soal <span class="flowora-gradient-text">${exam ? exam.class_name : 'Sekolah'}</span>
@@ -3245,37 +3390,30 @@
     function renderManajemenUlanganView() {
       if (state.subjects.length === 0) mergeSubjectsState();
 
-      const teacherGrade = state.currentUser?.role === 'guru' ? decodeTeacherMeta(state.currentUser).classAssigned : '';
-      const defaultExamClass = GRADE_CLASS_OPTIONS.includes(teacherGrade) ? teacherGrade : GRADE_CLASS_OPTIONS[0];
-      const classOptions = GRADE_CLASS_OPTIONS.map(cls =>
-        `<option value="${escapeHtml(cls)}" ${cls === defaultExamClass ? 'selected' : ''}>${escapeHtml(cls)}</option>`
+      const classOptions = '<option value="" selected>-- Pilih Kelas --</option>' + GRADE_CLASS_OPTIONS.map(cls =>
+        `<option value="${escapeHtml(cls)}">${escapeHtml(cls)}</option>`
       ).join('');
-      const titleOptions = EXAM_TITLE_OPTIONS.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-
-      const userSubjects = state.currentUser?.role === 'guru' ? parseTeacherSubjects(state.currentUser.subject) : [];
-      const defaultSubject = (userSubjects.length > 0 && state.subjects.some(s => s.name.toLowerCase() === userSubjects[0].toLowerCase()))
-        ? state.subjects.find(s => s.name.toLowerCase() === userSubjects[0].toLowerCase()).name
-        : (state.subjects[0]?.name || '');
+      const titleOptions = '<option value="" selected>-- Pilih Judul Ulangan / Penilaian --</option>' + EXAM_TITLE_OPTIONS.map(t =>
+        `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`
+      ).join('');
 
       const subjectOptions = state.subjects.length > 0
-        ? state.subjects.map(s =>
-          `<option value="${escapeHtml(s.name)}" ${s.name === defaultSubject ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
-        ).join('')
-        : '<option value="">Belum ada mapel</option>';
+        ? '<option value="" selected>-- Pilih Mata Pelajaran --</option>' + state.subjects.map(s =>
+            `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`
+          ).join('')
+        : '<option value="" selected>Belum ada mata pelajaran</option>';
 
-      const defaultTeacherObj = getSubjectTeacher(defaultSubject) || (state.currentUser?.role === 'guru' ? state.teachers.find(t => t.id === state.currentUser.id) : null) || state.teachers[0];
       const teacherOptions = state.teachers.length > 0
-        ? `<option value="">-- Pilih Nama Guru --</option>` + state.teachers.map(t =>
-          `<option value="${t.id}" ${defaultTeacherObj && t.id === defaultTeacherObj.id ? 'selected' : ''}>${escapeHtml(t.full_name)}</option>`
-        ).join('')
-        : '<option value="">Belum ada data guru</option>';
+        ? '<option value="" selected>-- Pilih Nama Guru --</option>' + state.teachers.map(t =>
+            `<option value="${t.id}">${escapeHtml(t.full_name)}</option>`
+          ).join('')
+        : '<option value="" selected>Belum ada data guru</option>';
 
       const qTypeChecklistHtml = QUESTION_TYPE_ORDER.map(qType => {
         const qt = QUESTION_TYPES[qType];
-        const isChecked = qType === 'PG';
         return `
-          <label class="flex items-center gap-2.5 px-3 py-2 rounded-2xl border text-xs font-bold cursor-pointer transition select-none ${isChecked ? 'bg-indigo-50/80 border-indigo-300 text-indigo-900' : 'bg-slate-50 border-slate-200/80 text-slate-600 hover:border-indigo-200'}">
-            <input type="checkbox" name="exam-qtype-chk" value="${qt.id}" ${isChecked ? 'checked' : ''}
+          <label class="flex items-center gap-2.5 px-3 py-2 rounded-2xl border text-xs font-bold cursor-pointer transition select-none bg-slate-50 border-slate-200/80 text-slate-600 hover:border-indigo-200">
+            <input type="checkbox" name="exam-qtype-chk" value="${qt.id}"
               onchange="window.handleExamQuestionTypesChange(this)"
               class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shrink-0" />
             <span class="truncate">${qt.label}</span>
@@ -3285,31 +3423,27 @@
 
       const qTypeConfigCardsHtml = QUESTION_TYPE_ORDER.map(qType => {
         const qt = QUESTION_TYPES[qType];
-        const isChecked = qType === 'PG';
         const isNum = isNumericQuestionType(qType);
-        const defaultCount = isNum ? parseNumericScores(qt.defaultKey).length : qt.defaultKey.length;
-        const defaultWeight = isNum ? parseNumericScores(qt.defaultKey, defaultCount).reduce((a, b) => a + b, 0) : 0;
-        const initialCounter = isNum
-          ? `${defaultCount} / ${defaultCount} Nomor • Total Bobot ${defaultWeight}`
-          : `${defaultCount} / ${defaultCount} Karakter`;
+        const initialCounter = isNum ? '0 / 0 Nomor' : '0 / 0 Karakter';
 
         return `
           <div id="exam-qtype-card-${qt.id}" data-qtype="${qt.id}"
-            class="${isChecked ? '' : 'hidden '}p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/90 space-y-2.5">
+            class="hidden p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/90 space-y-2.5">
             <div class="flex items-center justify-between gap-2">
               <span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${qt.badgeClass}">${qt.label}</span>
-              <span id="key-length-counter-${qt.id}" class="text-[11px] font-extrabold text-emerald-600 shrink-0">${initialCounter}</span>
+              <span id="key-length-counter-${qt.id}" class="text-[11px] font-extrabold text-slate-400 shrink-0">${initialCounter}</span>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
               <div class="sm:col-span-4">
                 <label class="block text-[11px] font-bold text-slate-600 mb-1">Jumlah Soal</label>
-                <input type="number" id="exam-total-${qt.id}" ${isChecked ? '' : 'disabled'} required min="1" max="100" value="${defaultCount}"
+                <input type="number" id="exam-total-${qt.id}" disabled required min="1" max="100" value=""
                   oninput="window.syncAnswerKeyLength('${qt.id}')"
+                  placeholder="Contoh: 10"
                   class="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div class="sm:col-span-8">
                 <label class="block text-[11px] font-bold text-slate-600 mb-1">${qt.keyLabel}</label>
-                <input type="text" id="exam-answer-key-${qt.id}" ${isChecked ? '' : 'disabled'} required value="${qt.defaultKey}"
+                <input type="text" id="exam-answer-key-${qt.id}" disabled required value=""
                   oninput="window.syncAnswerKeyLength('${qt.id}')"
                   placeholder="${qt.keyPlaceholder}"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-indigo-50/50 border border-indigo-200 font-mono text-xs font-extrabold tracking-widest ${isNum ? '' : 'uppercase'} text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
@@ -3367,18 +3501,18 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Pilih Kelas</label>
-                <select id="exam-class" class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <select id="exam-class" required class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
                   ${classOptions}
                 </select>
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Nilai KKM</label>
-                <input type="number" id="exam-kkm" required min="1" max="100" value="75"
+                <input type="number" id="exam-kkm" required min="1" max="100" value="" placeholder="Contoh: 75"
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal</label>
-                <input type="date" id="exam-date" required value="${new Date().toISOString().split('T')[0]}"
+                <input type="date" id="exam-date" required value=""
                   class="w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
             </div>
@@ -3386,7 +3520,7 @@
             <div class="space-y-2">
               <div class="flex items-center justify-between gap-2">
                 <label class="text-xs font-bold text-slate-700">Jenis Soal <span class="font-medium text-slate-400">(Pilih 1 atau lebih)</span></label>
-                <span id="exam-total-summary-badge" class="text-[11px] font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full">1 Jenis • 10 Soal</span>
+                <span id="exam-total-summary-badge" class="text-[11px] font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full">0 Jenis • 0 Soal</span>
               </div>
               <div class="grid grid-cols-2 gap-2">
                 ${qTypeChecklistHtml}
@@ -3488,6 +3622,10 @@
       const subjSelect = document.getElementById('exam-subject');
       const teacherSelect = document.getElementById('exam-teacher');
       if (!subjSelect || !teacherSelect) return;
+      if (!subjSelect.value) {
+        teacherSelect.value = '';
+        return;
+      }
       const teacherObj = getSubjectTeacher(subjSelect.value);
       if (teacherObj) {
         teacherSelect.value = teacherObj.id;
@@ -3505,16 +3643,9 @@
       badgeEl.textContent = `${checkedTypes.length} Jenis • ${checkedTypes.length > 1 ? `Total ${totalQ} Soal` : `${totalQ} Soal`}`;
     }
 
-    window.handleExamQuestionTypesChange = function (changedChk = null) {
+    window.handleExamQuestionTypesChange = function () {
       const checkboxes = Array.from(document.querySelectorAll('input[name="exam-qtype-chk"]'));
       if (checkboxes.length === 0) return;
-
-      let checkedBoxes = checkboxes.filter(cb => cb.checked);
-      if (checkedBoxes.length === 0 && changedChk) {
-        changedChk.checked = true;
-        showToast('Minimal pilih 1 jenis soal untuk paket ulangan.', 'warning');
-        checkedBoxes = checkboxes.filter(cb => cb.checked);
-      }
 
       checkboxes.forEach(cb => {
         const qt = cb.value;
@@ -3548,9 +3679,25 @@
       const counter = document.getElementById(`key-length-counter-${targetType}`);
       if (!totalInput || !keyInput || !counter) return;
 
-      const targetLen = Math.max(1, Number(totalInput.value) || 1);
+      const rawTotal = Number(totalInput.value);
+      const targetLen = Number.isFinite(rawTotal) && rawTotal >= 1 ? Math.floor(rawTotal) : 0;
       const cleanVal = sanitizeAnswerInputValue(targetType, keyInput.value);
       if (cleanVal !== keyInput.value) keyInput.value = cleanVal;
+
+      if (targetLen === 0) {
+        if (isNumericQuestionType(targetType)) {
+          const scores = cleanVal ? parseNumericScores(cleanVal) : [];
+          const totalMax = scores.reduce((acc, n) => acc + n, 0);
+          counter.textContent = cleanVal
+            ? `${scores.length} / 0 Nomor • Total Bobot ${totalMax}`
+            : '0 / 0 Nomor';
+        } else {
+          counter.textContent = `${cleanVal.length} / 0 Karakter`;
+        }
+        counter.className = 'text-[11px] font-extrabold text-slate-400 shrink-0';
+        updateExamSummaryBadge();
+        return;
+      }
 
       if (isNumericQuestionType(targetType)) {
         const scores = parseNumericScores(cleanVal, targetLen);
@@ -3574,13 +3721,33 @@
       e.preventDefault();
       const title = document.getElementById('exam-title').value.trim();
       const subject = document.getElementById('exam-subject').value.trim();
-      const teacherId = document.getElementById('exam-teacher')?.value || (state.currentUser?.role === 'guru' ? state.currentUser.id : (state.teachers[0]?.id || null));
-      const className = document.getElementById('exam-class').value;
+      const teacherId = document.getElementById('exam-teacher')?.value || (state.currentUser?.role === 'guru' ? state.currentUser.id : null);
+      const className = document.getElementById('exam-class').value.trim();
       const kkm = Number(document.getElementById('exam-kkm').value);
       const examDate = document.getElementById('exam-date').value;
 
+      if (!title) {
+        showToast('Pilih Judul Ulangan / Penilaian terlebih dahulu.', 'warning');
+        return;
+      }
+
       if (!subject) {
         showToast('Pilih Mata Pelajaran terlebih dahulu (atau tambahkan di menu Mapel).', 'warning');
+        return;
+      }
+
+      if (!className) {
+        showToast('Pilih Kelas terlebih dahulu.', 'warning');
+        return;
+      }
+
+      if (!Number.isFinite(kkm) || kkm < 1 || kkm > 100) {
+        showToast('Masukkan Nilai KKM antara 1 hingga 100.', 'warning');
+        return;
+      }
+
+      if (!examDate) {
+        showToast('Pilih Tanggal ulangan terlebih dahulu.', 'warning');
         return;
       }
 
@@ -5309,6 +5476,12 @@
                   </td>
                   <td class="py-3 px-3 text-right whitespace-nowrap">
                     <div class="inline-flex items-center justify-end gap-1">
+                      <button type="button" onclick="window.handleSwitchToTeacher('${t.id}')"
+                        class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white text-[11px] font-bold transition mr-1"
+                        title="Beralih langsung ke akun ${escapeHtml(t.full_name)}">
+                        <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+                        <span>Beralih</span>
+                      </button>
                       <button type="button" onclick="window.handleEditTeacher('${t.id}')"
                         class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit Guru">
                         <i data-lucide="pencil" class="w-4 h-4"></i>
@@ -5787,15 +5960,25 @@
         try {
           const { data: { session } } = await supabase.auth.getSession();
           state.supabaseAccessToken = session?.access_token || null;
-          if (savedSession?.currentUser?.role === 'admin' && !session?.user) {
+          if ((savedSession?.currentUser?.role === 'admin' || savedSession?.impersonatedByAdmin) && !session?.user) {
             clearSessionFromStorage();
             savedSession.currentUser = null;
+            savedSession.impersonatedByAdmin = null;
           }
         } catch (e) { }
       }
 
       if (savedSession?.currentUser) {
+        if (savedSession.currentUser.role === 'admin') {
+          savedSession.currentUser.full_name = 'Administrator';
+          savedSession.currentUser.subject = 'MIS. Nurul Islam Km. 5';
+        }
+        if (savedSession.impersonatedByAdmin?.role === 'admin') {
+          savedSession.impersonatedByAdmin.full_name = 'Administrator';
+          savedSession.impersonatedByAdmin.subject = 'MIS. Nurul Islam Km. 5';
+        }
         state.currentUser = savedSession.currentUser;
+        state.impersonatedByAdmin = savedSession.impersonatedByAdmin || null;
         state.activeMenu = savedSession.activeMenu || 'dashboard';
         if (savedSession.activeExamId) state.activeExamId = savedSession.activeExamId;
         await enterWorkspace({ animate: true, fromRefresh: true });
@@ -5818,8 +6001,15 @@
             class_assigned: freshTeacher.class_assigned
           };
           saveSessionToStorage();
+        } else if (state.impersonatedByAdmin) {
+          state.currentUser = { ...state.impersonatedByAdmin };
+          state.impersonatedByAdmin = null;
+          state.activeMenu = 'manajemen_guru';
+          saveSessionToStorage();
+          showToast('Akun guru tidak lagi aktif, dikembalikan ke akun Admin.', 'warning');
         } else {
           state.currentUser = null;
+          state.impersonatedByAdmin = null;
           state.activeMenu = 'dashboard';
           clearSessionFromStorage();
           await switchViewAnimated(
