@@ -820,6 +820,7 @@
       editingStudentId: null,
       editingTeacherId: null,
       editingExamId: null,
+      editingResultId: null,
       subjects: [],
       students: [],
       teachers: [],
@@ -2552,6 +2553,7 @@
         state.editingStudentId = null;
         state.editingTeacherId = null;
         state.editingExamId = null;
+        state.editingResultId = null;
         state.headerExamClassFilter = 'ALL';
         state.examClassFilter = 'ALL';
         state.examSubjectFilter = 'ALL';
@@ -2637,6 +2639,7 @@
       state.editingStudentId = null;
       state.editingTeacherId = null;
       state.editingExamId = null;
+      state.editingResultId = null;
       state.headerExamClassFilter = 'ALL';
       state.examClassFilter = 'ALL';
       state.examSubjectFilter = 'ALL';
@@ -2693,6 +2696,7 @@
       state.editingStudentId = null;
       state.editingTeacherId = null;
       state.editingExamId = null;
+      state.editingResultId = null;
       state.headerExamClassFilter = 'ALL';
       state.examClassFilter = 'ALL';
       state.examSubjectFilter = 'ALL';
@@ -2887,6 +2891,7 @@
 
     window.handleHeaderClassFilterChange = function (className) {
       state.headerExamClassFilter = className || 'ALL';
+      state.editingResultId = null;
       state.pagination.inputResults = 1;
       state.pagination.itemAnalysis = 1;
       state.pagination.remedial = 1;
@@ -2995,6 +3000,7 @@
         state.headerExamClassFilter = 'ALL';
       }
       state.activeExamId = examId;
+      state.editingResultId = null;
       state.pagination.inputResults = 1;
       state.pagination.itemAnalysis = 1;
       state.pagination.remedial = 1;
@@ -3027,6 +3033,7 @@
       state.editingStudentId = null;
       state.editingTeacherId = null;
       state.editingExamId = null;
+      state.editingResultId = null;
       saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -3302,6 +3309,9 @@
       void container.offsetWidth;
       container.classList.add('animate-view-in');
       lucide.createIcons({ nodes: [container] });
+      if (state.activeMenu === 'input_nilai' && state.editingResultId) {
+        window.previewLiveScore();
+      }
     }
 
     // ==================== 1. DASHBOARD ANALITIK (FLOWORA BENTO STYLE) ====================
@@ -4579,14 +4589,44 @@
       `).join('')}</div>`;
     }
 
+    function normalizeStudentMatchText(val) {
+      return String(val || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+
+    function findExistingExamResultForStudent(examId, nis, fullName = '', excludeResultId = null) {
+      if (!examId) return null;
+      const cleanNis = normalizeStudentMatchText(nis);
+      const cleanName = normalizeStudentMatchText(fullName);
+      if (!cleanNis && !cleanName) return null;
+      return state.examResults.find(r => {
+        if (r.exam_id !== examId) return false;
+        if (excludeResultId && r.id === excludeResultId) return false;
+        const rNis = normalizeStudentMatchText(r.student_nis);
+        const rName = normalizeStudentMatchText(r.student_name);
+        if (cleanNis && rNis && rNis === cleanNis) return true;
+        if (cleanName && rName && rName === cleanName && (!cleanNis || !rNis)) return true;
+        return false;
+      }) || null;
+    }
+
     function renderInputNilaiView(exam, stats) {
       if (!exam) {
         return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Silakan buat Paket Ulangan terlebih dahulu pada menu <strong>Paket Ulangan & Kunci</strong>.</div>`;
       }
 
+      const editingResult = state.editingResultId
+        ? stats.results.find(r => r.id === state.editingResultId)
+        : null;
+      if (state.editingResultId && !editingResult) state.editingResultId = null;
+
       const examMeta = decodeExamMeta(exam);
       const isNumType = isNumericQuestionType(examMeta.questionType);
       const showNumericScoreCol = examMeta.hasWeightedScore;
+      const initStudentName = editingResult ? String(editingResult.student_name || '') : '';
+      const initStudentNis = editingResult ? String(editingResult.student_nis || '') : '';
+      const initStudentNotes = editingResult ? String(editingResult.notes || '') : '';
+      const editSectionAnswers = editingResult ? parseStudentAnswerSections(examMeta, editingResult.student_answers) : {};
+
       const headerBadgesHtml = examMeta.sections.map(sec => {
         const w = !isNumericQuestionType(sec.questionType) && sec.scorePerItem !== 1 ? ` • @${sec.scorePerItem}` : '';
         const label = examMeta.isMultiType ? `${sec.typeMeta.shortLabel} (${sec.count}${w})` : `${sec.typeMeta.label}${w}`;
@@ -4628,13 +4668,14 @@
           <div class="space-y-2.5">
             <div class="flex items-center justify-between">
               <label class="text-xs font-bold text-slate-700">Jawaban / Skor Siswa (${exam.total_questions} Soal)</label>
-              <button type="button" onclick="window.fillRandomStudentAnswer()" class="text-[11px] font-bold text-indigo-600 hover:underline">
+              <button type="button" id="btn-fill-random-answer" onclick="window.fillRandomStudentAnswer()" class="text-[11px] font-bold text-indigo-600 hover:underline">
                 + Isi Simulasi Cepat
               </button>
             </div>
             <div class="space-y-2.5">
               ${examMeta.sections.map(sec => {
           const secIsNum = isNumericQuestionType(sec.questionType);
+          const initSecVal = editingResult ? String(editSectionAnswers[sec.questionType] || '') : '';
           return `
                   <div class="p-3 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-1.5">
                     <div class="flex items-center justify-between gap-2">
@@ -4644,7 +4685,7 @@
                       </span>
                       <span id="student-ans-counter-${sec.questionType}" class="text-[11px] font-extrabold text-slate-400">0 / ${sec.count}</span>
                     </div>
-                    <input type="text" id="student-answers-${sec.questionType}" required maxlength="${secIsNum ? 250 : sec.count}" oninput="window.previewLiveScore()"
+                    <input type="text" id="student-answers-${sec.questionType}" required maxlength="${secIsNum ? 250 : sec.count}" value="${escapeHtml(initSecVal)}" oninput="window.previewLiveScore()"
                       placeholder="${sec.typeMeta.studentPlaceholder}"
                       class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 font-mono text-xs font-extrabold tracking-widest ${secIsNum ? '' : 'uppercase'} text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                     <p class="text-[10px] text-slate-500">
@@ -4662,11 +4703,11 @@
           <div>
             <div class="flex items-center justify-between mb-1.5">
               <label class="text-xs font-bold text-slate-700">${examMeta.typeMeta.studentLabel} (${exam.total_questions} Soal)</label>
-              <button type="button" onclick="window.fillRandomStudentAnswer()" class="text-[11px] font-bold text-indigo-600 hover:underline">
+              <button type="button" id="btn-fill-random-answer" onclick="window.fillRandomStudentAnswer()" class="text-[11px] font-bold text-indigo-600 hover:underline">
                 + Isi Simulasi Cepat
               </button>
             </div>
-            <input type="text" id="student-answers" required maxlength="${isNumType ? 250 : exam.total_questions}" oninput="window.previewLiveScore()"
+            <input type="text" id="student-answers" required maxlength="${isNumType ? 250 : exam.total_questions}" value="${escapeHtml(editingResult ? String(editSectionAnswers[examMeta.questionType] || '') : '')}" oninput="window.previewLiveScore()"
               placeholder="${examMeta.typeMeta.studentPlaceholder}"
               class="w-full px-4 py-3 rounded-2xl bg-white border border-slate-300 font-mono text-sm font-extrabold tracking-widest ${isNumType ? '' : 'uppercase'} text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             <p class="text-[11px] text-slate-500 mt-1">
@@ -4685,14 +4726,17 @@
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <!-- Left Form: Input Lembar Jawaban Siswa -->
-        <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit">
+        <div id="input-nilai-form-card" class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit ${editingResult ? 'ring-2 ring-amber-300/80' : ''}">
           <div class="flex items-start justify-between gap-2 flex-wrap">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <i data-lucide="user-plus" class="w-5 h-5"></i>
+              <div class="w-10 h-10 rounded-2xl ${editingResult ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'} flex items-center justify-center shrink-0">
+                <i data-lucide="${editingResult ? 'pencil' : 'user-plus'}" class="w-5 h-5"></i>
               </div>
               <div class="min-w-0">
-                <h3 class="text-base font-extrabold text-slate-900">Input Jawaban Siswa</h3>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="text-base font-extrabold text-slate-900">${editingResult ? 'Edit Jawaban Siswa' : 'Input Jawaban Siswa'}</h3>
+                  ${editingResult ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-extrabold">Sedang Diedit</span>' : ''}
+                </div>
                 <p class="text-xs text-slate-500 truncate">${escapeHtml(exam.title)} (${escapeHtml(exam.class_name)})</p>
               </div>
             </div>
@@ -4705,34 +4749,66 @@
           ${keySummaryHtml}
 
           <form onsubmit="window.handleSaveStudentResult(event)" class="space-y-4">
-            ${state.students.length > 0 ? (() => {
+            ${editingResult ? `
+              <div class="p-3 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 flex items-center justify-between gap-2">
+                <div>
+                  <div class="font-extrabold">Mode Edit Jawaban Siswa</div>
+                  <div class="text-[11px] text-amber-800">Ubah jawaban/skor atau catatan lalu klik <strong>Simpan Perubahan Nilai</strong>.</div>
+                </div>
+                <button type="button" onclick="window.handleCancelEditStudentResult()"
+                  class="px-3 py-1 rounded-full bg-white border border-amber-300 text-amber-800 text-[11px] font-bold hover:bg-amber-100 transition shrink-0">
+                  Batal
+                </button>
+              </div>
+            ` : (state.students.length > 0 ? (() => {
         const matchingStudents = state.students.filter(stu => stu.class_name === exam.class_name);
         const listToPick = matchingStudents.length > 0 ? matchingStudents : state.students;
+        let lockedCount = 0;
+        const quickOptionsHtml = listToPick.map(stu => {
+          const existingRes = findExistingExamResultForStudent(exam.id, stu.nis, stu.full_name);
+          if (existingRes) {
+            lockedCount++;
+            return `<option value="${stu.id}" disabled class="text-slate-400">🔒 ${escapeHtml(stu.full_name)} • NIS: ${escapeHtml(stu.nis)} (Sudah Terisi • Nilai ${existingRes.score})</option>`;
+          }
+          return `<option value="${stu.id}">${escapeHtml(stu.full_name)} • NIS: ${escapeHtml(stu.nis)} (${escapeHtml(stu.class_name)})</option>`;
+        }).join('');
+        const remainingCount = listToPick.length - lockedCount;
         return `
               <div>
-                <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center justify-between mb-1.5 gap-2">
                   <label class="block text-xs font-bold text-slate-700">Pilih Cepat dari Data Siswa</label>
-                  <button type="button" onclick="window.navigateMenu('manajemen_siswa')" class="text-[11px] font-bold text-indigo-600 hover:underline">Kelola Siswa</button>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <span class="text-[11px] font-bold ${remainingCount === 0 ? 'text-emerald-600' : 'text-slate-500'}">${lockedCount} terisi • ${remainingCount} tersisa</span>
+                    <button type="button" onclick="window.navigateMenu('manajemen_siswa')" class="text-[11px] font-bold text-indigo-600 hover:underline">Kelola Siswa</button>
+                  </div>
                 </div>
-                <select onchange="window.pickStudentForInput(this.value)"
+                <select id="student-quick-pick" onchange="window.pickStudentForInput(this.value)"
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-indigo-50/50 border border-indigo-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="">-- Pilih Siswa ${matchingStudents.length > 0 ? `(${escapeHtml(exam.class_name)})` : '(Semua Kelas)'} atau ketik manual --</option>
-                  ${listToPick.map(stu => `<option value="${stu.id}">${escapeHtml(stu.full_name)} • NIS: ${escapeHtml(stu.nis)} (${escapeHtml(stu.class_name)})</option>`).join('')}
+                  <option value="">${remainingCount === 0 ? `-- Semua siswa ${matchingStudents.length > 0 ? `(${escapeHtml(exam.class_name)}) ` : ''}sudah terisi --` : `-- Pilih Siswa ${matchingStudents.length > 0 ? `(${escapeHtml(exam.class_name)})` : '(Semua Kelas)'} atau ketik manual --`}</option>
+                  ${quickOptionsHtml}
                 </select>
+                ${remainingCount === 0 ? `
+                  <p class="text-[11px] text-emerald-700 font-semibold mt-1.5 flex items-center gap-1">
+                    <i data-lucide="lock" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span>Seluruh siswa pada daftar sudah terisi & terkunci. Gunakan tombol <strong>Edit</strong> di tabel kanan untuk mengubah nilai.</span>
+                  </p>
+                ` : ''}
               </div>`;
-      })() : ''}
+      })() : '')}
             <div class="grid grid-cols-3 gap-3">
               <div class="col-span-2">
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap Siswa</label>
-                <input type="text" id="student-name" required placeholder="Contoh: Nadia Vega"
+                <input type="text" id="student-name" required value="${escapeHtml(initStudentName)}" oninput="window.checkDuplicateStudentLock()" placeholder="Contoh: Nadia Vega"
                   class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">NIS / Absen</label>
-                <input type="text" id="student-nis" required placeholder="102409"
+                <input type="text" id="student-nis" required value="${escapeHtml(initStudentNis)}" oninput="window.checkDuplicateStudentLock()" placeholder="102409"
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
             </div>
+
+            <div id="duplicate-student-lock-banner" class="hidden p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-900 flex items-start justify-between gap-3"></div>
 
             ${answerInputsHtml}
 
@@ -4747,13 +4823,24 @@
 
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">Catatan Evaluasi Guru (Opsional)</label>
-              <input type="text" id="student-notes" placeholder="Catatan penguasaan materi / indikator remedial"
+              <input type="text" id="student-notes" value="${escapeHtml(initStudentNotes)}" placeholder="Catatan penguasaan materi / indikator remedial"
                 class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
-            <button type="submit" class="w-full py-3.5 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
-              <i data-lucide="check-circle" class="w-4 h-4"></i> Koreksi & Simpan Nilai Siswa
-            </button>
+            <div class="flex items-center gap-2.5">
+              <button type="submit" id="student-result-submit-btn"
+                data-default-label="${editingResult ? 'Simpan Perubahan Nilai' : 'Koreksi &amp; Simpan Nilai Siswa'}"
+                class="flex-1 py-3.5 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4"></i>
+                <span id="student-result-submit-label">${editingResult ? 'Simpan Perubahan Nilai' : 'Koreksi & Simpan Nilai Siswa'}</span>
+              </button>
+              ${editingResult ? `
+                <button type="button" onclick="window.handleCancelEditStudentResult()"
+                  class="py-3.5 px-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition shrink-0">
+                  Batal
+                </button>
+              ` : ''}
+            </div>
           </form>
         </div>
 
@@ -4795,11 +4882,15 @@
                 ` : resultsPage.items.map(r => {
         const graded = scoreStudentResponse(exam, r.student_answers);
         const ansBadges = renderStudentAnswerChips(graded);
+        const isEditingRow = Boolean(editingResult && editingResult.id === r.id);
 
         return `
-                    <tr class="hover:bg-slate-50/80 transition">
+                    <tr class="transition ${isEditingRow ? 'bg-amber-50/70' : 'hover:bg-slate-50/80'}">
                       <td class="py-3 px-3">
-                        <div class="font-bold text-slate-900">${escapeHtml(r.student_name)}</div>
+                        <div class="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                          <span>${escapeHtml(r.student_name)}</span>
+                          ${isEditingRow ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-[9px] font-extrabold">Sedang Diedit</span>' : ''}
+                        </div>
                         <div class="text-[11px] text-slate-400">NIS: ${escapeHtml(r.student_nis)}</div>
                       </td>
                       <td class="py-3 px-3">${ansBadges}</td>
@@ -4815,9 +4906,16 @@
                         </span>
                       </td>
                       <td class="py-3 px-3 text-right">
-                        <button type="button" onclick="window.handleDeleteStudentResult('${r.id}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus">
-                          <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
+                        <div class="inline-flex items-center justify-end gap-1.5">
+                          <button type="button" onclick="window.handleEditStudentResult('${r.id}')"
+                            class="px-2.5 py-1 rounded-full ${isEditingRow ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700'} text-[11px] font-bold transition inline-flex items-center gap-1" title="Edit Jawaban & Nilai Siswa">
+                            <i data-lucide="pencil" class="w-3 h-3"></i> Edit
+                          </button>
+                          <button type="button" onclick="window.handleDeleteStudentResult('${r.id}')"
+                            class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   `;
@@ -4834,19 +4932,135 @@
     `;
     }
 
+    window.checkDuplicateStudentLock = function () {
+      const exam = getActiveExam();
+      if (!exam) return false;
+      const nameEl = document.getElementById('student-name');
+      const nisEl = document.getElementById('student-nis');
+      const lockBanner = document.getElementById('duplicate-student-lock-banner');
+      const submitBtn = document.getElementById('student-result-submit-btn');
+      const submitLabel = document.getElementById('student-result-submit-label');
+      const notesEl = document.getElementById('student-notes');
+      const randomBtn = document.getElementById('btn-fill-random-answer');
+      const answerInputs = Array.from(document.querySelectorAll('#input-nilai-form-card input[id^="student-answers"]'));
+
+      const duplicate = findExistingExamResultForStudent(
+        exam.id,
+        nisEl?.value || '',
+        nameEl?.value || '',
+        state.editingResultId || null
+      );
+      const isLocked = Boolean(duplicate);
+
+      answerInputs.forEach(inp => {
+        inp.disabled = isLocked;
+        inp.classList.toggle('bg-slate-100', isLocked);
+        inp.classList.toggle('text-slate-400', isLocked);
+        inp.classList.toggle('cursor-not-allowed', isLocked);
+        inp.classList.toggle('bg-white', !isLocked);
+      });
+      if (notesEl) {
+        notesEl.disabled = isLocked;
+        notesEl.classList.toggle('bg-slate-100', isLocked);
+        notesEl.classList.toggle('cursor-not-allowed', isLocked);
+      }
+      if (randomBtn) {
+        randomBtn.disabled = isLocked;
+        randomBtn.classList.toggle('opacity-40', isLocked);
+        randomBtn.classList.toggle('pointer-events-none', isLocked);
+      }
+      if (submitBtn) {
+        submitBtn.disabled = isLocked;
+        submitBtn.classList.toggle('opacity-50', isLocked);
+        submitBtn.classList.toggle('cursor-not-allowed', isLocked);
+      }
+      if (submitLabel && submitBtn) {
+        submitLabel.textContent = isLocked
+          ? 'Terkunci (Sudah Terisi)'
+          : (submitBtn.dataset.defaultLabel || 'Koreksi & Simpan Nilai Siswa');
+      }
+
+      if (lockBanner) {
+        if (duplicate) {
+          lockBanner.classList.remove('hidden');
+          lockBanner.innerHTML = `
+            <div class="flex items-start gap-2 min-w-0">
+              <i data-lucide="lock" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+              <div class="min-w-0">
+                <div class="font-extrabold text-amber-900">Siswa Sudah Terisi (Terkunci)</div>
+                <div class="text-[11px] text-amber-800 mt-0.5">
+                  <strong>${escapeHtml(duplicate.student_name)}</strong> (NIS: ${escapeHtml(duplicate.student_nis)}) sudah memiliki nilai <strong>${duplicate.score}</strong> pada ulangan ini.
+                </div>
+              </div>
+            </div>
+            <button type="button" onclick="window.handleEditStudentResult('${duplicate.id}')"
+              class="px-3 py-1.5 rounded-full bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 text-[11px] font-bold shrink-0 transition">
+              Edit Data
+            </button>
+          `;
+          if (window.lucide) lucide.createIcons({ nodes: [lockBanner] });
+        } else {
+          lockBanner.classList.add('hidden');
+          lockBanner.innerHTML = '';
+        }
+      }
+
+      return isLocked;
+    };
+
     window.pickStudentForInput = function (studentId) {
-      if (!studentId) return;
+      if (!studentId) {
+        window.checkDuplicateStudentLock();
+        return;
+      }
+      const exam = getActiveExam();
       const stu = state.students.find(s => s.id === studentId);
       if (!stu) return;
+
+      if (exam) {
+        const existingRes = findExistingExamResultForStudent(exam.id, stu.nis, stu.full_name, state.editingResultId || null);
+        if (existingRes) {
+          const selectEl = document.getElementById('student-quick-pick');
+          if (selectEl) selectEl.value = '';
+          showToast(`Siswa ${stu.full_name} sudah terisi nilainya (${existingRes.score}) dan otomatis terkunci. Klik Edit di tabel untuk mengubah.`, 'warning');
+          return;
+        }
+      }
+
       const nameEl = document.getElementById('student-name');
       const nisEl = document.getElementById('student-nis');
       if (nameEl) nameEl.value = stu.full_name || '';
       if (nisEl) nisEl.value = stu.nis || '';
+      window.checkDuplicateStudentLock();
+    };
+
+    window.handleEditStudentResult = function (resultId) {
+      const exam = getActiveExam();
+      if (!exam) return;
+      const target = state.examResults.find(r => r.id === resultId && r.exam_id === exam.id);
+      if (!target) return;
+      state.editingResultId = resultId;
+      renderCurrentMenu();
+      const formCard = document.getElementById('input-nilai-form-card');
+      if (formCard) {
+        formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      const examMeta = decodeExamMeta(exam);
+      const focusTarget = examMeta.isMultiType
+        ? document.getElementById(`student-answers-${examMeta.sections[0]?.questionType}`)
+        : document.getElementById('student-answers');
+      if (focusTarget) focusTarget.focus({ preventScroll: true });
+    };
+
+    window.handleCancelEditStudentResult = function () {
+      if (!state.editingResultId) return;
+      state.editingResultId = null;
+      renderCurrentMenu();
     };
 
     window.fillRandomStudentAnswer = function () {
       const exam = getActiveExam();
-      if (!exam) return;
+      if (!exam || window.checkDuplicateStudentLock()) return;
       const examMeta = decodeExamMeta(exam);
 
       if (!examMeta.isMultiType) {
@@ -4917,9 +5131,30 @@
       const exam = getActiveExam();
       if (!exam) return;
 
+      const editingId = state.editingResultId;
+      const existingResult = editingId ? state.examResults.find(r => r.id === editingId && r.exam_id === exam.id) : null;
+
       const studentName = document.getElementById('student-name').value.trim();
       const studentNis = document.getElementById('student-nis').value.trim();
       const notes = document.getElementById('student-notes').value.trim();
+
+      if (!studentName || !studentNis) {
+        showToast('Lengkapi Nama Lengkap dan NIS / Absen siswa terlebih dahulu.', 'warning');
+        return;
+      }
+
+      const duplicate = findExistingExamResultForStudent(
+        exam.id,
+        studentNis,
+        studentName,
+        existingResult ? existingResult.id : null
+      );
+      if (duplicate) {
+        window.checkDuplicateStudentLock();
+        showToast(`Siswa ${duplicate.student_name} (NIS: ${duplicate.student_nis}) sudah terisi nilainya! Gunakan tombol Edit pada tabel untuk mengubah.`, 'warning');
+        return;
+      }
+
       const examMeta = decodeExamMeta(exam);
       const rawAnswers = readAndSanitizeStudentInputs(examMeta);
       if (rawAnswers === null) return;
@@ -4948,8 +5183,8 @@
       const score = graded.score;
       const isPassed = score >= Number(exam.kkm);
 
-      const newResult = {
-        id: crypto.randomUUID(),
+      const resultRecord = {
+        id: existingResult ? existingResult.id : crypto.randomUUID(),
         exam_id: exam.id,
         student_name: studentName,
         student_nis: studentNis,
@@ -4960,20 +5195,37 @@
         notes: notes || (isPassed ? 'Tuntas KKM dengan baik.' : 'Perlu remedial pada butir soal yang belum tuntas.')
       };
 
+      const prevEditingId = state.editingResultId;
+      const prevResultCopy = existingResult ? { ...existingResult } : null;
       const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
+
       await saveRecordWithSync({
         submitterBtn,
         table: 'exam_results',
-        record: newResult,
-        overlayTitle: 'Menyimpan Nilai Siswa...',
-        overlaySuccessTitle: `Nilai ${studentName} Tersimpan!`,
+        record: resultRecord,
+        overlayTitle: existingResult ? 'Menyimpan Perubahan Nilai...' : 'Menyimpan Nilai Siswa...',
+        overlaySuccessTitle: existingResult ? `Nilai ${studentName} Diperbarui!` : `Nilai ${studentName} Tersimpan!`,
         overlaySuccessSub: `Skor ${score} • Otomatis tersinkron ke Supabase`,
-        toastMsg: `Nilai ${studentName} (Skor: ${score}) berhasil disimpan & tersinkron!`,
+        toastMsg: existingResult
+          ? `Perubahan nilai ${studentName} (Skor: ${score}) berhasil disimpan & tersinkron!`
+          : `Nilai ${studentName} (Skor: ${score}) berhasil disimpan & tersinkron!`,
         onLocalApply: () => {
-          state.examResults.push(newResult);
+          if (existingResult) {
+            const idx = state.examResults.findIndex(r => r.id === existingResult.id);
+            if (idx !== -1) state.examResults[idx] = resultRecord;
+            state.editingResultId = null;
+          } else {
+            state.examResults.push(resultRecord);
+          }
         },
         onRollback: () => {
-          state.examResults = state.examResults.filter(r => r.id !== newResult.id);
+          if (prevResultCopy) {
+            const idx = state.examResults.findIndex(r => r.id === prevResultCopy.id);
+            if (idx !== -1) state.examResults[idx] = prevResultCopy;
+            state.editingResultId = prevEditingId;
+          } else {
+            state.examResults = state.examResults.filter(r => r.id !== resultRecord.id);
+          }
         }
       });
     };
@@ -4988,6 +5240,7 @@
             recordId: resultId,
             onLocalDelete: () => {
               state.examResults = state.examResults.filter(r => r.id !== resultId);
+              if (state.editingResultId === resultId) state.editingResultId = null;
             },
             toastMsg: 'Data jawaban siswa dihapus dan tersinkron.'
           });
