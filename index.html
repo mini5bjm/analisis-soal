@@ -444,7 +444,8 @@
         text-transform: uppercase;
         padding: 6px 7px;
         border: 1px solid #cbd5e1;
-        text-align: left;
+        text-align: center;
+        vertical-align: middle;
       }
 
       .pr-table td {
@@ -607,7 +608,7 @@
               Satu Platform.<br />Analisis Ulangan Tanpa Batas.
             </h1>
             <p class="text-indigo-100/90 text-sm leading-relaxed">
-              Otomatisasi koreksi kunci jawaban, analisis tingkat kesukaran, daya pembeda butir soal, hingga pemetaan
+              Otomatisasi koreksi kunci jawaban, analisis tingkat kesukaran, capaian penguasaan siswa, hingga pemetaan
               program remedial & pengayaan secara real-time.
             </p>
           </div>
@@ -3032,7 +3033,7 @@
       { id: 'manajemen_mapel', label: 'Mapel & Kelas', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Kelola daftar mata pelajaran dan pembagian kelas untuk setiap mapel', roles: ['admin', 'guru'] },
       { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, jenis soal, KKM, jumlah butir, dan kunci jawaban', roles: ['admin', 'guru'] },
       { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban PG, Benar Salah, Isian, dan Uraian', roles: ['admin', 'guru'] },
-      { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Indeks tingkat kesukaran (P), daya pembeda (D), dan kualitas butir soal', roles: ['admin', 'guru'] },
+      { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Tingkat kesukaran (P), capaian penguasaan siswa, dan tindak lanjut pembelajaran', roles: ['admin', 'guru'] },
       { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['admin', 'guru'] }
     ];
 
@@ -3409,14 +3410,11 @@
       const remedialCount = totalStudents - passedCount;
       const classicalMastery = Math.round((passedCount / totalStudents) * 100);
 
-      // Split Upper Group (Kelompok Atas) and Lower Group (Kelompok Bawah) for Daya Pembeda (D)
-      const halfSize = Math.max(1, Math.floor(totalStudents / 2));
       const gradedAll = results.map(r => scoreStudentResponse(exam, r.student_answers));
-      const gradedUpper = gradedAll.slice(0, halfSize);
-      const gradedLower = gradedAll.slice(totalStudents - halfSize);
-
       const numQ = Number(exam.total_questions) || examMeta.totalQuestions || examMeta.keyItems.length;
       const itemAnalysis = [];
+      const kkmTarget = Math.max(1, Math.min(100, Number(exam.kkm) || 70));
+      const midThreshold = Math.max(35, Math.round(kkmTarget * 0.6));
 
       for (let i = 0; i < numQ; i++) {
         const itemMeta = examMeta.items[i] || null;
@@ -3426,7 +3424,6 @@
 
         let keyDisplay = '';
         let pIndex = 0;
-        let dIndex = 0;
         let correctTotal = 0;
         let correctPercent = 0;
         let optionCounts = null;
@@ -3438,39 +3435,23 @@
           maxScore = Number(itemMeta?.maxScore ?? examMeta.keyScores[i] ?? 0);
           keyDisplay = String(maxScore);
           const sumAll = gradedAll.reduce((acc, g) => acc + (g.itemResults[i]?.earned || 0), 0);
-          const sumUpper = gradedUpper.reduce((acc, g) => acc + (g.itemResults[i]?.earned || 0), 0);
-          const sumLower = gradedLower.reduce((acc, g) => acc + (g.itemResults[i]?.earned || 0), 0);
           correctTotal = gradedAll.filter(g => g.itemResults[i]?.isCorrect).length;
 
           meanScore = +(sumAll / totalStudents).toFixed(1);
-          const meanUpper = sumUpper / gradedUpper.length;
-          const meanLower = sumLower / gradedLower.length;
           pIndex = maxScore > 0 ? +((sumAll / totalStudents) / maxScore).toFixed(2) : 0;
-          dIndex = maxScore > 0 ? +((meanUpper - meanLower) / maxScore).toFixed(2) : 0;
           correctPercent = maxScore > 0 ? Math.min(100, Math.round(((sumAll / totalStudents) / maxScore) * 100)) : 0;
           metricSummary = `Rata ${meanScore}/${maxScore} Poin`;
         } else {
           keyDisplay = itemMeta?.keyVal || examMeta.keyItems[i] || (itemType === 'BS' ? 'B' : 'A');
           optionCounts = itemType === 'BS' ? { B: 0, S: 0 } : { A: 0, B: 0, C: 0, D: 0, E: 0 };
-          let upperCorrect = 0;
-          let lowerCorrect = 0;
 
           gradedAll.forEach(g => {
             const ans = g.itemResults[i]?.studentVal || '';
             if (optionCounts[ans] !== undefined) optionCounts[ans]++;
             if (ans === keyDisplay) correctTotal++;
           });
-          gradedUpper.forEach(g => {
-            if (g.itemResults[i]?.studentVal === keyDisplay) upperCorrect++;
-          });
-          gradedLower.forEach(g => {
-            if (g.itemResults[i]?.studentVal === keyDisplay) lowerCorrect++;
-          });
 
           pIndex = +(correctTotal / totalStudents).toFixed(2);
-          const pA = upperCorrect / gradedUpper.length;
-          const pB = lowerCorrect / gradedLower.length;
-          dIndex = +(pA - pB).toFixed(2);
           correctPercent = Math.round((correctTotal / totalStudents) * 100);
           metricSummary = `${correctTotal}/${totalStudents} Siswa Benar`;
         }
@@ -3485,27 +3466,27 @@
           difficultyBadge = 'bg-rose-50 text-rose-600 border-rose-200';
         }
 
-        let discrimLabel = 'Cukup';
-        let discrimBadge = 'bg-amber-50 text-amber-600 border-amber-200';
-        if (dIndex >= 0.40) {
-          discrimLabel = 'Sangat Baik';
-          discrimBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-        } else if (dIndex >= 0.30) {
-          discrimLabel = 'Baik';
-          discrimBadge = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-        } else if (dIndex < 0.20) {
-          discrimLabel = 'Jelek';
-          discrimBadge = 'bg-rose-50 text-rose-700 border-rose-200';
-        }
+        const pendingCount = Math.max(0, totalStudents - correctTotal);
+        const studentSplitSummary = isNumericQuestionType(itemType)
+          ? `${correctTotal} Tuntas • ${pendingCount} Belum`
+          : `${correctTotal} Benar • ${pendingCount} Salah`;
 
-        // Keputusan Butir Soal
-        let statusAction = 'Diterima (Bank Soal)';
+        let masteryTier = 'high';
+        let masteryLabel = 'Tercapai';
+        let masteryBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        let statusAction = 'Materi Tuntas';
         let statusColor = 'bg-emerald-100 text-emerald-800';
-        if (dIndex < 0.10) {
-          statusAction = 'Dibuang / Ganti';
+        if (correctPercent < midThreshold) {
+          masteryTier = 'low';
+          masteryLabel = 'Perlu Bimbingan';
+          masteryBadge = 'bg-rose-50 text-rose-700 border-rose-200';
+          statusAction = 'Pembahasan Ulang';
           statusColor = 'bg-rose-100 text-rose-800';
-        } else if (dIndex < 0.25 || pIndex > 0.90 || pIndex < 0.15) {
-          statusAction = 'Perlu Revisi';
+        } else if (correctPercent < kkmTarget) {
+          masteryTier = 'mid';
+          masteryLabel = 'Cukup';
+          masteryBadge = 'bg-amber-50 text-amber-700 border-amber-200';
+          statusAction = 'Penguatan Konsep';
           statusColor = 'bg-amber-100 text-amber-800';
         }
 
@@ -3523,9 +3504,10 @@
           pIndex,
           difficultyLabel,
           difficultyBadge,
-          dIndex,
-          discrimLabel,
-          discrimBadge,
+          studentSplitSummary,
+          masteryTier,
+          masteryLabel,
+          masteryBadge,
           optionCounts,
           statusAction,
           statusColor
@@ -3544,6 +3526,16 @@
         classicalMastery,
         itemAnalysis
       };
+    }
+
+    /** Ringkas jumlah butir yang sudah dikuasai siswa, perlu penguatan, dan perlu pembahasan ulang. */
+    function summarizeItemMastery(itemAnalysis = []) {
+      return itemAnalysis.reduce((acc, item) => {
+        if (item.masteryTier === 'high') acc.masteredCount++;
+        else if (item.masteryTier === 'mid') acc.reinforceCount++;
+        else acc.reteachCount++;
+        return acc;
+      }, { masteredCount: 0, reinforceCount: 0, reteachCount: 0 });
     }
 
     // ==================== VIEW RENDERER ROUTER ====================
@@ -3838,9 +3830,9 @@
               </span>
             </div>
             <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-500 font-medium">Soal Perlu Revisi:</span>
+              <span class="text-slate-500 font-medium">Perlu Penguatan / Ulasan:</span>
               <span class="font-extrabold text-indigo-600">
-                ${stats.itemAnalysis.filter(i => i.statusAction !== 'Diterima (Bank Soal)').length} dari ${exam?.total_questions || 0} Soal
+                ${stats.itemAnalysis.filter(i => i.masteryTier !== 'high').length} dari ${exam?.total_questions || 0} Soal
               </span>
             </div>
           </div>
@@ -5235,13 +5227,13 @@
           <div class="overflow-x-auto custom-scroll">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
-                  <th class="py-3 px-3">Siswa</th>
-                  <th class="py-3 px-3">Rincian Jawaban vs Kunci</th>
+                <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400 text-center">
+                  <th class="py-3 px-3 text-center">Siswa</th>
+                  <th class="py-3 px-3 text-center">Rincian Jawaban vs Kunci</th>
                   <th class="py-3 px-3 text-center">${showNumericScoreCol ? 'Skor' : 'Benar'}</th>
                   <th class="py-3 px-3 text-center">Nilai</th>
                   <th class="py-3 px-3 text-center">Status</th>
-                  <th class="py-3 px-3 text-right">Aksi</th>
+                  <th class="py-3 px-3 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 text-xs">
@@ -5697,9 +5689,7 @@
         return isMulti ? `${s.typeMeta.shortLabel} (${s.count}${w})` : `${s.typeMeta.label}${w}`;
       }).join(' + ');
 
-      const acceptedCount = stats.itemAnalysis.filter(i => i.statusAction === 'Diterima (Bank Soal)').length;
-      const reviseCount = stats.itemAnalysis.filter(i => i.statusAction === 'Perlu Revisi').length;
-      const discardCount = stats.itemAnalysis.filter(i => i.statusAction === 'Dibuang / Ganti').length;
+      const { masteredCount, reinforceCount, reteachCount } = summarizeItemMastery(stats.itemAnalysis);
 
       const distHeaderLabel = isMulti
         ? 'Sebaran / Rata Skor'
@@ -5765,12 +5755,12 @@
           const diffPillCls = item.difficultyLabel === 'Mudah'
             ? 'pr-pill-emerald'
             : (item.difficultyLabel === 'Sedang' ? 'pr-pill-indigo' : 'pr-pill-amber');
-          const discPillCls = (item.discrimLabel === 'Sangat Baik' || item.discrimLabel === 'Baik')
-            ? 'pr-pill-emerald'
-            : (item.discrimLabel === 'Cukup' ? 'pr-pill-amber' : 'pr-pill-rose');
-          const statusPillCls = item.statusAction === 'Diterima (Bank Soal)'
-            ? 'pr-pill-emerald'
-            : (item.statusAction === 'Perlu Revisi' ? 'pr-pill-amber' : 'pr-pill-rose');
+          const tierPillMap = {
+            high: 'pr-pill-emerald',
+            mid: 'pr-pill-amber',
+            low: 'pr-pill-rose'
+          };
+          const tierPillCls = tierPillMap[item.masteryTier] || 'pr-pill-rose';
 
           return `
             <tr>
@@ -5793,12 +5783,12 @@
                 <span class="pr-pill ${diffPillCls}">${escapeHtml(item.difficultyLabel)}</span>
               </td>
               <td style="text-align:center;">
-                <div style="font-weight:800;">${item.dIndex}</div>
-                <span class="pr-pill ${discPillCls}">${escapeHtml(item.discrimLabel)}</span>
+                <div style="font-weight:700; font-size:9.5px; color:#334155; margin-bottom:2px;">${escapeHtml(item.studentSplitSummary)}</div>
+                <span class="pr-pill ${tierPillCls}">${escapeHtml(item.masteryLabel)}</span>
               </td>
               <td style="text-align:center; font-family:monospace; font-size:9.5px;">${escapeHtml(distText)}</td>
-              <td style="text-align:right; white-space:nowrap;">
-                <span class="pr-pill ${statusPillCls}">${escapeHtml(item.statusAction)}</span>
+              <td style="text-align:center; white-space:nowrap;">
+                <span class="pr-pill ${tierPillCls}">${escapeHtml(item.statusAction)}</span>
               </td>
             </tr>
           `;
@@ -5936,9 +5926,9 @@
           <div class="pr-section-header">
             <div class="pr-section-title">Rincian Analisis Kualitas Butir Soal (${exam.total_questions} Soal)</div>
             <div class="pr-pill-row">
-              <span class="pr-pill pr-pill-emerald">Diterima (Bank Soal): ${acceptedCount} Soal</span>
-              <span class="pr-pill pr-pill-amber">Perlu Revisi: ${reviseCount} Soal</span>
-              <span class="pr-pill pr-pill-rose">Dibuang / Diganti: ${discardCount} Soal</span>
+              <span class="pr-pill pr-pill-emerald">Materi Dikuasai: ${masteredCount} Soal</span>
+              <span class="pr-pill pr-pill-amber">Perlu Penguatan: ${reinforceCount} Soal</span>
+              <span class="pr-pill pr-pill-rose">Perlu Pembahasan Ulang: ${reteachCount} Soal</span>
             </div>
           </div>
 
@@ -5946,12 +5936,12 @@
             <thead>
               <tr>
                 <th style="width:82px;">No Soal</th>
-                <th style="text-align:center; width:72px;">${isMulti ? 'Kunci/Bobot' : (isNumType ? 'Bobot' : 'Kunci')}</th>
+                <th style="width:72px;">${isMulti ? 'Kunci/Bobot' : (isNumType ? 'Bobot' : 'Kunci')}</th>
                 <th style="width:150px;">${isMulti ? 'Ketuntasan / Penguasaan' : (isNumType ? 'Penguasaan (%)' : 'Ketuntasan (%)')}</th>
-                <th style="text-align:center; width:100px;">Kesukaran (P)</th>
-                <th style="text-align:center; width:110px;">Daya Pembeda (D)</th>
-                <th style="text-align:center;">${escapeHtml(distHeaderLabel)}</th>
-                <th style="text-align:right; width:138px;">Rekomendasi Status</th>
+                <th style="width:100px;">Kesukaran (P)</th>
+                <th style="width:120px;">Capaian Siswa</th>
+                <th>${escapeHtml(distHeaderLabel)}</th>
+                <th style="width:136px;">Tindak Lanjut</th>
               </tr>
             </thead>
             <tbody>
@@ -6052,9 +6042,7 @@
       const isMulti = examMeta.isMultiType;
       const teacherName = getExamTeacher(exam)?.full_name || '-';
       const classLabel = formatExamClassLabel(exam.class_name);
-      const acceptedCount = stats.itemAnalysis.filter(i => i.statusAction === 'Diterima (Bank Soal)').length;
-      const reviseCount = stats.itemAnalysis.filter(i => i.statusAction === 'Perlu Revisi').length;
-      const discardCount = stats.itemAnalysis.filter(i => i.statusAction === 'Dibuang / Ganti').length;
+      const { masteredCount, reinforceCount, reteachCount } = summarizeItemMastery(stats.itemAnalysis);
 
       const headerBadgesHtml = examMeta.sections.map(sec =>
         `<span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${sec.typeMeta.badgeClass}">${isMulti ? `${sec.typeMeta.shortLabel} (${sec.count})` : sec.typeMeta.label}</span>`
@@ -6065,13 +6053,13 @@
         : (isNumType ? 'Rata-rata / Bobot Maks' : (qType === 'BS' ? 'Sebaran Jawaban (B/S)' : 'Sebaran Opsi (A/B/C/D/E)'));
 
       return `
-      <!-- Summary Metrics Row for Item Quality -->
+      <!-- Summary Metrics Row for Item Mastery & Follow-Up -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="glass-surface rounded-3xl p-5 flex items-center justify-between border-l-4 border-l-emerald-500">
           <div>
-            <div class="text-xs font-bold text-slate-500 uppercase">Soal Berkualitas (Diterima)</div>
-            <div class="text-2xl font-extrabold text-slate-900 mt-1">${acceptedCount} <span class="text-xs font-semibold text-emerald-600">Butir Soal</span></div>
-            <p class="text-[11px] text-slate-400 mt-0.5">Layak masuk Bank Soal Sekolah</p>
+            <div class="text-xs font-bold text-slate-500 uppercase">Materi Dikuasai Siswa</div>
+            <div class="text-2xl font-extrabold text-slate-900 mt-1">${masteredCount} <span class="text-xs font-semibold text-emerald-600">Butir Soal</span></div>
+            <p class="text-[11px] text-slate-400 mt-0.5">Ketuntasan butir mencapai KKM (&ge; ${exam.kkm}%)</p>
           </div>
           <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
             <i data-lucide="check-check" class="w-5 h-5"></i>
@@ -6080,23 +6068,23 @@
 
         <div class="glass-surface rounded-3xl p-5 flex items-center justify-between border-l-4 border-l-amber-500">
           <div>
-            <div class="text-xs font-bold text-slate-500 uppercase">Soal Perlu Revisi</div>
-            <div class="text-2xl font-extrabold text-slate-900 mt-1">${reviseCount} <span class="text-xs font-semibold text-amber-600">Butir Soal</span></div>
-            <p class="text-[11px] text-slate-400 mt-0.5">Evaluasi pengecoh atau redaksi soal</p>
+            <div class="text-xs font-bold text-slate-500 uppercase">Perlu Penguatan</div>
+            <div class="text-2xl font-extrabold text-slate-900 mt-1">${reinforceCount} <span class="text-xs font-semibold text-amber-600">Butir Soal</span></div>
+            <p class="text-[11px] text-slate-400 mt-0.5">Sebagian siswa perlu latihan tambahan</p>
           </div>
           <div class="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-            <i data-lucide="file-warning" class="w-5 h-5"></i>
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
           </div>
         </div>
 
         <div class="glass-surface rounded-3xl p-5 flex items-center justify-between border-l-4 border-l-rose-500">
           <div>
-            <div class="text-xs font-bold text-slate-500 uppercase">Soal Dibuang / Diganti</div>
-            <div class="text-2xl font-extrabold text-slate-900 mt-1">${discardCount} <span class="text-xs font-semibold text-rose-600">Butir Soal</span></div>
-            <p class="text-[11px] text-slate-400 mt-0.5">Daya pembeda sangat rendah (D &lt; 0.10)</p>
+            <div class="text-xs font-bold text-slate-500 uppercase">Perlu Pembahasan Ulang</div>
+            <div class="text-2xl font-extrabold text-slate-900 mt-1">${reteachCount} <span class="text-xs font-semibold text-rose-600">Butir Soal</span></div>
+            <p class="text-[11px] text-slate-400 mt-0.5">Materi butir perlu diulas bersama di kelas</p>
           </div>
           <div class="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-            <i data-lucide="x-octagon" class="w-5 h-5"></i>
+            <i data-lucide="book-open" class="w-5 h-5"></i>
           </div>
         </div>
       </div>
@@ -6117,7 +6105,7 @@
             <span>•</span>
             <span>KKM: <strong class="text-slate-900">${exam.kkm}</strong></span>
           </div>
-          <p class="text-[11px] text-slate-500 mt-1">Menghitung Tingkat Kesukaran (P), Daya Pembeda Kelompok Atas-Bawah (D), dan Distribusi Jawaban</p>
+          <p class="text-[11px] text-slate-500 mt-1">Memetakan Tingkat Kesukaran (P), Capaian Penguasaan Siswa per Butir, Sebaran Jawaban, dan Tindak Lanjut Pembelajaran</p>
         </div>
 
         ${(() => {
@@ -6126,14 +6114,14 @@
         <div class="overflow-x-auto custom-scroll">
           <table class="w-full text-left border-collapse">
             <thead>
-              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
-                <th class="py-3.5 px-3">No Soal</th>
+              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400 text-center">
+                <th class="py-3.5 px-3 text-center">No Soal</th>
                 <th class="py-3.5 px-3 text-center">${isMulti ? 'Kunci / Bobot' : (isNumType ? 'Bobot' : 'Kunci')}</th>
-                <th class="py-3.5 px-3">${isMulti ? 'Ketuntasan / Penguasaan' : (isNumType ? 'Penguasaan Butir (%)' : 'Ketuntasan Butir (%)')}</th>
+                <th class="py-3.5 px-3 text-center">${isMulti ? 'Ketuntasan / Penguasaan' : (isNumType ? 'Penguasaan Butir (%)' : 'Ketuntasan Butir (%)')}</th>
                 <th class="py-3.5 px-3 text-center">Indeks Kesukaran (P)</th>
-                <th class="py-3.5 px-3 text-center">Daya Pembeda (D)</th>
+                <th class="py-3.5 px-3 text-center">Capaian Siswa</th>
                 <th class="py-3.5 px-3 text-center">${distHeaderLabel}</th>
-                <th class="py-3.5 px-3 text-right">Rekomendasi Status</th>
+                <th class="py-3.5 px-3 text-center">Tindak Lanjut</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-xs">
@@ -6196,17 +6184,17 @@
                     </span>
                   </td>
                   <td class="py-3.5 px-3 text-center">
-                    <div class="font-extrabold text-slate-800">${item.dIndex}</div>
-                    <span class="inline-block mt-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${item.discrimBadge}">
-                      ${item.discrimLabel}
+                    <div class="font-bold text-slate-700">${escapeHtml(item.studentSplitSummary)}</div>
+                    <span class="inline-block mt-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${item.masteryBadge}">
+                      ${escapeHtml(item.masteryLabel)}
                     </span>
                   </td>
                   <td class="py-3.5 px-3 text-center font-mono text-[11px]">
                     ${distCell}
                   </td>
-                  <td class="py-3.5 px-3 text-right">
+                  <td class="py-3.5 px-3 text-center">
                     <span class="px-3 py-1 rounded-full text-[11px] font-extrabold ${item.statusColor}">
-                      ${item.statusAction}
+                      ${escapeHtml(item.statusAction)}
                     </span>
                   </td>
                 </tr>
@@ -6285,11 +6273,11 @@
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
-                  <th class="py-3 px-3">Nama Siswa</th>
+                <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400 text-center">
+                  <th class="py-3 px-3 text-center">Nama Siswa</th>
                   <th class="py-3 px-3 text-center">Nilai Awal</th>
-                  <th class="py-3 px-3">Indikator Soal Belum Tuntas</th>
-                  <th class="py-3 px-3">Bentuk Tindak Lanjut</th>
+                  <th class="py-3 px-3 text-center">Indikator Soal Belum Tuntas</th>
+                  <th class="py-3 px-3 text-center">Bentuk Tindak Lanjut</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 text-xs">
@@ -6438,11 +6426,11 @@
         <div class="overflow-x-auto custom-scroll">
           <table class="w-full text-left border-collapse">
             <thead>
-              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
-                <th class="py-3 px-3 w-12">No</th>
-                <th class="py-3 px-3">Nama Mata Pelajaran</th>
-                <th class="py-3 px-3">Kelas</th>
-                <th class="py-3 px-3 text-right">Aksi</th>
+              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400 text-center">
+                <th class="py-3 px-3 w-12 text-center">No</th>
+                <th class="py-3 px-3 text-center">Nama Mata Pelajaran</th>
+                <th class="py-3 px-3 text-center">Kelas</th>
+                <th class="py-3 px-3 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-xs">
@@ -6761,13 +6749,13 @@
         <div class="overflow-x-auto custom-scroll">
           <table class="w-full text-left border-collapse">
             <thead>
-              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
-                <th class="py-3 px-3 w-12">No</th>
-                <th class="py-3 px-3">NIS / NISN</th>
-                <th class="py-3 px-3">Nama Lengkap</th>
+              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400 text-center">
+                <th class="py-3 px-3 w-12 text-center">No</th>
+                <th class="py-3 px-3 text-center">NIS / NISN</th>
+                <th class="py-3 px-3 text-center">Nama Lengkap</th>
                 <th class="py-3 px-3 text-center">L/P</th>
                 <th class="py-3 px-3 text-center">Kelas</th>
-                <th class="py-3 px-3 text-right">Aksi</th>
+                <th class="py-3 px-3 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-xs">
@@ -7174,12 +7162,12 @@
         <div class="overflow-x-auto custom-scroll">
           <table class="w-full text-left border-collapse">
             <thead>
-              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
-                <th class="py-3 px-3 w-12">No</th>
-                <th class="py-3 px-3">Nama & Jabatan</th>
-                <th class="py-3 px-3">Identitas / Password</th>
-                <th class="py-3 px-3">Mapel & Kelas Ampuan</th>
-                <th class="py-3 px-3 text-right">Aksi</th>
+              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400 text-center">
+                <th class="py-3 px-3 w-12 text-center">No</th>
+                <th class="py-3 px-3 text-center">Nama & Jabatan</th>
+                <th class="py-3 px-3 text-center">Identitas / Password</th>
+                <th class="py-3 px-3 text-center">Mapel & Kelas Ampuan</th>
+                <th class="py-3 px-3 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-xs">
