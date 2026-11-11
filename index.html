@@ -804,6 +804,7 @@
       editingSubjectId: null,
       editingStudentId: null,
       editingTeacherId: null,
+      editingExamId: null,
       subjects: [],
       students: [],
       teachers: [],
@@ -2508,6 +2509,10 @@
         state.currentUser = null;
         state.impersonatedByAdmin = null;
         state.activeMenu = 'dashboard';
+        state.editingSubjectId = null;
+        state.editingStudentId = null;
+        state.editingTeacherId = null;
+        state.editingExamId = null;
         state.supabaseAccessToken = null;
         clearSessionFromStorage();
 
@@ -2588,6 +2593,7 @@
       state.editingSubjectId = null;
       state.editingStudentId = null;
       state.editingTeacherId = null;
+      state.editingExamId = null;
       saveSessionToStorage();
 
       await sleep(320);
@@ -2639,6 +2645,7 @@
       state.editingSubjectId = null;
       state.editingStudentId = null;
       state.editingTeacherId = null;
+      state.editingExamId = null;
       saveSessionToStorage();
 
       await sleep(320);
@@ -2850,6 +2857,7 @@
       state.editingSubjectId = null;
       state.editingStudentId = null;
       state.editingTeacherId = null;
+      state.editingExamId = null;
       saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -3387,33 +3395,146 @@
     }
 
     // ==================== 2. MANAJEMEN ULANGAN & KUNCI JAWABAN ====================
+    function renderNumericScoreBoxesHtml(qType, count, scoresArr = [], isEnabled = true) {
+      const safeCount = Number.isFinite(Number(count)) && Number(count) >= 1
+        ? Math.min(100, Math.floor(Number(count)))
+        : 0;
+      if (safeCount === 0) {
+        return `<div class="text-[11px] text-slate-400 italic py-1">Masukkan Jumlah Soal di atas untuk menampilkan skor No. 1 dst.</div>`;
+      }
+      const cells = [];
+      for (let i = 1; i <= safeCount; i++) {
+        const rawVal = scoresArr[i - 1];
+        const valStr = rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== ''
+          ? String(rawVal).trim()
+          : '';
+        cells.push(`
+          <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100">
+            <span class="text-[11px] font-bold text-slate-500 shrink-0">No. ${i}</span>
+            <input type="number" min="0" step="any"
+              id="exam-item-score-${qType}-${i}"
+              data-num-score-qtype="${qType}"
+              data-num-score-index="${i}"
+              ${isEnabled ? '' : 'disabled'}
+              required
+              value="${escapeHtml(valStr)}"
+              oninput="window.handleNumericItemScoreInput('${qType}')"
+              placeholder="0"
+              class="w-full min-w-0 bg-transparent text-right font-mono text-xs font-extrabold text-indigo-900 focus:outline-none" />
+          </div>
+        `);
+      }
+      return `<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${cells.join('')}</div>`;
+    }
+
+    function getNumericKeyCounterMeta(targetLen, rawValues = []) {
+      const len = Number.isFinite(Number(targetLen)) && Number(targetLen) >= 1
+        ? Math.min(100, Math.floor(Number(targetLen)))
+        : 0;
+      if (len === 0) {
+        return {
+          text: '0 / 0 Nomor',
+          isMatch: false,
+          colorClass: 'text-[11px] font-extrabold text-slate-400 shrink-0'
+        };
+      }
+      let filledCount = 0;
+      let totalWeight = 0;
+      for (let i = 0; i < len; i++) {
+        const raw = String(rawValues[i] ?? '').trim();
+        if (raw === '') continue;
+        const num = Number(raw);
+        if (Number.isFinite(num) && num >= 0) {
+          filledCount++;
+          totalWeight += num;
+        }
+      }
+      const roundedTotal = Number(totalWeight.toFixed(2));
+      const isMatch = filledCount === len && roundedTotal > 0;
+      return {
+        text: `${filledCount} / ${len} Nomor • Total Bobot ${roundedTotal}`,
+        isMatch,
+        colorClass: isMatch
+          ? 'text-[11px] font-extrabold text-emerald-600 shrink-0'
+          : 'text-[11px] font-extrabold text-rose-600 shrink-0'
+      };
+    }
+
+    function getExamKeyCounterMeta(qType, targetLen, rawVal) {
+      const cleanVal = sanitizeAnswerInputValue(qType, rawVal);
+      const len = Number.isFinite(Number(targetLen)) && Number(targetLen) >= 1 ? Math.floor(Number(targetLen)) : 0;
+
+      if (len === 0) {
+        return {
+          cleanVal,
+          text: `${cleanVal.length} / 0 Karakter`,
+          isMatch: false,
+          colorClass: 'text-[11px] font-extrabold text-slate-400 shrink-0'
+        };
+      }
+
+      const isMatch = cleanVal.length === len;
+      return {
+        cleanVal,
+        text: `${cleanVal.length} / ${len} Karakter`,
+        isMatch,
+        colorClass: isMatch
+          ? 'text-[11px] font-extrabold text-emerald-600 shrink-0'
+          : 'text-[11px] font-extrabold text-rose-600 shrink-0'
+      };
+    }
+
     function renderManajemenUlanganView() {
       if (state.subjects.length === 0) mergeSubjectsState();
 
-      const classOptions = '<option value="" selected>-- Pilih Kelas --</option>' + GRADE_CLASS_OPTIONS.map(cls =>
-        `<option value="${escapeHtml(cls)}">${escapeHtml(cls)}</option>`
-      ).join('');
-      const titleOptions = '<option value="" selected>-- Pilih Judul Ulangan / Penilaian --</option>' + EXAM_TITLE_OPTIONS.map(t =>
-        `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`
+      const editingExam = state.editingExamId ? state.exams.find(ex => ex.id === state.editingExamId) : null;
+      if (state.editingExamId && !editingExam) state.editingExamId = null;
+
+      const editingMeta = editingExam ? decodeExamMeta(editingExam) : null;
+      const sectionByType = new Map((editingMeta?.sections || []).map(sec => [sec.questionType, sec]));
+
+      const initTitle = editingExam ? String(editingExam.title || '').trim() : '';
+      const initSubject = editingExam ? String(editingExam.subject || '').trim() : '';
+      const initTeacherId = editingExam ? String(editingExam.teacher_id || '').trim() : '';
+      const initClass = editingExam ? String(editingExam.class_name || '').trim() : '';
+      const initKkm = editingExam && editingExam.kkm !== null && editingExam.kkm !== undefined ? String(editingExam.kkm) : '';
+      const initDate = editingExam ? String(editingExam.exam_date || '').trim() : '';
+
+      const titleList = [...EXAM_TITLE_OPTIONS];
+      if (initTitle && !titleList.includes(initTitle)) titleList.unshift(initTitle);
+      const titleOptions = `<option value="" ${!initTitle ? 'selected' : ''}>-- Pilih Judul Ulangan / Penilaian --</option>` + titleList.map(t =>
+        `<option value="${escapeHtml(t)}" ${t === initTitle ? 'selected' : ''}>${escapeHtml(t)}</option>`
       ).join('');
 
-      const subjectOptions = state.subjects.length > 0
-        ? '<option value="" selected>-- Pilih Mata Pelajaran --</option>' + state.subjects.map(s =>
-            `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`
-          ).join('')
+      const classList = [...GRADE_CLASS_OPTIONS];
+      if (initClass && !classList.includes(initClass)) classList.unshift(initClass);
+      const classOptions = `<option value="" ${!initClass ? 'selected' : ''}>-- Pilih Kelas --</option>` + classList.map(cls =>
+        `<option value="${escapeHtml(cls)}" ${cls === initClass ? 'selected' : ''}>${escapeHtml(cls)}</option>`
+      ).join('');
+
+      const subjectList = state.subjects.map(s => s.name);
+      if (initSubject && !subjectList.some(n => n.toLowerCase() === initSubject.toLowerCase())) {
+        subjectList.unshift(initSubject);
+      }
+      const subjectOptions = subjectList.length > 0
+        ? `<option value="" ${!initSubject ? 'selected' : ''}>-- Pilih Mata Pelajaran --</option>` + subjectList.map(name => {
+            const isSel = initSubject && name.toLowerCase() === initSubject.toLowerCase();
+            return `<option value="${escapeHtml(name)}" ${isSel ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+          }).join('')
         : '<option value="" selected>Belum ada mata pelajaran</option>';
 
       const teacherOptions = state.teachers.length > 0
-        ? '<option value="" selected>-- Pilih Nama Guru --</option>' + state.teachers.map(t =>
-            `<option value="${t.id}">${escapeHtml(t.full_name)}</option>`
+        ? `<option value="" ${!initTeacherId ? 'selected' : ''}>-- Pilih Nama Guru --</option>` + state.teachers.map(t =>
+            `<option value="${t.id}" ${t.id === initTeacherId ? 'selected' : ''}>${escapeHtml(t.full_name)}</option>`
           ).join('')
         : '<option value="" selected>Belum ada data guru</option>';
 
       const qTypeChecklistHtml = QUESTION_TYPE_ORDER.map(qType => {
         const qt = QUESTION_TYPES[qType];
+        const isChecked = sectionByType.has(qType);
         return `
-          <label class="flex items-center gap-2.5 px-3 py-2 rounded-2xl border text-xs font-bold cursor-pointer transition select-none bg-slate-50 border-slate-200/80 text-slate-600 hover:border-indigo-200">
-            <input type="checkbox" name="exam-qtype-chk" value="${qt.id}"
+          <label class="flex items-center gap-2.5 px-3 py-2 rounded-2xl border text-xs font-bold cursor-pointer transition select-none ${isChecked ? 'bg-indigo-50/80 border-indigo-300 text-indigo-900' : 'bg-slate-50 border-slate-200/80 text-slate-600 hover:border-indigo-200'}">
+            <input type="checkbox" name="exam-qtype-chk" value="${qt.id}" ${isChecked ? 'checked' : ''}
               onchange="window.handleExamQuestionTypesChange(this)"
               class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shrink-0" />
             <span class="truncate">${qt.label}</span>
@@ -3423,30 +3544,76 @@
 
       const qTypeConfigCardsHtml = QUESTION_TYPE_ORDER.map(qType => {
         const qt = QUESTION_TYPES[qType];
+        const sec = sectionByType.get(qType) || null;
+        const isChecked = Boolean(sec);
         const isNum = isNumericQuestionType(qType);
-        const initialCounter = isNum ? '0 / 0 Nomor' : '0 / 0 Karakter';
+        const totalVal = isChecked ? String(sec.count || '') : '';
+
+        if (isNum) {
+          const scoresArr = isChecked && Array.isArray(sec.keyScores) ? sec.keyScores : [];
+          const countNum = isChecked ? (Number(sec.count) || 0) : 0;
+          const allUniform = isChecked && countNum > 0 && scoresArr.length === countNum && scoresArr.every(v => Number(v) === Number(scoresArr[0]));
+          const uniformVal = allUniform ? String(scoresArr[0]) : '';
+          const counterMeta = getNumericKeyCounterMeta(countNum, scoresArr);
+
+          return `
+            <div id="exam-qtype-card-${qt.id}" data-qtype="${qt.id}"
+              class="${isChecked ? '' : 'hidden '}p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/90 space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${qt.badgeClass}">${qt.label}</span>
+                <span id="key-length-counter-${qt.id}" class="${counterMeta.colorClass}">${counterMeta.text}</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                <div class="sm:col-span-4">
+                  <label class="block text-[11px] font-bold text-slate-600 mb-1">Jumlah Soal</label>
+                  <input type="number" id="exam-total-${qt.id}" ${isChecked ? '' : 'disabled'} required min="1" max="100" value="${escapeHtml(totalVal)}"
+                    oninput="window.handleNumericExamCountChange('${qt.id}')"
+                    placeholder="Contoh: 5"
+                    class="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div class="sm:col-span-8">
+                  <label class="block text-[11px] font-bold text-slate-600 mb-1">Skor Sama Semua Soal <span class="font-medium text-slate-400">(Opsional)</span></label>
+                  <input type="number" id="exam-uniform-score-${qt.id}" ${isChecked ? '' : 'disabled'} min="0" step="any" value="${escapeHtml(uniformVal)}"
+                    oninput="window.applyUniformExamScore('${qt.id}')"
+                    placeholder="Misal: 10 (isi 1x untuk semua nomor)"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-indigo-50/50 border border-indigo-200 text-xs font-extrabold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+              </div>
+              <div class="space-y-1.5">
+                <label class="block text-[11px] font-bold text-slate-600">Nilai Maksimal per Nomor (${qt.label})</label>
+                <div id="exam-num-scores-grid-${qt.id}">
+                  ${renderNumericScoreBoxesHtml(qt.id, countNum, scoresArr, isChecked)}
+                </div>
+              </div>
+              <p class="text-[11px] text-slate-500">Isi skor tiap nomor di kotak atas, atau isi kolom <strong>Skor Sama Semua Soal</strong> sekali saja jika bobot setiap nomor sama.</p>
+            </div>
+          `;
+        }
+
+        const keyVal = isChecked ? String(sec.rawKey || '') : '';
+        const counterMeta = getExamKeyCounterMeta(qType, isChecked ? sec.count : 0, keyVal);
 
         return `
           <div id="exam-qtype-card-${qt.id}" data-qtype="${qt.id}"
-            class="hidden p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/90 space-y-2.5">
+            class="${isChecked ? '' : 'hidden '}p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/90 space-y-2.5">
             <div class="flex items-center justify-between gap-2">
               <span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${qt.badgeClass}">${qt.label}</span>
-              <span id="key-length-counter-${qt.id}" class="text-[11px] font-extrabold text-slate-400 shrink-0">${initialCounter}</span>
+              <span id="key-length-counter-${qt.id}" class="${counterMeta.colorClass}">${counterMeta.text}</span>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
               <div class="sm:col-span-4">
                 <label class="block text-[11px] font-bold text-slate-600 mb-1">Jumlah Soal</label>
-                <input type="number" id="exam-total-${qt.id}" disabled required min="1" max="100" value=""
+                <input type="number" id="exam-total-${qt.id}" ${isChecked ? '' : 'disabled'} required min="1" max="100" value="${escapeHtml(totalVal)}"
                   oninput="window.syncAnswerKeyLength('${qt.id}')"
                   placeholder="Contoh: 10"
                   class="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div class="sm:col-span-8">
                 <label class="block text-[11px] font-bold text-slate-600 mb-1">${qt.keyLabel}</label>
-                <input type="text" id="exam-answer-key-${qt.id}" disabled required value=""
+                <input type="text" id="exam-answer-key-${qt.id}" ${isChecked ? '' : 'disabled'} required value="${escapeHtml(keyVal)}"
                   oninput="window.syncAnswerKeyLength('${qt.id}')"
                   placeholder="${qt.keyPlaceholder}"
-                  class="w-full px-3.5 py-2.5 rounded-xl bg-indigo-50/50 border border-indigo-200 font-mono text-xs font-extrabold tracking-widest ${isNum ? '' : 'uppercase'} text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-indigo-50/50 border border-indigo-200 font-mono text-xs font-extrabold tracking-widest uppercase text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
             </div>
             <p class="text-[11px] text-slate-500">${qt.keyHint}</p>
@@ -3454,19 +3621,26 @@
         `;
       }).join('');
 
+      const initCheckedCount = editingMeta ? editingMeta.sections.length : 0;
+      const initTotalQ = editingMeta ? editingMeta.sections.reduce((sum, s) => sum + (Number(s.count) || 0), 0) : 0;
+      const initSummaryText = `${initCheckedCount} Jenis • ${initCheckedCount > 1 ? `Total ${initTotalQ} Soal` : `${initTotalQ} Soal`}`;
+
       return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        <!-- Form Buat Paket Ulangan Baru -->
-        <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <i data-lucide="file-plus-2" class="w-5 h-5"></i>
+        <!-- Form Buat / Edit Paket Ulangan -->
+        <div id="exam-form-card" class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit ${editingExam ? 'ring-2 ring-indigo-300' : ''}">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl ${editingExam ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'} flex items-center justify-center shrink-0">
+                <i data-lucide="${editingExam ? 'pencil' : 'file-plus-2'}" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-extrabold text-slate-900">${editingExam ? 'Edit Paket Ulangan & Kunci' : 'Buat Paket Ulangan & Kunci'}</h3>
+                <p class="text-xs text-slate-500">${editingExam ? 'Perbarui detail paket ulangan, KKM, atau kunci jawaban' : 'Atur jenis soal, mata pelajaran, KKM, dan kunci jawaban'}</p>
+              </div>
             </div>
-            <div>
-              <h3 class="text-base font-extrabold text-slate-900">Buat Paket Ulangan & Kunci</h3>
-              <p class="text-xs text-slate-500">Atur jenis soal, mata pelajaran, KKM, dan kunci jawaban</p>
-            </div>
+            ${editingExam ? '<span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-extrabold shrink-0">Mode Edit</span>' : ''}
           </div>
 
           <form onsubmit="window.handleSaveExam(event)" class="space-y-4">
@@ -3484,7 +3658,7 @@
                   <label class="block text-xs font-bold text-slate-700">Mata Pelajaran</label>
                   <button type="button" onclick="window.navigateMenu('manajemen_mapel')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Mapel</button>
                 </div>
-                <select id="exam-subject" required onchange="window.syncExamTeacherFromSubject()"
+                <select id="exam-subject" required
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
                   ${subjectOptions}
                 </select>
@@ -3507,12 +3681,12 @@
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Nilai KKM</label>
-                <input type="number" id="exam-kkm" required min="1" max="100" value="" placeholder="Contoh: 75"
+                <input type="number" id="exam-kkm" required min="1" max="100" value="${escapeHtml(initKkm)}" placeholder="Contoh: 75"
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal</label>
-                <input type="date" id="exam-date" required value=""
+                <input type="date" id="exam-date" required value="${escapeHtml(initDate)}"
                   class="w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
             </div>
@@ -3520,7 +3694,7 @@
             <div class="space-y-2">
               <div class="flex items-center justify-between gap-2">
                 <label class="text-xs font-bold text-slate-700">Jenis Soal <span class="font-medium text-slate-400">(Pilih 1 atau lebih)</span></label>
-                <span id="exam-total-summary-badge" class="text-[11px] font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full">0 Jenis • 0 Soal</span>
+                <span id="exam-total-summary-badge" class="text-[11px] font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full">${initSummaryText}</span>
               </div>
               <div class="grid grid-cols-2 gap-2">
                 ${qTypeChecklistHtml}
@@ -3531,9 +3705,17 @@
               ${qTypeConfigCardsHtml}
             </div>
 
-            <button type="submit" class="w-full py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
-              <i data-lucide="save" class="w-4 h-4"></i> Simpan Paket Ulangan
-            </button>
+            <div class="flex items-center gap-2.5">
+              <button type="submit" class="flex-1 py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+                <i data-lucide="save" class="w-4 h-4"></i> ${editingExam ? 'Simpan Perubahan' : 'Simpan Paket Ulangan'}
+              </button>
+              ${editingExam ? `
+                <button type="button" onclick="window.handleCancelEditExam()"
+                  class="py-3 px-4 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition shrink-0">
+                  Batal
+                </button>
+              ` : ''}
+            </div>
           </form>
         </div>
 
@@ -3558,18 +3740,20 @@
         const exMeta = s.examMeta || decodeExamMeta(ex);
         const teacherObj = state.teachers.find(t => t.id === ex.teacher_id) || getSubjectTeacher(ex.subject);
         const isSelected = ex.id === state.activeExamId;
+        const isEditingCard = Boolean(editingExam && ex.id === editingExam.id);
         const typeBadgesHtml = exMeta.sections.map(sec =>
           `<span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${sec.typeMeta.badgeClass}">${exMeta.isMultiType ? `${sec.typeMeta.shortLabel} (${sec.count})` : sec.typeMeta.label}</span>`
         ).join(' ');
 
         return `
-                <div class="p-4 rounded-2xl border transition ${isSelected ? 'bg-indigo-50/70 border-indigo-300 shadow-sm' : 'bg-white border-slate-200/80 hover:border-slate-300'} flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="p-4 rounded-2xl border transition ${isEditingCard ? 'bg-amber-50/40 border-amber-300 ring-2 ring-amber-200/70 shadow-sm' : (isSelected ? 'bg-indigo-50/70 border-indigo-300 shadow-sm' : 'bg-white border-slate-200/80 hover:border-slate-300')} flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div class="space-y-1.5">
                     <div class="flex items-center gap-2 flex-wrap">
                       <span class="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-extrabold">${escapeHtml(ex.class_name)}</span>
                       ${typeBadgesHtml}
                       <span class="text-xs font-bold text-indigo-700">${escapeHtml(ex.subject)}</span>
                       <span class="text-[11px] text-slate-400">• ${ex.exam_date}</span>
+                      ${isEditingCard ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-extrabold">Sedang Diedit</span>' : ''}
                     </div>
                     <h4 class="text-sm font-extrabold text-slate-900">${escapeHtml(ex.title)}</h4>
                     ${teacherObj ? `<div class="text-[11px] text-slate-500 font-semibold">Nama Guru: <span class="text-slate-700">${escapeHtml(teacherObj.full_name)}</span></div>` : ''}
@@ -3600,10 +3784,16 @@
                       class="px-4 py-2 rounded-full text-xs font-bold transition ${isSelected ? 'bg-emerald-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}">
                       ${isSelected ? '✓ Sedang Aktif' : 'Pilih Analisis'}
                     </button>
-                    <button type="button" onclick="window.handleDeleteExam('${ex.id}')"
-                      class="px-3 py-1.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition flex items-center gap-1">
-                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus
-                    </button>
+                    <div class="flex items-center gap-1.5">
+                      <button type="button" onclick="window.handleEditExam('${ex.id}')"
+                        class="px-3 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition flex items-center gap-1" title="Edit Paket Ulangan">
+                        <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
+                      </button>
+                      <button type="button" onclick="window.handleDeleteExam('${ex.id}')"
+                        class="px-3 py-1.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition flex items-center gap-1" title="Hapus Paket Ulangan">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus
+                      </button>
+                    </div>
                   </div>
                 </div>
               `;
@@ -3618,20 +3808,6 @@
     `;
     }
 
-    window.syncExamTeacherFromSubject = function () {
-      const subjSelect = document.getElementById('exam-subject');
-      const teacherSelect = document.getElementById('exam-teacher');
-      if (!subjSelect || !teacherSelect) return;
-      if (!subjSelect.value) {
-        teacherSelect.value = '';
-        return;
-      }
-      const teacherObj = getSubjectTeacher(subjSelect.value);
-      if (teacherObj) {
-        teacherSelect.value = teacherObj.id;
-      }
-    };
-
     function updateExamSummaryBadge() {
       const badgeEl = document.getElementById('exam-total-summary-badge');
       if (!badgeEl) return;
@@ -3642,6 +3818,75 @@
       }, 0);
       badgeEl.textContent = `${checkedTypes.length} Jenis • ${checkedTypes.length > 1 ? `Total ${totalQ} Soal` : `${totalQ} Soal`}`;
     }
+
+    function getNumericScoreInputs(qType) {
+      const grid = document.getElementById(`exam-num-scores-grid-${qType}`);
+      if (!grid) return [];
+      return Array.from(grid.querySelectorAll(`input[data-num-score-qtype="${qType}"]`));
+    }
+
+    window.handleNumericExamCountChange = function (qType) {
+      const totalInput = document.getElementById(`exam-total-${qType}`);
+      const grid = document.getElementById(`exam-num-scores-grid-${qType}`);
+      if (!totalInput || !grid) return;
+
+      const existingValues = getNumericScoreInputs(qType).map(inp => inp.value.trim());
+      const uniformRaw = document.getElementById(`exam-uniform-score-${qType}`)?.value?.trim() || '';
+      const uniformNum = Number(uniformRaw);
+      const hasValidUniform = uniformRaw !== '' && Number.isFinite(uniformNum) && uniformNum >= 0;
+
+      const rawTotal = Number(totalInput.value);
+      const nextCount = Number.isFinite(rawTotal) && rawTotal >= 1
+        ? Math.min(100, Math.floor(rawTotal))
+        : 0;
+
+      const nextScores = [];
+      for (let i = 0; i < nextCount; i++) {
+        const prev = existingValues[i];
+        if (prev !== undefined && prev !== '') {
+          nextScores.push(prev);
+        } else if (hasValidUniform) {
+          nextScores.push(uniformRaw);
+        } else {
+          nextScores.push('');
+        }
+      }
+
+      const chk = document.querySelector(`input[name="exam-qtype-chk"][value="${qType}"]`);
+      const isEnabled = Boolean(chk?.checked);
+      grid.innerHTML = renderNumericScoreBoxesHtml(qType, nextCount, nextScores, isEnabled);
+      window.syncAnswerKeyLength(qType);
+    };
+
+    window.applyUniformExamScore = function (qType) {
+      const uniformInput = document.getElementById(`exam-uniform-score-${qType}`);
+      if (!uniformInput) return;
+      const rawVal = uniformInput.value.trim();
+      if (rawVal !== '') {
+        const num = Number(rawVal);
+        if (Number.isFinite(num) && num >= 0) {
+          getNumericScoreInputs(qType).forEach(inp => {
+            inp.value = rawVal;
+          });
+        }
+      }
+      window.syncAnswerKeyLength(qType);
+    };
+
+    window.handleNumericItemScoreInput = function (qType) {
+      const uniformInput = document.getElementById(`exam-uniform-score-${qType}`);
+      if (uniformInput) {
+        const inputs = getNumericScoreInputs(qType);
+        if (inputs.length > 0) {
+          const vals = inputs.map(inp => inp.value.trim());
+          const first = vals[0];
+          const firstNum = Number(first);
+          const allEqual = first !== '' && Number.isFinite(firstNum) && firstNum >= 0 && vals.every(v => v !== '' && Number(v) === firstNum);
+          uniformInput.value = allEqual ? first : '';
+        }
+      }
+      window.syncAnswerKeyLength(qType);
+    };
 
     window.handleExamQuestionTypesChange = function () {
       const checkboxes = Array.from(document.querySelectorAll('input[name="exam-qtype-chk"]'));
@@ -3656,9 +3901,14 @@
         const card = document.getElementById(`exam-qtype-card-${qt}`);
         const totalEl = document.getElementById(`exam-total-${qt}`);
         const keyEl = document.getElementById(`exam-answer-key-${qt}`);
+        const uniformEl = document.getElementById(`exam-uniform-score-${qt}`);
         if (card) card.classList.toggle('hidden', !cb.checked);
         if (totalEl) totalEl.disabled = !cb.checked;
         if (keyEl) keyEl.disabled = !cb.checked;
+        if (uniformEl) uniformEl.disabled = !cb.checked;
+        getNumericScoreInputs(qt).forEach(inp => {
+          inp.disabled = !cb.checked;
+        });
         if (cb.checked) window.syncAnswerKeyLength(qt);
       });
 
@@ -3675,53 +3925,56 @@
       }
 
       const totalInput = document.getElementById(`exam-total-${targetType}`);
-      const keyInput = document.getElementById(`exam-answer-key-${targetType}`);
       const counter = document.getElementById(`key-length-counter-${targetType}`);
-      if (!totalInput || !keyInput || !counter) return;
+      if (!totalInput || !counter) return;
 
-      const rawTotal = Number(totalInput.value);
-      const targetLen = Number.isFinite(rawTotal) && rawTotal >= 1 ? Math.floor(rawTotal) : 0;
-      const cleanVal = sanitizeAnswerInputValue(targetType, keyInput.value);
-      if (cleanVal !== keyInput.value) keyInput.value = cleanVal;
-
-      if (targetLen === 0) {
-        if (isNumericQuestionType(targetType)) {
-          const scores = cleanVal ? parseNumericScores(cleanVal) : [];
-          const totalMax = scores.reduce((acc, n) => acc + n, 0);
-          counter.textContent = cleanVal
-            ? `${scores.length} / 0 Nomor • Total Bobot ${totalMax}`
-            : '0 / 0 Nomor';
-        } else {
-          counter.textContent = `${cleanVal.length} / 0 Karakter`;
-        }
-        counter.className = 'text-[11px] font-extrabold text-slate-400 shrink-0';
+      if (isNumericQuestionType(targetType)) {
+        const rawVals = getNumericScoreInputs(targetType).map(inp => inp.value);
+        const meta = getNumericKeyCounterMeta(totalInput.value, rawVals);
+        counter.textContent = meta.text;
+        counter.className = meta.colorClass;
         updateExamSummaryBadge();
         return;
       }
 
-      if (isNumericQuestionType(targetType)) {
-        const scores = parseNumericScores(cleanVal, targetLen);
-        const totalMax = scores.reduce((acc, n) => acc + n, 0);
-        const isMatch = scores.length === targetLen && totalMax > 0;
-        counter.textContent = `${scores.length} / ${targetLen} Nomor • Total Bobot ${totalMax}`;
-        counter.className = isMatch
-          ? 'text-[11px] font-extrabold text-emerald-600 shrink-0'
-          : 'text-[11px] font-extrabold text-rose-600 shrink-0';
-      } else {
-        counter.textContent = `${cleanVal.length} / ${targetLen} Karakter`;
-        counter.className = cleanVal.length === targetLen
-          ? 'text-[11px] font-extrabold text-emerald-600 shrink-0'
-          : 'text-[11px] font-extrabold text-rose-600 shrink-0';
-      }
+      const keyInput = document.getElementById(`exam-answer-key-${targetType}`);
+      if (!keyInput) return;
+
+      const meta = getExamKeyCounterMeta(targetType, totalInput.value, keyInput.value);
+      if (meta.cleanVal !== keyInput.value) keyInput.value = meta.cleanVal;
+      counter.textContent = meta.text;
+      counter.className = meta.colorClass;
 
       updateExamSummaryBadge();
     };
 
+    window.handleEditExam = function (examId) {
+      const target = state.exams.find(e => e.id === examId);
+      if (!target) return;
+      state.editingExamId = examId;
+      renderCurrentMenu();
+      const formCard = document.getElementById('exam-form-card');
+      if (formCard) {
+        formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      const titleSelect = document.getElementById('exam-title');
+      if (titleSelect) titleSelect.focus({ preventScroll: true });
+    };
+
+    window.handleCancelEditExam = function () {
+      if (!state.editingExamId) return;
+      state.editingExamId = null;
+      renderCurrentMenu();
+    };
+
     window.handleSaveExam = async function (e) {
       e.preventDefault();
+      const editingId = state.editingExamId;
+      const existingExam = editingId ? state.exams.find(ex => ex.id === editingId) : null;
+
       const title = document.getElementById('exam-title').value.trim();
       const subject = document.getElementById('exam-subject').value.trim();
-      const teacherId = document.getElementById('exam-teacher')?.value || (state.currentUser?.role === 'guru' ? state.currentUser.id : null);
+      const teacherId = document.getElementById('exam-teacher')?.value || (!existingExam && state.currentUser?.role === 'guru' ? state.currentUser.id : null);
       const className = document.getElementById('exam-class').value.trim();
       const kkm = Number(document.getElementById('exam-kkm').value);
       const examDate = document.getElementById('exam-date').value;
@@ -3761,30 +4014,46 @@
       for (const qType of checkedTypes) {
         const qtMeta = QUESTION_TYPES[qType] || QUESTION_TYPES.PG;
         const secTotal = Number(document.getElementById(`exam-total-${qType}`)?.value) || 0;
-        const rawKey = document.getElementById(`exam-answer-key-${qType}`)?.value || '';
 
-        if (secTotal < 1) {
-          showToast(`Jumlah soal ${qtMeta.label} minimal 1.`, 'warning');
+        if (secTotal < 1 || secTotal > 100) {
+          showToast(`Jumlah soal ${qtMeta.label} harus antara 1 hingga 100.`, 'warning');
           return;
         }
 
+        let rawKey = '';
         if (isNumericQuestionType(qType)) {
-          const scores = parseNumericScores(rawKey, secTotal);
-          const totalWeight = scores.reduce((a, b) => a + b, 0);
-          if (scores.length !== secTotal) {
-            showToast(`Jumlah nilai per nomor ${qtMeta.label} (${scores.length}) harus sama dengan Jumlah Soal (${secTotal})!`, 'warning');
-            return;
+          const itemInputs = getNumericScoreInputs(qType);
+          const scores = [];
+          for (let idx = 0; idx < secTotal; idx++) {
+            const inp = itemInputs[idx];
+            const rawVal = inp ? inp.value.trim() : '';
+            if (rawVal === '') {
+              if (inp) inp.focus();
+              showToast(`Skor ${qtMeta.label} No. ${idx + 1} belum diisi.`, 'warning');
+              return;
+            }
+            const numVal = Number(rawVal);
+            if (!Number.isFinite(numVal) || numVal < 0) {
+              if (inp) inp.focus();
+              showToast(`Skor ${qtMeta.label} No. ${idx + 1} tidak valid.`, 'warning');
+              return;
+            }
+            scores.push(Number(numVal.toFixed(2)));
           }
+          const totalWeight = scores.reduce((a, b) => a + b, 0);
           if (totalWeight <= 0) {
             showToast(`Total bobot nilai maksimal ${qtMeta.label} harus lebih dari 0.`, 'warning');
             return;
           }
+          rawKey = scores.join(',');
         } else {
+          rawKey = document.getElementById(`exam-answer-key-${qType}`)?.value || '';
           const cleanKey = sanitizeAnswerInputValue(qType, rawKey);
           if (cleanKey.length !== secTotal) {
             showToast(`Panjang Kunci Jawaban ${qtMeta.label} (${cleanKey.length}) harus sama dengan Jumlah Soal (${secTotal})!`, 'warning');
             return;
           }
+          rawKey = cleanKey;
         }
 
         sections.push({
@@ -3797,8 +4066,8 @@
       const totalQuestions = sections.reduce((acc, s) => acc + s.count, 0);
       const encodedKey = encodeMultiExamAnswerKey(sections);
 
-      const newExam = {
-        id: crypto.randomUUID(),
+      const examRecord = {
+        id: existingExam ? existingExam.id : crypto.randomUUID(),
         teacher_id: teacherId || null,
         title,
         subject,
@@ -3811,20 +4080,74 @@
 
       const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
       const prevActiveId = state.activeExamId;
+      const prevEditingId = state.editingExamId;
+      const prevExamCopy = existingExam ? { ...existingExam } : null;
+      const shouldRecalcResults = Boolean(
+        existingExam && (
+          existingExam.answer_key !== examRecord.answer_key ||
+          Number(existingExam.kkm) !== Number(examRecord.kkm) ||
+          Number(existingExam.total_questions) !== Number(examRecord.total_questions)
+        )
+      );
+      const prevResultsSnapshot = shouldRecalcResults
+        ? state.examResults.filter(r => r.exam_id === examRecord.id).map(r => ({ ...r }))
+        : [];
+      const recalculatedOpIds = new Set();
 
       await saveRecordWithSync({
         submitterBtn,
         table: 'exams',
-        record: newExam,
-        overlayTitle: 'Menyimpan Paket Ulangan...',
-        overlaySuccessTitle: 'Paket Ulangan Tersimpan!',
-        toastMsg: 'Paket ulangan baru berhasil disimpan dan tersinkron!',
+        record: examRecord,
+        overlayTitle: existingExam ? 'Menyimpan Perubahan Paket...' : 'Menyimpan Paket Ulangan...',
+        overlaySuccessTitle: existingExam ? 'Paket Ulangan Diperbarui!' : 'Paket Ulangan Tersimpan!',
+        toastMsg: existingExam
+          ? 'Perubahan paket ulangan berhasil disimpan dan tersinkron!'
+          : 'Paket ulangan baru berhasil disimpan dan tersinkron!',
         onLocalApply: () => {
-          state.exams.unshift(newExam);
-          state.activeExamId = newExam.id;
+          if (existingExam) {
+            const idx = state.exams.findIndex(ex => ex.id === existingExam.id);
+            if (idx !== -1) state.exams[idx] = examRecord;
+            state.editingExamId = null;
+            if (!state.activeExamId) state.activeExamId = examRecord.id;
+
+            if (shouldRecalcResults) {
+              state.examResults = state.examResults.map(r => {
+                if (r.exam_id !== examRecord.id) return r;
+                const graded = scoreStudentResponse(examRecord, r.student_answers);
+                const nextScore = graded.score;
+                const nextPassed = nextScore >= Number(examRecord.kkm);
+                const updatedResult = {
+                  ...r,
+                  correct_count: graded.correctCount,
+                  score: nextScore,
+                  is_passed: nextPassed
+                };
+                const opId = crypto.randomUUID();
+                recalculatedOpIds.add(opId);
+                enqueuePendingSync({ id: opId, table: 'exam_results', action: 'upsert', record: updatedResult });
+                return updatedResult;
+              });
+            }
+          } else {
+            state.exams.unshift(examRecord);
+            state.activeExamId = examRecord.id;
+          }
         },
         onRollback: () => {
-          state.exams = state.exams.filter(ex => ex.id !== newExam.id);
+          if (prevExamCopy) {
+            const idx = state.exams.findIndex(ex => ex.id === prevExamCopy.id);
+            if (idx !== -1) state.exams[idx] = prevExamCopy;
+            state.editingExamId = prevEditingId;
+            if (prevResultsSnapshot.length > 0) {
+              const snapById = new Map(prevResultsSnapshot.map(r => [r.id, r]));
+              state.examResults = state.examResults.map(r => snapById.get(r.id) || r);
+            }
+            if (recalculatedOpIds.size > 0) {
+              savePendingSyncQueue(getPendingSyncQueue().filter(op => !recalculatedOpIds.has(op.id)));
+            }
+          } else {
+            state.exams = state.exams.filter(ex => ex.id !== examRecord.id);
+          }
           state.activeExamId = prevActiveId;
         }
       });
@@ -3844,6 +4167,9 @@
             onLocalDelete: () => {
               state.exams = state.exams.filter(e => e.id !== examId);
               state.examResults = state.examResults.filter(r => r.exam_id !== examId);
+              if (state.editingExamId === examId) {
+                state.editingExamId = null;
+              }
               if (state.activeExamId === examId) {
                 state.activeExamId = state.exams[0]?.id || null;
               }
