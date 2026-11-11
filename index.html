@@ -738,6 +738,8 @@
       deletedSubjectNames: [],
       studentClassFilter: 'ALL',
       studentSearchQuery: '',
+      editingStudentId: null,
+      editingTeacherId: null,
       subjects: [],
       students: [],
       teachers: [],
@@ -2243,6 +2245,8 @@
         return;
       }
       state.activeMenu = menuId;
+      state.editingStudentId = null;
+      state.editingTeacherId = null;
       saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -4045,40 +4049,55 @@
         .slice()
         .sort((a, b) => (a.class_name || '').localeCompare(b.class_name || '') || (a.full_name || '').localeCompare(b.full_name || ''));
 
+      let editingStudent = state.editingStudentId
+        ? (state.students || []).find(s => s.id === state.editingStudentId) || null
+        : null;
+      if (state.editingStudentId && !editingStudent) {
+        state.editingStudentId = null;
+      }
+
       const teacherGrade = state.currentUser?.role === 'guru' ? decodeTeacherMeta(state.currentUser).classAssigned : '';
       const defaultStuClass = GRADE_CLASS_OPTIONS.includes(teacherGrade) ? teacherGrade : GRADE_CLASS_OPTIONS[0];
-      const classOptionsHtml = GRADE_CLASS_OPTIONS.map(c =>
-        `<option value="${escapeHtml(c)}" ${c === defaultStuClass ? 'selected' : ''}>${escapeHtml(c)}</option>`
+      const selectedStuClass = editingStudent ? editingStudent.class_name : defaultStuClass;
+      const stuClassList = selectedStuClass && !GRADE_CLASS_OPTIONS.includes(selectedStuClass)
+        ? [...GRADE_CLASS_OPTIONS, selectedStuClass]
+        : GRADE_CLASS_OPTIONS;
+      const classOptionsHtml = stuClassList.map(c =>
+        `<option value="${escapeHtml(c)}" ${c === selectedStuClass ? 'selected' : ''}>${escapeHtml(c)}</option>`
       ).join('');
+      const selectedGender = editingStudent?.gender === 'P' ? 'P' : 'L';
       const filterOptionsHtml = `<option value="ALL" ${classFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
         GRADE_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}" ${classFilter === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
 
       return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        <!-- Left Form: Tambah Data Siswa -->
-        <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+        <!-- Left Form: Tambah / Edit Data Siswa -->
+        <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit ${editingStudent ? 'ring-2 ring-indigo-500/30 border-indigo-300' : ''}">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl ${editingStudent ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'} flex items-center justify-center">
+                <i data-lucide="${editingStudent ? 'pencil' : 'graduation-cap'}" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-extrabold text-slate-900">${editingStudent ? 'Edit Data Siswa' : 'Tambah Data Siswa'}</h3>
+                <p class="text-xs text-slate-500">${editingStudent ? 'Perbarui data peserta didik lalu simpan perubahan' : 'Input peserta didik per kelas untuk mempermudah koreksi'}</p>
+              </div>
             </div>
-            <div>
-              <h3 class="text-base font-extrabold text-slate-900">Tambah Data Siswa</h3>
-              <p class="text-xs text-slate-500">Input peserta didik per kelas untuk mempermudah koreksi</p>
-            </div>
+            ${editingStudent ? `<span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-extrabold uppercase shrink-0">Mode Edit</span>` : ''}
           </div>
 
           <form onsubmit="window.handleSaveStudent(event)" class="space-y-4">
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap Siswa</label>
-              <input type="text" id="stu-fullname" required placeholder="Contoh: Ahmad Fauzi"
+              <input type="text" id="stu-fullname" required value="${escapeHtml(editingStudent ? editingStudent.full_name : '')}" placeholder="Contoh: Ahmad Fauzi"
                 class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">NIS / NISN</label>
-                <input type="text" id="stu-nis" inputmode="numeric" required placeholder="Hanya Angka"
+                <input type="text" id="stu-nis" inputmode="numeric" required value="${escapeHtml(editingStudent ? editingStudent.nis : '')}" placeholder="Hanya Angka"
                   oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
@@ -4086,8 +4105,8 @@
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Jenis Kelamin</label>
                 <select id="stu-gender" required
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="L">Laki-laki (L)</option>
-                  <option value="P">Perempuan (P)</option>
+                  <option value="L" ${selectedGender === 'L' ? 'selected' : ''}>Laki-laki (L)</option>
+                  <option value="P" ${selectedGender === 'P' ? 'selected' : ''}>Perempuan (P)</option>
                 </select>
               </div>
             </div>
@@ -4100,9 +4119,16 @@
               </select>
             </div>
 
-            <button type="submit" class="w-full py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
-              <i data-lucide="user-plus" class="w-4 h-4"></i> Simpan Data Siswa
-            </button>
+            <div class="flex items-center gap-2.5">
+              ${editingStudent ? `
+                <button type="button" onclick="window.handleCancelEditStudent()" class="px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition shrink-0">
+                  Batal
+                </button>
+              ` : ''}
+              <button type="submit" class="flex-1 py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+                <i data-lucide="${editingStudent ? 'save' : 'user-plus'}" class="w-4 h-4"></i> ${editingStudent ? 'Simpan Perubahan' : 'Simpan Data Siswa'}
+              </button>
+            </div>
           </form>
         </div>
 
@@ -4155,8 +4181,10 @@
               <tbody class="divide-y divide-slate-100 text-xs">
                 ${filteredStudents.length === 0 ? `
                   <tr><td colspan="5" class="py-10 text-center text-slate-400">Belum ada data siswa${classFilter !== 'ALL' ? ` di ${escapeHtml(classFilter)}` : ''}. Tambah manual atau klik <strong>Import</strong> Excel.</td></tr>
-                ` : filteredStudents.map(stu => `
-                  <tr class="hover:bg-slate-50/80 transition">
+                ` : filteredStudents.map(stu => {
+        const isEditingRow = editingStudent && stu.id === editingStudent.id;
+        return `
+                  <tr class="${isEditingRow ? 'bg-indigo-50/70' : 'hover:bg-slate-50/80'} transition">
                     <td class="py-3 px-3 font-mono font-bold text-indigo-700">${escapeHtml(stu.nis)}</td>
                     <td class="py-3 px-3 font-bold text-slate-900">${escapeHtml(stu.full_name)}</td>
                     <td class="py-3 px-3 text-center">
@@ -4168,12 +4196,18 @@
                       <span class="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">${escapeHtml(stu.class_name)}</span>
                     </td>
                     <td class="py-3 px-3 text-right">
-                      <button type="button" onclick="window.handleDeleteStudent('${stu.id}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                      </button>
+                      <div class="inline-flex items-center justify-end gap-1">
+                        <button type="button" onclick="window.handleEditStudent('${stu.id}')" class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit">
+                          <i data-lucide="pencil" class="w-4 h-4"></i>
+                        </button>
+                        <button type="button" onclick="window.handleDeleteStudent('${stu.id}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus">
+                          <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                `).join('')}
+                `;
+      }).join('')}
               </tbody>
             </table>
           </div>
@@ -4200,8 +4234,26 @@
       }
     };
 
+    window.handleEditStudent = function (studentId) {
+      if (!state.students.some(s => s.id === studentId)) return;
+      state.editingStudentId = studentId;
+      renderCurrentMenu();
+      const input = document.getElementById('stu-fullname');
+      if (input) {
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        input.focus();
+      }
+    };
+
+    window.handleCancelEditStudent = function () {
+      state.editingStudentId = null;
+      renderCurrentMenu();
+    };
+
     window.handleSaveStudent = async function (e) {
       e.preventDefault();
+      const editingId = state.editingStudentId;
+      const existingTarget = editingId ? state.students.find(s => s.id === editingId) : null;
       const fullName = document.getElementById('stu-fullname').value.trim();
       const nis = document.getElementById('stu-nis').value.trim();
       const gender = document.getElementById('stu-gender').value === 'P' ? 'P' : 'L';
@@ -4212,35 +4264,36 @@
         return;
       }
 
-      const duplicate = state.students.find(s => String(s.nis).trim() === nis);
+      const duplicate = state.students.find(s => String(s.nis).trim() === nis && s.id !== editingId);
       if (duplicate) {
         showToast(`NIS/NISN ${nis} sudah terdaftar atas nama ${duplicate.full_name}.`, 'warning');
         return;
       }
 
-      const newStudent = {
-        id: crypto.randomUUID(),
-        nis,
-        full_name: fullName,
-        gender,
-        class_name: className
-      };
+      const studentRecord = existingTarget
+        ? { ...existingTarget, nis, full_name: fullName, gender, class_name: className }
+        : { id: crypto.randomUUID(), nis, full_name: fullName, gender, class_name: className };
 
       const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
       setButtonLoading(submitterBtn, true, 'Menyimpan...');
       showActionOverlay({
         stateType: 'loading',
-        title: 'Menyimpan Data Siswa...',
+        title: existingTarget ? 'Memperbarui Data Siswa...' : 'Menyimpan Data Siswa...',
         subtitle: 'Memperbarui daftar siswa & menyinkronkan data'
       });
 
       try {
-        state.students.push(newStudent);
+        if (existingTarget) {
+          Object.assign(existingTarget, studentRecord);
+          state.editingStudentId = null;
+        } else {
+          state.students.push(studentRecord);
+        }
         saveStudentsToStorage();
         saveCacheToStorage();
 
         if (state.hasStudentsTable === true) {
-          enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'upsert', record: newStudent });
+          enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'upsert', record: studentRecord });
           updateSyncBadge('syncing');
           await flushPendingSyncToSupabase();
           const pendingLeft = getPendingSyncQueue().length;
@@ -4250,12 +4303,12 @@
         renderCurrentMenu();
         showActionOverlay({
           stateType: 'success',
-          title: 'Data Siswa Tersimpan!',
-          subtitle: `${fullName} (${className}) berhasil ditambahkan`
+          title: existingTarget ? 'Perubahan Siswa Tersimpan!' : 'Data Siswa Tersimpan!',
+          subtitle: `${fullName} (${className}) berhasil ${existingTarget ? 'diperbarui' : 'ditambahkan'}`
         });
         await sleep(450);
         await hideActionOverlay();
-        showToast(`Siswa "${fullName}" (${className}) berhasil disimpan!`, 'success');
+        showToast(`Siswa "${fullName}" (${className}) berhasil ${existingTarget ? 'diperbarui' : 'disimpan'}!`, 'success');
       } finally {
         setButtonLoading(submitterBtn, false);
       }
@@ -4270,6 +4323,7 @@
         `<p>Apakah Anda yakin ingin menghapus data siswa <strong>${escapeHtml(target.full_name)}</strong> (${escapeHtml(target.class_name)})?</p>`,
         async () => {
           state.students = state.students.filter(s => s.id !== studentId);
+          if (state.editingStudentId === studentId) state.editingStudentId = null;
           saveStudentsToStorage();
           saveCacheToStorage();
           if (state.hasStudentsTable === true) {
@@ -4422,22 +4476,42 @@
     function renderManajemenGuruView() {
       if (state.subjects.length === 0) mergeSubjectsState();
 
-      const idTypeOptions = TEACHER_ID_TYPES.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-      const jabatanOptions = TEACHER_JABATAN_OPTIONS.map(j => `<option value="${escapeHtml(j)}">${escapeHtml(j)}</option>`).join('');
-      const classAmpuanOptions = TEACHER_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      const editingTeacher = state.editingTeacherId
+        ? state.teachers.find(t => t.id === state.editingTeacherId) || null
+        : null;
+      if (state.editingTeacherId && !editingTeacher) {
+        state.editingTeacherId = null;
+      }
+
+      const editMeta = editingTeacher
+        ? decodeTeacherMeta(editingTeacher)
+        : { idType: TEACHER_ID_TYPES[0], jabatan: TEACHER_JABATAN_OPTIONS[0], classAssigned: TEACHER_CLASS_OPTIONS[0] };
+      const editSubjectsSet = new Set(editingTeacher ? parseTeacherSubjects(editingTeacher.subject).map(s => s.toLowerCase()) : []);
+
+      const idTypeOptions = TEACHER_ID_TYPES.map(t => `<option value="${escapeHtml(t)}" ${t === editMeta.idType ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('');
+      const jabatanOptions = TEACHER_JABATAN_OPTIONS.map(j => `<option value="${escapeHtml(j)}" ${j === editMeta.jabatan ? 'selected' : ''}>${escapeHtml(j)}</option>`).join('');
+      const classPool = (editingTeacher && editMeta.classAssigned && !TEACHER_CLASS_OPTIONS.includes(editMeta.classAssigned))
+        ? [...TEACHER_CLASS_OPTIONS, editMeta.classAssigned]
+        : TEACHER_CLASS_OPTIONS;
+      const classAmpuanOptions = classPool.map(c => `<option value="${escapeHtml(c)}" ${c === editMeta.classAssigned ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
 
       return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        <!-- Form Tambah Akun Guru -->
-        <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center">
-              <i data-lucide="user-cog" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <h3 class="text-base font-extrabold text-slate-900">Kelola Akun Login Guru</h3>
-              <p class="text-xs text-slate-500">Nomor Identitas berfungsi sebagai ID login Guru</p>
+        <!-- Form Tambah / Edit Akun Guru -->
+        <div id="guru-form-card" class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit ${editingTeacher ? 'border-2 border-indigo-400/80 ring-2 ring-indigo-100' : ''}">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl ${editingTeacher ? 'bg-indigo-600 text-white shadow-sm' : 'bg-purple-100 text-purple-700'} flex items-center justify-center shrink-0">
+                <i data-lucide="${editingTeacher ? 'pencil' : 'user-cog'}" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-base font-extrabold text-slate-900">${editingTeacher ? 'Edit Akun Login Guru' : 'Kelola Akun Login Guru'}</h3>
+                  ${editingTeacher ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-700">Mode Edit</span>' : ''}
+                </div>
+                <p class="text-xs text-slate-500">${editingTeacher ? `Memperbarui data: ${escapeHtml(editingTeacher.full_name)}` : 'Nomor Identitas berfungsi sebagai ID login Guru'}</p>
+              </div>
             </div>
           </div>
 
@@ -4445,6 +4519,7 @@
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap & Gelar Guru</label>
               <input type="text" id="t-fullname" required placeholder="Contoh: Hendra Wijaya, S.Pd."
+                value="${escapeHtml(editingTeacher ? editingTeacher.full_name || '' : '')}"
                 class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
@@ -4459,6 +4534,7 @@
               <div class="sm:col-span-3">
                 <label class="block text-xs font-bold text-slate-700 mb-1">Nomor Identitas</label>
                 <input type="text" id="t-id-number" inputmode="numeric" required placeholder="Hanya Angka"
+                  value="${escapeHtml(editingTeacher ? editingTeacher.username || '' : '')}"
                   oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                   class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
@@ -4484,6 +4560,7 @@
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Password Login</label>
               <input type="text" id="t-password" required placeholder="123456"
+                value="${escapeHtml(editingTeacher ? editingTeacher.password || '' : '')}"
                 class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
@@ -4495,7 +4572,7 @@
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto custom-scroll pr-1">
                 ${state.subjects.map(subj => `
                   <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/40 cursor-pointer transition">
-                    <input type="checkbox" name="t-subject-chk" value="${escapeHtml(subj.name)}"
+                    <input type="checkbox" name="t-subject-chk" value="${escapeHtml(subj.name)}" ${editSubjectsSet.has(subj.name.toLowerCase()) ? 'checked' : ''}
                       class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shrink-0" />
                     <span class="text-xs font-semibold text-slate-700 truncate">${escapeHtml(subj.name)}</span>
                   </label>
@@ -4503,9 +4580,17 @@
               </div>
             </div>
 
-            <button type="submit" class="w-full py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
-              <i data-lucide="user-plus" class="w-4 h-4"></i> Tambah Akun Guru
-            </button>
+            <div class="${editingTeacher ? 'grid grid-cols-2 gap-2.5' : ''}">
+              ${editingTeacher ? `
+                <button type="button" onclick="window.handleCancelEditTeacher()"
+                  class="w-full py-3 px-4 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                  <i data-lucide="x" class="w-4 h-4"></i> Batal
+                </button>
+              ` : ''}
+              <button type="submit" class="w-full py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+                <i data-lucide="${editingTeacher ? 'save' : 'user-plus'}" class="w-4 h-4"></i> ${editingTeacher ? 'Simpan Perubahan' : 'Tambah Akun Guru'}
+              </button>
+            </div>
           </form>
         </div>
 
@@ -4551,8 +4636,9 @@
         const jabBadgeCls = tMeta.jabatan === 'Wali Kelas'
           ? 'bg-emerald-100 text-emerald-700'
           : 'bg-purple-100 text-purple-700';
+        const isEditingRow = editingTeacher && editingTeacher.id === t.id;
         return `
-                  <tr class="hover:bg-slate-50/80">
+                  <tr class="${isEditingRow ? 'bg-indigo-50/90 ring-1 ring-inset ring-indigo-300' : 'hover:bg-slate-50/80'} transition">
                     <td class="py-3 px-3">
                       <div class="font-bold text-slate-900">${escapeHtml(t.full_name)}</div>
                       <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${jabBadgeCls}">${escapeHtml(tMeta.jabatan)}</span>
@@ -4566,10 +4652,17 @@
                       <div class="font-semibold text-slate-800">${escapeHtml(t.subject)}</div>
                       <div class="text-[11px] text-slate-500 font-semibold mt-0.5">${escapeHtml(tMeta.classAssigned)}</div>
                     </td>
-                    <td class="py-3 px-3 text-right">
-                      <button type="button" onclick="window.handleDeleteTeacher('${t.id}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600" title="Hapus">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                      </button>
+                    <td class="py-3 px-3 text-right whitespace-nowrap">
+                      <div class="inline-flex items-center justify-end gap-1">
+                        <button type="button" onclick="window.handleEditTeacher('${t.id}')"
+                          class="p-1.5 rounded-lg ${isEditingRow ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-indigo-50 text-slate-400 hover:text-indigo-600'} transition" title="Edit Guru">
+                          <i data-lucide="pencil" class="w-4 h-4"></i>
+                        </button>
+                        <button type="button" onclick="window.handleDeleteTeacher('${t.id}')"
+                          class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus">
+                          <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 `;
@@ -4583,11 +4676,38 @@
     `;
     }
 
+    window.handleEditTeacher = function (teacherId) {
+      if (!state.teachers.some(t => t.id === teacherId)) return;
+      state.editingTeacherId = teacherId;
+      renderCurrentMenu();
+      requestAnimationFrame(() => {
+        const card = document.getElementById('guru-form-card');
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const nameInput = document.getElementById('t-fullname');
+        if (nameInput) {
+          nameInput.focus();
+          const len = nameInput.value.length;
+          nameInput.setSelectionRange?.(len, len);
+        }
+      });
+    };
+
+    window.handleCancelEditTeacher = function () {
+      state.editingTeacherId = null;
+      renderCurrentMenu();
+    };
+
     window.handleSaveTeacher = async function (e) {
       e.preventDefault();
+      const editingId = state.editingTeacherId;
+      const existingTarget = editingId ? state.teachers.find(t => t.id === editingId) : null;
+
       const fullName = document.getElementById('t-fullname').value.trim();
       const idType = document.getElementById('t-id-type').value;
-      const idNumber = document.getElementById('t-id-number').value.replace(/[^0-9]/g, '').trim();
+      const rawIdVal = document.getElementById('t-id-number').value.trim();
+      const existingUsername = existingTarget ? String(existingTarget.username || '').trim() : '';
+      const preserveLegacyId = Boolean(existingTarget && rawIdVal === existingUsername);
+      const idNumber = preserveLegacyId ? rawIdVal : rawIdVal.replace(/[^0-9]/g, '').trim();
       const jabatan = document.getElementById('t-jabatan').value;
       const classAmpuan = document.getElementById('t-classes').value;
       const password = document.getElementById('t-password').value.trim();
@@ -4597,7 +4717,7 @@
         showToast('Nomor Identitas wajib diisi dengan angka.', 'warning');
         return;
       }
-      if (state.teachers.some(t => String(t.username || '').trim() === idNumber)) {
+      if (state.teachers.some(t => (!existingTarget || t.id !== existingTarget.id) && String(t.username || '').trim().toLowerCase() === idNumber.toLowerCase())) {
         showToast(`Nomor Identitas ${idNumber} sudah terdaftar! Gunakan nomor lain.`, 'warning');
         return;
       }
@@ -4609,8 +4729,8 @@
       const subject = checkedSubjects.join(', ');
       const classAssignedEncoded = encodeTeacherMeta(classAmpuan, jabatan, idType);
 
-      const newTeacher = {
-        id: crypto.randomUUID(),
+      const teacherRecord = {
+        id: existingTarget ? existingTarget.id : crypto.randomUUID(),
         full_name: fullName,
         username: idNumber,
         password,
@@ -4618,30 +4738,68 @@
         class_assigned: classAssignedEncoded
       };
 
-      const prevTeachersSnapshot = state.subjects.map(s => ({ id: s.id, teacher_id: s.teacher_id }));
+      const prevTeacherCopy = existingTarget ? { ...existingTarget } : null;
+      const prevSubjectsSnapshot = state.subjects.map(s => ({ id: s.id, teacher_id: s.teacher_id }));
+      const prevEditingId = state.editingTeacherId;
+      const prevCurrentUserCopy = (existingTarget && state.currentUser?.id === existingTarget.id) ? { ...state.currentUser } : null;
+
       const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
       await saveRecordWithSync({
         submitterBtn,
         table: 'teachers',
-        record: newTeacher,
-        overlayTitle: 'Menyimpan Akun Guru...',
-        overlaySuccessTitle: 'Akun Guru Tersimpan!',
-        toastMsg: `Akun Guru ${fullName} berhasil ditambahkan dan tersinkron!`,
+        record: teacherRecord,
+        overlayTitle: existingTarget ? 'Menyimpan Perubahan Guru...' : 'Menyimpan Akun Guru...',
+        overlaySuccessTitle: existingTarget ? 'Data Guru Diperbarui!' : 'Akun Guru Tersimpan!',
+        toastMsg: existingTarget
+          ? `Data Guru ${fullName} berhasil diperbarui dan tersinkron!`
+          : `Akun Guru ${fullName} berhasil ditambahkan dan tersinkron!`,
         onLocalApply: () => {
-          state.teachers.push(newTeacher);
-          checkedSubjects.forEach(subName => {
-            const subj = state.subjects.find(s => s.name.toLowerCase() === subName.toLowerCase());
-            if (subj) subj.teacher_id = newTeacher.id;
+          if (existingTarget) {
+            const idx = state.teachers.findIndex(t => t.id === existingTarget.id);
+            if (idx !== -1) state.teachers[idx] = teacherRecord;
+            state.editingTeacherId = null;
+          } else {
+            state.teachers.push(teacherRecord);
+          }
+          const checkedLower = new Set(checkedSubjects.map(s => s.toLowerCase()));
+          state.subjects.forEach(subj => {
+            if (checkedLower.has(subj.name.toLowerCase())) {
+              subj.teacher_id = teacherRecord.id;
+            } else if (existingTarget && subj.teacher_id === teacherRecord.id) {
+              subj.teacher_id = null;
+            }
           });
           saveSubjectsMetaToStorage();
+          if (existingTarget && state.currentUser?.id === teacherRecord.id) {
+            state.currentUser = { ...state.currentUser, ...teacherRecord };
+            saveSessionToStorage();
+            const nameEl = document.getElementById('user-display-name');
+            const subEl = document.getElementById('user-display-sub');
+            if (nameEl) nameEl.textContent = teacherRecord.full_name;
+            if (subEl) subEl.textContent = formatTeacherHeaderSub(state.currentUser);
+          }
         },
         onRollback: () => {
-          state.teachers = state.teachers.filter(t => t.id !== newTeacher.id);
-          prevTeachersSnapshot.forEach(snap => {
+          if (prevTeacherCopy) {
+            const idx = state.teachers.findIndex(t => t.id === prevTeacherCopy.id);
+            if (idx !== -1) state.teachers[idx] = prevTeacherCopy;
+            state.editingTeacherId = prevEditingId;
+          } else {
+            state.teachers = state.teachers.filter(t => t.id !== teacherRecord.id);
+          }
+          prevSubjectsSnapshot.forEach(snap => {
             const subj = state.subjects.find(s => s.id === snap.id);
             if (subj) subj.teacher_id = snap.teacher_id;
           });
           saveSubjectsMetaToStorage();
+          if (prevCurrentUserCopy) {
+            state.currentUser = prevCurrentUserCopy;
+            saveSessionToStorage();
+            const nameEl = document.getElementById('user-display-name');
+            const subEl = document.getElementById('user-display-sub');
+            if (nameEl) nameEl.textContent = prevCurrentUserCopy.full_name;
+            if (subEl) subEl.textContent = formatTeacherHeaderSub(prevCurrentUserCopy);
+          }
         }
       });
     };
@@ -4656,6 +4814,7 @@
             recordId: teacherId,
             onLocalDelete: () => {
               state.teachers = state.teachers.filter(t => t.id !== teacherId);
+              if (state.editingTeacherId === teacherId) state.editingTeacherId = null;
               state.subjects.forEach(s => {
                 if (s.teacher_id === teacherId) s.teacher_id = null;
               });
