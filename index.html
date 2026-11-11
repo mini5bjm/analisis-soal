@@ -3332,6 +3332,16 @@
     }
 
     // ==================== STATISTICAL & ITEM ANALYSIS ENGINE ====================
+    function sortByNameAlphabetical(list, nameKey = 'student_name', secondaryKey = 'student_nis') {
+      return (Array.isArray(list) ? list : [])
+        .slice()
+        .sort((a, b) => {
+          const cmp = String(a?.[nameKey] || '').trim().localeCompare(String(b?.[nameKey] || '').trim(), 'id', { sensitivity: 'base' });
+          if (cmp !== 0) return cmp;
+          return String(a?.[secondaryKey] || '').trim().localeCompare(String(b?.[secondaryKey] || '').trim(), 'id', { numeric: true });
+        });
+    }
+
     function computeExamStatistics(exam) {
       if (!exam) {
         return {
@@ -5009,7 +5019,11 @@
               </div>
             ` : (state.students.length > 0 ? (() => {
         const matchingStudents = state.students.filter(stu => stu.class_name === exam.class_name);
-        const listToPick = matchingStudents.length > 0 ? matchingStudents : state.students;
+        const listToPick = sortByNameAlphabetical(
+          matchingStudents.length > 0 ? matchingStudents : state.students,
+          'full_name',
+          'nis'
+        );
         let lockedCount = 0;
         const quickOptionsHtml = listToPick.map(stu => {
           const existingRes = findExistingExamResultForStudent(exam.id, stu.nis, stu.full_name);
@@ -5109,7 +5123,8 @@
           </div>
 
           ${(() => {
-        const resultsPage = paginateItems(stats.results, 'inputResults');
+        const sortedInputResults = sortByNameAlphabetical(stats.results, 'student_name', 'student_nis');
+        const resultsPage = paginateItems(sortedInputResults, 'inputResults');
         return `
           <div class="overflow-x-auto custom-scroll">
             <table class="w-full text-left border-collapse">
@@ -5570,9 +5585,11 @@
           ).join(' ')
         : `<strong>${isNumType ? 'Bobot Maks per Nomor' : `Kunci Jawaban ${examMeta.typeMeta.shortLabel}`}:</strong> <code style="font-family:monospace; font-weight:800; color:#312e81;">${escapeHtml(examMeta.displayKey)}</code>`;
 
-      const studentRowsHtml = stats.results.length === 0
+      const alphabeticalResults = sortByNameAlphabetical(stats.results, 'student_name', 'student_nis');
+
+      const studentRowsHtml = alphabeticalResults.length === 0
         ? `<tr><td colspan="7" style="text-align:center; padding:18px; color:#64748b;">Belum ada data jawaban siswa yang diinput pada paket ulangan ini.</td></tr>`
-        : stats.results.map((r, idx) => {
+        : alphabeticalResults.map((r, idx) => {
           const graded = scoreStudentResponse(exam, r.student_answers);
           const isTuntas = Number(r.score) >= Number(exam.kkm);
           return `
@@ -5655,8 +5672,8 @@
           `;
         }).join('');
 
-      const remedialStudents = stats.results.filter(r => Number(r.score) < Number(exam.kkm));
-      const enrichmentStudents = stats.results.filter(r => Number(r.score) >= Number(exam.kkm));
+      const remedialStudents = alphabeticalResults.filter(r => Number(r.score) < Number(exam.kkm));
+      const enrichmentStudents = alphabeticalResults.filter(r => Number(r.score) >= Number(exam.kkm));
 
       const remedialRowsHtml = remedialStudents.length === 0
         ? `<tr><td colspan="5" style="text-align:center; padding:16px; color:#047857; font-weight:700;">Luar biasa! Seluruh siswa pada kelas ini telah TUNTAS mencapai batas KKM (${exam.kkm}).</td></tr>`
@@ -5731,7 +5748,7 @@
 
         <div class="pr-summary-bar">
           <span><strong>Jenis Soal:</strong> ${escapeHtml(qTypeSummary)} (${exam.total_questions} Soal${examMeta.hasWeightedScore ? ` • Bobot Total ${examMeta.maxTotalScore}` : ''})</span>
-          <span><strong>KKM:</strong> ${exam.kkm} &nbsp;|&nbsp; <strong>Peserta:</strong> ${stats.totalStudents} Siswa &nbsp;|&nbsp; <strong>Rata-rata:</strong> ${stats.averageScore} &nbsp;|&nbsp; <strong>Ketuntasan Klasikal:</strong> ${stats.classicalMastery}% (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)</span>
+          <span><strong>KKM:</strong> ${exam.kkm} &nbsp;|&nbsp; <strong>Peserta:</strong> ${stats.totalStudents} Siswa &nbsp;|&nbsp; <strong>Rata-rata:</strong> ${stats.avgScore} &nbsp;|&nbsp; <strong>Ketuntasan Klasikal:</strong> ${stats.classicalMastery}% (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)</span>
         </div>
       `;
 
@@ -6082,8 +6099,9 @@
       const examMeta = stats.examMeta || decodeExamMeta(exam);
       const teacherName = getExamTeacher(exam)?.full_name || '-';
       const classLabel = formatExamClassLabel(exam.class_name);
-      const remedialStudents = stats.results.filter(r => Number(r.score) < Number(exam.kkm));
-      const enrichmentStudents = stats.results.filter(r => Number(r.score) >= Number(exam.kkm));
+      const alphabeticalResults = sortByNameAlphabetical(stats.results, 'student_name', 'student_nis');
+      const remedialStudents = alphabeticalResults.filter(r => Number(r.score) < Number(exam.kkm));
+      const enrichmentStudents = alphabeticalResults.filter(r => Number(r.score) >= Number(exam.kkm));
 
       return `
       <!-- Header Action Bar -->
@@ -6240,7 +6258,7 @@
         ? `NIS,Nama Siswa,Rincian Jawaban / Skor,Total Poin,Butir Tuntas,Nilai Akhir,Status Ketuntasan,Catatan\n`
         : `NIS,Nama Siswa,Jawaban Siswa,Jumlah Benar,Nilai Akhir,Status Ketuntasan,Catatan\n`;
 
-      stats.results.forEach(r => {
+      sortByNameAlphabetical(stats.results, 'student_name', 'student_nis').forEach(r => {
         const status = r.score >= exam.kkm ? 'TUNTAS' : 'REMEDIAL';
         const graded = scoreStudentResponse(exam, r.student_answers);
         if (showPointsCol) {
