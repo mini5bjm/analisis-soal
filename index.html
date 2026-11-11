@@ -484,22 +484,37 @@
       .pr-ans-grid {
         display: flex;
         flex-wrap: wrap;
-        gap: 2.5px;
+        gap: 2px;
         align-items: center;
       }
 
       .pr-ans-chip {
         display: inline-flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-width: 17px;
-        height: 16px;
-        padding: 0 3px;
+        min-width: 18px;
+        padding: 1.5px 2px 2px;
         border-radius: 4px;
+        line-height: 1;
+        border: 1px solid transparent;
+        white-space: nowrap;
+      }
+
+      .pr-ans-num {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 7px;
+        font-weight: 700;
+        color: #475569;
+        margin-bottom: 1.5px;
+        line-height: 1;
+      }
+
+      .pr-ans-val {
         font-family: monospace;
         font-size: 9px;
         font-weight: 800;
-        border: 1px solid transparent;
+        line-height: 1;
       }
 
       .pr-ans-ok { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
@@ -4823,25 +4838,38 @@
       return map;
     }
 
+    /** Siapkan nomor soal, teks jawaban/skor, dan status koreksi secara seragam untuk chip jawaban. */
+    function getAnswerChipInfo(item) {
+      const isNum = isNumericQuestionType(item.questionType);
+      const status = item.isCorrect ? 'ok' : (isNum && item.isPartial ? 'partial' : 'bad');
+      const valText = isNum
+        ? `${escapeHtml(String(item.studentVal))}/${escapeHtml(String(item.keyVal))}`
+        : escapeHtml(String(item.studentVal));
+      return { isNum, status, valText, number: item.number };
+    }
+
     function renderStudentAnswerChips(graded) {
+      const statusClsMap = {
+        ok: 'bg-emerald-100 text-emerald-700 border-emerald-200/80',
+        partial: 'bg-amber-100 text-amber-800 border-amber-200/80',
+        bad: 'bg-rose-100 text-rose-700 border-rose-200/80'
+      };
       const renderChip = item => {
-        if (isNumericQuestionType(item.questionType)) {
-          const cls = item.isCorrect
-            ? 'bg-emerald-100 text-emerald-700'
-            : (item.isPartial ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700');
-          return `<span class="inline-flex items-center justify-center px-1.5 h-5 rounded text-[10px] font-mono font-bold ${cls}" title="${item.sectionShort} #${item.sectionNumber}: Skor ${item.studentVal} / Maks ${item.keyVal}">${item.studentVal}/${item.keyVal}</span>`;
-        }
-        return `<span class="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-mono font-bold ${item.isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}" title="${item.sectionShort} #${item.sectionNumber}: Kunci ${item.keyVal}, Jawab ${item.studentVal}">${item.studentVal}</span>`;
+        const chip = getAnswerChipInfo(item);
+        const tipText = chip.isNum
+          ? `No. ${chip.number} (${item.sectionShort} #${item.sectionNumber}): Skor ${item.studentVal} / Maks ${item.keyVal}`
+          : `No. ${chip.number} (${item.sectionShort} #${item.sectionNumber}): Kunci ${item.keyVal}, Jawab ${item.studentVal}`;
+        return `<span class="inline-flex flex-col items-center justify-center ${chip.isNum ? 'min-w-[26px] px-1.5' : 'min-w-[20px] px-1'} py-0.5 rounded border leading-none whitespace-nowrap ${statusClsMap[chip.status]}" title="${escapeHtml(tipText)}"><span class="text-[8px] font-sans font-bold text-slate-600 leading-none mb-0.5">${chip.number}</span><span class="text-[10px] font-mono font-extrabold leading-none">${chip.valText}</span></span>`;
       };
 
       if (!graded.isMultiType) {
-        return `<div class="flex flex-wrap gap-1">${graded.itemResults.map(renderChip).join(' ')}</div>`;
+        return `<div class="flex flex-wrap gap-1">${graded.itemResults.map(renderChip).join('')}</div>`;
       }
 
       return `<div class="space-y-1.5">${graded.sectionSummaries.map(sec => `
-        <div class="flex flex-wrap items-center gap-1">
-          <span class="px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-700 text-[9px] font-extrabold mr-0.5">${sec.shortLabel}</span>
-          ${sec.itemResults.map(renderChip).join(' ')}
+        <div class="flex items-start gap-1.5">
+          <span class="shrink-0 mt-0.5 px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-700 text-[9px] font-extrabold">${escapeHtml(sec.shortLabel)}</span>
+          <div class="flex flex-wrap gap-1">${sec.itemResults.map(renderChip).join('')}</div>
         </div>
       `).join('')}</div>`;
     }
@@ -5532,12 +5560,14 @@
     }
 
     function renderPrintAnswerChipsHtml(graded) {
+      const statusClsMap = {
+        ok: 'pr-ans-ok',
+        partial: 'pr-ans-partial',
+        bad: 'pr-ans-bad'
+      };
       const renderChip = item => {
-        if (isNumericQuestionType(item.questionType)) {
-          const cls = item.isCorrect ? 'pr-ans-ok' : (item.isPartial ? 'pr-ans-partial' : 'pr-ans-bad');
-          return `<span class="pr-ans-chip ${cls}">${escapeHtml(String(item.studentVal))}/${escapeHtml(String(item.keyVal))}</span>`;
-        }
-        return `<span class="pr-ans-chip ${item.isCorrect ? 'pr-ans-ok' : 'pr-ans-bad'}">${escapeHtml(String(item.studentVal))}</span>`;
+        const chip = getAnswerChipInfo(item);
+        return `<span class="pr-ans-chip ${statusClsMap[chip.status]}"><span class="pr-ans-num">${chip.number}</span><span class="pr-ans-val">${chip.valText}</span></span>`;
       };
 
       if (!graded.isMultiType) {
@@ -5545,9 +5575,9 @@
       }
 
       return graded.sectionSummaries.map(sec => `
-        <div style="margin-bottom:2px;">
-          <span style="display:inline-block; font-size:8.5px; font-weight:800; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; border-radius:4px; padding:0 4px; margin-right:3px;">${escapeHtml(sec.shortLabel)}</span>
-          <span class="pr-ans-grid" style="display:inline-flex;">${sec.itemResults.map(renderChip).join('')}</span>
+        <div style="display:flex; align-items:flex-start; gap:4px; margin-bottom:3px;">
+          <span style="flex-shrink:0; margin-top:2px; font-size:8.5px; font-weight:800; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; border-radius:4px; padding:1px 4px;">${escapeHtml(sec.shortLabel)}</span>
+          <span class="pr-ans-grid">${sec.itemResults.map(renderChip).join('')}</span>
         </div>
       `).join('');
     }
