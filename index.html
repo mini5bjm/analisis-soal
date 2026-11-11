@@ -468,9 +468,9 @@
             <div>
               <div class="flex items-center gap-2">
                 <span class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-teal-600" id="header-eyebrow">EVALUASI AKADEMIK</span>
-                <span id="sync-status-pill" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <button type="button" id="sync-status-pill" onclick="openCloudSyncModal()" title="Klik untuk melihat status sinkronisasi otomatis &amp; cadangan data" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-pointer hover:brightness-95 transition">
                   <i class="fa-solid fa-circle-check mr-1"></i>Tersinkronisasi
-                </span>
+                </button>
               </div>
               <h2 id="header-page-title" class="text-base sm:text-lg font-extrabold text-slate-900">Dashboard Analisis Butir Soal</h2>
             </div>
@@ -2217,6 +2217,41 @@
       </div>
     </div>
 
+    <!-- Modal: Monitor Sinkronisasi Otomatis & Cadangan -->
+    <div id="modal-sync-status" class="fixed inset-0 z-[75] hidden items-center justify-center bg-slate-900/55 backdrop-blur-xs p-4">
+      <div class="bg-white w-full max-w-lg rounded-[26px] shadow-2xl border border-slate-200 overflow-hidden animate-fade-in-scale">
+        <div class="p-5 sm:p-6 bg-gradient-to-r from-teal-700 to-emerald-700 text-white flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-extrabold">Sinkronisasi Otomatis &amp; Cadangan</h3>
+              <p class="text-[11px] text-teal-100">Auto-Sync real-time + Antrean Offline anti-hilang</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeCloudSyncModal()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition" title="Tutup">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="p-5 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          <div id="modal-sync-status-body" class="space-y-3 text-xs text-slate-700"></div>
+
+          <div class="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <button type="button" onclick="exportFullBackupJson()" class="px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-file-arrow-down text-teal-700"></i>
+              <span>Unduh Cadangan (.json)</span>
+            </button>
+            <button type="button" id="btn-modal-sync-now" onclick="handleManualCloudSync()" class="px-5 py-2 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-rotate"></i>
+              <span>Sinkronkan Sekarang</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ========================================================= -->
@@ -2242,66 +2277,401 @@
     let isCloudConnected = false;
     let collection, doc, setDoc, deleteDoc, getDocs;
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'smart-anabutir-app';
+    const PENDING_SYNC_STORAGE_KEY = 'smart_anabutir_pending_ops_v2';
+    const LAST_EXAM_STORAGE_KEY = 'smart_anabutir_last_exam_v2';
     let startupCloudPromise = null;
+    let sdkInitPromise = null;
+    let syncInFlightPromise = null;
+    let _fbAuthMod = null;
+    let lastPullAt = 0;
+    let periodicSyncTimerId = null;
+    let lifecycleListenersBound = false;
+    let deferredRenderAfterTyping = false;
     let cloudSyncState = {
       sdkReady: false,
       readOk: false,
       writeOk: null,
+      syncing: false,
       lastErrorCode: '',
       lastErrorMsg: '',
       lastSyncedAt: null
     };
 
+    const COLLECTION_STORAGE_KEYS = {
+      users_peserta: 'smart_anabutir_guru_v2',
+      master_siswa: 'smart_anabutir_siswa_v2',
+      paket_ujian: 'smart_anabutir_exams_v2',
+      jawaban_siswa: 'smart_anabutir_jawaban_v2',
+      app_settings: 'smart_anabutir_settings_v2'
+    };
+
+    function makePendingKey(collectionName, docId) {
+      return `${collectionName}::${docId}`;
+    }
+
+    function loadPendingSyncOps() {
+      try {
+        const raw = localStorage.getItem(PENDING_SYNC_STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function savePendingSyncOps(opsMap) {
+      try {
+        const clean = opsMap && typeof opsMap === 'object' ? opsMap : {};
+        if (Object.keys(clean).length === 0) {
+          localStorage.removeItem(PENDING_SYNC_STORAGE_KEY);
+        } else {
+          localStorage.setItem(PENDING_SYNC_STORAGE_KEY, JSON.stringify(clean));
+        }
+      } catch (e) {
+        console.warn('Gagal menyimpan antrean sync lokal:', e);
+      }
+    }
+
+    function getPendingSyncCount() {
+      return Object.keys(loadPendingSyncOps()).length;
+    }
+
+    function queuePendingSyncOp(op, collectionName, docId) {
+      if (!collectionName || !docId) return;
+      const opsMap = loadPendingSyncOps();
+      opsMap[makePendingKey(collectionName, docId)] = {
+        op,
+        col: collectionName,
+        id: String(docId),
+        queuedAt: Date.now()
+      };
+      savePendingSyncOps(opsMap);
+    }
+
+    function removePendingSyncOp(collectionName, docId) {
+      if (!collectionName || !docId) return;
+      const opsMap = loadPendingSyncOps();
+      const key = makePendingKey(collectionName, docId);
+      if (key in opsMap) {
+        delete opsMap[key];
+        savePendingSyncOps(opsMap);
+      }
+    }
+
+    function sanitizeForFirestore(val) {
+      if (val === undefined) return null;
+      if (val === null) return null;
+      if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
+      if (typeof val !== 'object') return val;
+      if (val instanceof Date) return val.toISOString();
+      if (Array.isArray(val)) {
+        return val.map(item => (item === undefined ? null : sanitizeForFirestore(item)));
+      }
+      const out = {};
+      Object.keys(val).forEach(k => {
+        if (val[k] !== undefined && typeof val[k] !== 'function') {
+          out[k] = sanitizeForFirestore(val[k]);
+        }
+      });
+      return out;
+    }
+
+    function persistCollectionToLocalStorage(collectionName) {
+      try {
+        if (collectionName === 'users_peserta') {
+          localStorage.setItem(COLLECTION_STORAGE_KEYS.users_peserta, JSON.stringify(pesertaAccounts));
+        } else if (collectionName === 'master_siswa') {
+          localStorage.setItem(COLLECTION_STORAGE_KEYS.master_siswa, JSON.stringify(masterSiswaList));
+        } else if (collectionName === 'paket_ujian') {
+          localStorage.setItem(COLLECTION_STORAGE_KEYS.paket_ujian, JSON.stringify(paketUjianList));
+        } else if (collectionName === 'jawaban_siswa') {
+          localStorage.setItem(COLLECTION_STORAGE_KEYS.jawaban_siswa, JSON.stringify(jawabanSiswaList));
+        } else if (collectionName === 'app_settings') {
+          localStorage.setItem(COLLECTION_STORAGE_KEYS.app_settings, JSON.stringify(appSettings));
+        }
+      } catch (e) {
+        console.warn('LocalStorage persist error:', e);
+      }
+    }
+
+    function findLocalDocByCollection(collectionName, docId) {
+      if (collectionName === 'users_peserta') {
+        return (pesertaAccounts || []).find(x => x && x.id === docId) || null;
+      }
+      if (collectionName === 'master_siswa') {
+        return (masterSiswaList || []).find(x => x && x.id === docId) || null;
+      }
+      if (collectionName === 'paket_ujian') {
+        return (paketUjianList || []).find(x => x && x.id === docId) || null;
+      }
+      if (collectionName === 'jawaban_siswa') {
+        return (jawabanSiswaList || []).find(x => x && x.id === docId) || null;
+      }
+      if (collectionName === 'app_settings') {
+        if (docId === 'general') {
+          const { adminUser: _dropAdmin, ...cleanGeneral } = appSettings || {};
+          return cleanGeneral;
+        }
+        if (docId === 'admin_account') {
+          return typeof getAdminCredentials === 'function' ? getAdminCredentials() : null;
+        }
+      }
+      return null;
+    }
+
+    function getUserExamKey(userObj) {
+      if (!userObj) return '';
+      if (userObj.id) return String(userObj.id);
+      return `${userObj.role || 'user'}:${String(userObj.username || userObj.nama || 'default').toLowerCase()}`;
+    }
+
+    function saveUserLastExamId(userObj, examId) {
+      if (!userObj || !examId) return;
+      try {
+        const key = getUserExamKey(userObj);
+        if (!key) return;
+        const raw = localStorage.getItem(LAST_EXAM_STORAGE_KEY);
+        const map = raw ? JSON.parse(raw) : {};
+        map[key] = examId;
+        localStorage.setItem(LAST_EXAM_STORAGE_KEY, JSON.stringify(map));
+      } catch (e) {}
+    }
+
+    function loadUserLastExamId(userObj) {
+      if (!userObj) return '';
+      try {
+        const key = getUserExamKey(userObj);
+        if (!key) return '';
+        const raw = localStorage.getItem(LAST_EXAM_STORAGE_KEY);
+        if (!raw) return '';
+        const map = JSON.parse(raw);
+        return map && typeof map === 'object' ? (map[key] || '') : '';
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function restoreUserPreferredExam(userObj) {
+      const allowed = typeof getUserExams === 'function' ? getUserExams(userObj || currentUser) : (paketUjianList || []);
+      if (!allowed || allowed.length === 0) {
+        activeExamId = '';
+        return '';
+      }
+      if (activeExamId && allowed.some(p => p.id === activeExamId)) {
+        return activeExamId;
+      }
+      const savedId = loadUserLastExamId(userObj || currentUser);
+      if (savedId && allowed.some(p => p.id === savedId)) {
+        activeExamId = savedId;
+        return activeExamId;
+      }
+      const examWithAnswers = allowed.find(p => (jawabanSiswaList || []).some(j => j.ujianId === p.id));
+      activeExamId = examWithAnswers ? examWithAnswers.id : allowed[0].id;
+      return activeExamId;
+    }
+
     function updateCloudStatusBadges() {
       const badgeEl = document.getElementById('login-mode-badge');
       const pillEl = document.getElementById('sync-status-pill');
+      const pendingCount = getPendingSyncCount();
+      const basePillClass = 'px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer hover:brightness-95 transition';
+      const errCode = cloudSyncState.lastErrorCode || '';
+      const isPermErr = errCode.includes('permission') || errCode.includes('unauthenticated');
 
-      if (!cloudSyncState.sdkReady && !cloudSyncState.readOk && !cloudSyncState.lastErrorCode) {
+      if (cloudSyncState.syncing) {
+        if (badgeEl) {
+          badgeEl.textContent = pendingCount > 0 ? `Menyinkronkan (${pendingCount} Antrean)...` : 'Menyinkronkan ke Cloud...';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-200 font-semibold';
+        }
+        if (pillEl) {
+          pillEl.innerHTML = `<i class="fa-solid fa-rotate fa-spin mr-1"></i>${pendingCount > 0 ? `Menyinkronkan (${pendingCount})...` : 'Menyinkronkan...'}`;
+          pillEl.className = `${basePillClass} bg-teal-50 text-teal-700 border border-teal-200`;
+        }
+      } else if (!cloudSyncState.sdkReady && !cloudSyncState.readOk && !errCode) {
         if (badgeEl) {
           badgeEl.textContent = 'Memeriksa Koneksi Cloud...';
           badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-slate-500/20 text-slate-300 font-semibold';
         }
         if (pillEl) {
-          pillEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Menghubungkan...';
-          pillEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200';
+          pillEl.innerHTML = pendingCount > 0
+            ? `<i class="fa-solid fa-spinner fa-spin mr-1"></i>Menghubungkan (${pendingCount} Antrean)`
+            : '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Menghubungkan...';
+          pillEl.className = `${basePillClass} bg-slate-100 text-slate-600 border border-slate-200`;
         }
-        return;
-      }
-
-      if (isCloudConnected && cloudSyncState.readOk && cloudSyncState.writeOk !== false) {
-        if (badgeEl) {
-          badgeEl.textContent = 'Terhubung ke Firebase (Live)';
-          badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-semibold';
-        }
-        if (pillEl) {
-          pillEl.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i>Cloud Terhubung';
-          pillEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200';
-        }
-      } else if (cloudSyncState.lastErrorCode && (cloudSyncState.lastErrorCode.includes('permission') || cloudSyncState.lastErrorCode.includes('unauthenticated'))) {
+      } else if (isPermErr) {
         if (badgeEl) {
           badgeEl.textContent = 'Cloud Terkunci (Cek Rules Firebase)';
           badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold';
           badgeEl.title = cloudSyncState.lastErrorMsg || 'Izin baca/tulis Firestore ditolak';
         }
         if (pillEl) {
-          pillEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i>Izin Cloud Ditolak (Lokal)';
-          pillEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300';
-          pillEl.title = cloudSyncState.lastErrorMsg || 'Data hanya tersimpan di browser ini karena izin Firestore ditolak';
+          pillEl.innerHTML = pendingCount > 0
+            ? `<i class="fa-solid fa-triangle-exclamation mr-1"></i>Izin Cloud Ditolak (${pendingCount} Antrean)`
+            : '<i class="fa-solid fa-triangle-exclamation mr-1"></i>Izin Cloud Ditolak (Lokal)';
+          pillEl.className = `${basePillClass} bg-rose-50 text-rose-800 border border-rose-300`;
+          pillEl.title = cloudSyncState.lastErrorMsg || 'Klik untuk lihat panduan perbaikan & unduh cadangan JSON';
+        }
+      } else if (isCloudConnected && cloudSyncState.readOk && cloudSyncState.writeOk !== false) {
+        if (pendingCount > 0) {
+          if (badgeEl) {
+            badgeEl.textContent = `Firebase Aktif (${pendingCount} Menunggu Sync)`;
+            badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-200 font-semibold';
+          }
+          if (pillEl) {
+            pillEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-1"></i>Antrean Sync (${pendingCount})`;
+            pillEl.className = `${basePillClass} bg-amber-50 text-amber-800 border border-amber-300`;
+            pillEl.title = 'Klik untuk menyinkronkan antrean data ke Cloud sekarang';
+          }
+        } else {
+          if (badgeEl) {
+            badgeEl.textContent = 'Terhubung & Auto-Sync Aktif';
+            badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-semibold';
+          }
+          if (pillEl) {
+            pillEl.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i>Auto-Sync Aktif';
+            pillEl.className = `${basePillClass} bg-emerald-50 text-emerald-700 border border-emerald-200`;
+            pillEl.title = 'Semua data tersinkronisasi otomatis ke browser & Cloud Firestore';
+          }
         }
       } else {
         if (badgeEl) {
-          badgeEl.textContent = 'Mode Lokal Browser (Offline)';
+          badgeEl.textContent = pendingCount > 0 ? `Offline (${pendingCount} Antrean Auto-Sync)` : 'Mode Lokal Browser (Offline)';
           badgeEl.className = 'px-2.5 py-0.5 rounded-full bg-slate-500/20 text-slate-300 font-semibold';
         }
         if (pillEl) {
-          pillEl.innerHTML = '<i class="fa-solid fa-hard-drive mr-1"></i>Mode Lokal Browser';
-          pillEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300';
+          pillEl.innerHTML = pendingCount > 0
+            ? `<i class="fa-solid fa-clock-rotate-left mr-1"></i>Offline (${pendingCount} Antrean)`
+            : '<i class="fa-solid fa-hard-drive mr-1"></i>Mode Lokal (Offline)';
+          pillEl.className = pendingCount > 0
+            ? `${basePillClass} bg-amber-50 text-amber-800 border border-amber-300`
+            : `${basePillClass} bg-slate-100 text-slate-700 border border-slate-300`;
+          pillEl.title = 'Data aman tersimpan di browser dan akan disinkronkan otomatis saat online';
         }
       }
+
       if (typeof renderCloudStatusBox === 'function') {
         renderCloudStatusBox();
       }
+      if (typeof renderCloudSyncModalBody === 'function') {
+        renderCloudSyncModalBody();
+      }
     }
+
+    function renderCloudSyncModalBody() {
+      const body = document.getElementById('modal-sync-status-body');
+      if (!body) return;
+      const pendingOps = loadPendingSyncOps();
+      const pendingList = Object.values(pendingOps);
+      const pendingCount = pendingList.length;
+      const errCode = cloudSyncState.lastErrorCode || '';
+      const isPermErr = errCode.includes('permission') || errCode.includes('unauthenticated');
+      const online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+      const syncTimeStr = cloudSyncState.lastSyncedAt
+        ? new Date(cloudSyncState.lastSyncedAt).toLocaleString('id-ID')
+        : 'Belum tersinkron di sesi ini';
+      const esc = typeof escHtmlSimple === 'function' ? escHtmlSimple : (v => String(v ?? ''));
+
+      let bannerHtml = '';
+      if (isPermErr) {
+        const rulesSnippet = `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /artifacts/{appId}/public/data/{col}/{docId} {\n      allow read, write: if true;\n    }\n  }\n}`;
+        bannerHtml = `
+          <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 space-y-2">
+            <p class="font-bold flex items-center gap-1.5 text-rose-950">
+              <i class="fa-solid fa-triangle-exclamation text-rose-600"></i>
+              Akses Tulis/Baca Firebase Ditolak (${esc(errCode)})
+            </p>
+            <p class="text-[11px] leading-relaxed">Aturan keamanan Firestore Rules memblokir sinkronisasi ke Cloud. Data Anda aman di browser ini dan masuk ke antrean (${pendingCount} data), namun belum bisa naik ke server sampai Admin memperbarui Firestore Rules.</p>
+            <details class="bg-white/90 border border-rose-200 rounded-lg p-2">
+              <summary class="cursor-pointer font-bold text-[11px] text-rose-900">Panduan Perbaikan Firestore Rules (Untuk Admin)</summary>
+              <pre class="mt-1.5 p-2 rounded bg-slate-900 text-teal-300 text-[10px] overflow-x-auto select-all">${esc(rulesSnippet)}</pre>
+            </details>
+          </div>`;
+      } else if (pendingCount > 0) {
+        bannerHtml = `
+          <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-1.5">
+            <p class="font-bold flex items-center gap-1.5 text-amber-950">
+              <i class="fa-solid fa-cloud-arrow-up text-amber-600"></i>
+              Ada ${pendingCount} Data dalam Antrean Auto-Sync
+            </p>
+            <p class="text-[11px] leading-relaxed">Data tetap tersimpan aman di browser ini dan akan dikirim otomatis ke Cloud saat koneksi internet &amp; Firebase siap. Klik <b>Sinkronkan Sekarang</b> untuk mengirim segera.</p>
+          </div>`;
+      } else if (isCloudConnected && cloudSyncState.readOk && cloudSyncState.writeOk !== false) {
+        bannerHtml = `
+          <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-1">
+            <p class="font-bold flex items-center gap-1.5 text-emerald-950">
+              <i class="fa-solid fa-circle-check text-emerald-600"></i>
+              Auto-Sync Cloud Firebase Aktif &amp; Aman
+            </p>
+            <p class="text-[11px] leading-relaxed">Semua jawaban siswa, paket ujian, dan data sekolah tersinkronisasi otomatis ke browser &amp; server Cloud setiap kali Anda menyimpan, login, berpindah tab, atau saat koneksi internet kembali aktif.</p>
+          </div>`;
+      } else {
+        bannerHtml = `
+          <div class="p-3.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-800 space-y-1">
+            <p class="font-bold flex items-center gap-1.5">
+              <i class="fa-solid fa-hard-drive text-slate-600"></i>
+              Mode Lokal Browser (${online ? 'Menunggu Koneksi Firebase' : 'Perangkat Offline'})
+            </p>
+            <p class="text-[11px] leading-relaxed">Aplikasi menyimpan perubahan ke memori browser &amp; antrean otomatis. Pastikan membuka file <code>index.html</code> di browser yang sama saat offline, atau hubungkan internet agar tersinkronisasi ke Cloud.</p>
+          </div>`;
+      }
+
+      const activeAnsCount = (jawabanSiswaList || []).length;
+      const activeExamCount = (paketUjianList || []).length;
+      body.innerHTML = `
+        ${bannerHtml}
+        <div class="grid grid-cols-2 gap-2.5 pt-1">
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status Internet</div>
+            <div class="mt-0.5 font-bold ${online ? 'text-emerald-700' : 'text-rose-700'}">${online ? 'Online' : 'Offline'}</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Antrean Belum Naik</div>
+            <div class="mt-0.5 font-bold ${pendingCount > 0 ? 'text-amber-700' : 'text-slate-800'}">${pendingCount} Dokumen</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Jawaban / Paket</div>
+            <div class="mt-0.5 font-bold text-slate-800">${activeAnsCount} / ${activeExamCount}</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sinkronisasi Terakhir</div>
+            <div class="mt-0.5 font-bold text-slate-800 truncate" title="${esc(syncTimeStr)}">${esc(syncTimeStr)}</div>
+          </div>
+        </div>`;
+    }
+
+    window.openCloudSyncModal = function() {
+      const modal = document.getElementById('modal-sync-status');
+      if (!modal) return;
+      renderCloudSyncModalBody();
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    };
+
+    window.closeCloudSyncModal = function() {
+      const modal = document.getElementById('modal-sync-status');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+
+    window.handleManualCloudSync = async function() {
+      const btn = document.getElementById('btn-modal-sync-now');
+      const oldHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Menyinkronkan...</span>';
+      }
+      try {
+        await syncWithCloudNow({ fullPull: true, manual: true, silent: false, reason: 'manual-modal' });
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = oldHtml || '<i class="fa-solid fa-rotate"></i><span>Sinkronkan Sekarang</span>';
+        }
+        renderCloudSyncModalBody();
+      }
+    };
 
     let currentLoginTab = 'admin';
     let currentUser = null; // { role: 'admin'|'guru', nama, username, kelas }
@@ -2380,6 +2750,9 @@
     // Session Persistence Helpers (Menyimpan sesi ke localStorage agar tahan refresh, ganti tab, atau replace file)
     function saveSessionState(userObj, menuKey) {
       try {
+        if (userObj && activeExamId) {
+          saveUserLastExamId(userObj, activeExamId);
+        }
         const payload = JSON.stringify({
           user: userObj,
           menu: menuKey || currentMenu,
@@ -2445,18 +2818,87 @@
     }
 
     // =========================================================
-    // 2. DATA INITIALIZATION & CLOUD SYNCHRONIZATION
+    // 2. DATA INITIALIZATION & CLOUD SYNCHRONIZATION ENGINE
     // =========================================================
-    async function autoSetupDatabase() {
-      const seed = getInitialSeedData();
-      loadLocalSeed(seed);
-      let initialSettingsSnap = null;
+    function normalizeDummyKelasText(rawKelas) {
+      if (!rawKelas) return rawKelas;
+      let val = String(rawKelas);
+      if (val.toLowerCase().includes('ganjil') || val.toLowerCase().includes('genap') || val.includes('/')) {
+        val = val.replace(/\s*\/\s*ganjil/i, '').replace(/\s*\/\s*genap/i, '').replace(/\s*\/\s*semester\s*\d*/i, '').trim();
+        if (val.toLowerCase() === 'kelas vi' || val.toLowerCase() === 'kelas vi-a') val = 'Kelas 6';
+      }
+      return val;
+    }
 
-      try {
-        if (!IS_PREVIEW && typeof firebaseConfig !== 'undefined' && firebaseConfig.apiKey !== "API_KEY_ANDA") {
+    function isLegacyDummyExamRecord(e) {
+      if (!e) return false;
+      const title = (e.judulUjian || '').toLowerCase();
+      const kelas = (e.kelas || '').toLowerCase();
+      const isDummyKelas = /ganjil|\bvi\b/i.test(kelas);
+      return (title.includes('asesmen sumatif') && isDummyKelas) || e.id === 'ujian_pas_pai_6' || e.id === 'ujian_demo';
+    }
+
+    function isLegacyDummyAccountRecord(a) {
+      if (!a) return false;
+      return ['usr_g1', 'usr_g2', 'usr_g3', 'usr_admin'].includes(a.id) ||
+        ['guru1', 'guru2', 'sitiaminah'].includes((a.username || '').toLowerCase()) ||
+        a.role === 'admin';
+    }
+
+    function isLegacyDummyAnswerRecord(j) {
+      if (!j) return false;
+      return j.ujianId === 'ujian_pas_pai_6' || j.ujianId === 'ujian_demo' ||
+        (j.id && j.id.startsWith('ans_') && Number(j.id.replace('ans_', '')) <= 8);
+    }
+
+    function isUserActivelyEditingForm() {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = (el.tagName || '').toUpperCase();
+      if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return false;
+      return Boolean(el.closest('#view-input, #view-paket, #modal-create-exam, #modal-generate-13mapel, #view-pengaturan, #modal-siswa, #modal-peserta'));
+    }
+
+    let _anonAuthAttempted = false;
+    async function ensureFirebaseSdkReady() {
+      if (IS_PREVIEW || typeof firebaseConfig === 'undefined' || !firebaseConfig.apiKey || firebaseConfig.apiKey === 'API_KEY_ANDA') {
+        cloudSyncState.sdkReady = false;
+        isCloudConnected = false;
+        return false;
+      }
+
+      if (db && setDoc && getDocs && deleteDoc && collection && doc) {
+        cloudSyncState.sdkReady = true;
+        if (!_anonAuthAttempted && auth && !auth.currentUser && _fbAuthMod && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+          _anonAuthAttempted = true;
+          try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+              await _fbAuthMod.signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+              await _fbAuthMod.signInAnonymously(auth);
+            }
+          } catch (authErr) {}
+        }
+        return true;
+      }
+
+      // Hindari dynamic import saat jelas offline agar module URL tidak di-cache gagal oleh browser
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        cloudSyncState.lastErrorCode = cloudSyncState.lastErrorCode || 'offline';
+        cloudSyncState.lastErrorMsg = 'Perangkat sedang offline (tidak ada koneksi internet).';
+        return false;
+      }
+
+      if (sdkInitPromise) {
+        return await sdkInitPromise;
+      }
+
+      sdkInitPromise = (async () => {
+        try {
           const fbApp = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
           const fbAuth = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
           const fbFirestore = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+          _fbAuthMod = fbAuth;
 
           collection = fbFirestore.collection;
           doc = fbFirestore.doc;
@@ -2470,260 +2912,461 @@
           cloudSyncState.sdkReady = true;
 
           if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            _anonAuthAttempted = true;
             try {
               await fbAuth.signInWithCustomToken(auth, __initial_auth_token);
             } catch (tErr) {
               console.warn('Initial token error:', tErr);
             }
-          } else {
+          } else if (!_anonAuthAttempted) {
+            _anonAuthAttempted = true;
             try {
               await fbAuth.signInAnonymously(auth);
             } catch (anonErr) {
               console.info('Firebase anonymous auth tidak aktif (normal):', anonErr.message);
             }
           }
+          return true;
+        } catch (err) {
+          cloudSyncState.sdkReady = false;
+          isCloudConnected = false;
+          cloudSyncState.lastErrorCode = err?.code || 'firebase-init-error';
+          cloudSyncState.lastErrorMsg = err?.message || String(err || 'Inisialisasi Firebase gagal');
+          console.warn('Firebase init fallback to local memory:', err);
+          return false;
+        } finally {
+          if (!db) {
+            sdkInitPromise = null;
+          }
+        }
+      })();
 
-          // Uji akses baca Firestore yang sebenarnya sebelum menandai Cloud Terhubung
-          try {
-            initialSettingsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'app_settings'));
-            isCloudConnected = true;
-            cloudSyncState.readOk = true;
+      return await sdkInitPromise;
+    }
+
+    let _flushInFlightPromise = null;
+    async function flushPendingOpsToCloud() {
+      if (_flushInFlightPromise) {
+        return await _flushInFlightPromise;
+      }
+
+      _flushInFlightPromise = (async () => {
+        const orderRank = {
+          app_settings: 1,
+          users_peserta: 2,
+          master_siswa: 3,
+          paket_ujian: 4,
+          jawaban_siswa: 5
+        };
+
+        let okCount = 0;
+        let failedCount = 0;
+        let lastErrCode = '';
+        let lastErrMsg = '';
+        let permBlocked = false;
+
+        try {
+          const opsSnapshot = loadPendingSyncOps();
+          const entries = Object.entries(opsSnapshot);
+          if (entries.length === 0) {
+            return { total: 0, ok: 0, failed: 0 };
+          }
+
+          const ready = await ensureFirebaseSdkReady();
+          if (!ready) {
+            return {
+              total: entries.length,
+              ok: 0,
+              failed: entries.length,
+              offline: true,
+              errorCode: cloudSyncState.lastErrorCode || 'offline',
+              errorMsg: cloudSyncState.lastErrorMsg || 'Belum terhubung ke internet/Firebase'
+            };
+          }
+
+          entries.sort((a, b) => {
+            const ra = orderRank[a[1].col] || 9;
+            const rb = orderRank[b[1].col] || 9;
+            if (ra !== rb) return ra - rb;
+            return (a[1].queuedAt || 0) - (b[1].queuedAt || 0);
+          });
+
+          const latestMap = loadPendingSyncOps();
+          const CHUNK_SIZE = 8;
+
+          for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
+            if (permBlocked) break;
+            const chunk = entries.slice(i, i + CHUNK_SIZE);
+            const results = await Promise.allSettled(
+              chunk.map(async ([key, item]) => {
+                if (item.op === 'delete') {
+                  await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', item.col, item.id));
+                  return { key, skipped: false };
+                }
+                const localObj = findLocalDocByCollection(item.col, item.id);
+                if (!localObj) {
+                  return { key, skipped: true };
+                }
+                const payload = sanitizeForFirestore(localObj);
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', item.col, item.id), payload);
+                return { key, skipped: false };
+              })
+            );
+
+            for (let j = 0; j < results.length; j++) {
+              const r = results[j];
+              const [key, item] = chunk[j];
+              if (r.status === 'fulfilled') {
+                // Hanya hapus jika belum diantre ulang selama proses async berlangsung
+                if (!latestMap[key] || (latestMap[key].queuedAt || 0) <= (item.queuedAt || 0)) {
+                  delete latestMap[key];
+                }
+                if (!r.value?.skipped) okCount++;
+              } else {
+                failedCount++;
+                const err = r.reason;
+                const code = err?.code || 'write-error';
+                const msg = err?.message || String(err || '');
+                if (!lastErrCode) {
+                  lastErrCode = code;
+                  lastErrMsg = msg;
+                }
+                if (code === 'permission-denied' || code === 'unauthenticated') {
+                  permBlocked = true;
+                }
+              }
+            }
+          }
+
+          savePendingSyncOps(latestMap);
+          const remaining = Object.keys(latestMap).length;
+
+          if (failedCount > 0) {
+            cloudSyncState.writeOk = false;
+            cloudSyncState.lastErrorCode = lastErrCode;
+            cloudSyncState.lastErrorMsg = lastErrMsg;
+            if (permBlocked) isCloudConnected = false;
+          } else if (okCount > 0 || remaining === 0) {
+            cloudSyncState.writeOk = true;
             cloudSyncState.lastErrorCode = '';
             cloudSyncState.lastErrorMsg = '';
             cloudSyncState.lastSyncedAt = Date.now();
-          } catch (readErr) {
+            isCloudConnected = true;
+          }
+
+          return {
+            total: entries.length,
+            ok: okCount,
+            failed: failedCount,
+            remaining,
+            errorCode: lastErrCode,
+            errorMsg: lastErrMsg
+          };
+        } finally {
+          _flushInFlightPromise = null;
+          updateCloudStatusBadges();
+        }
+      })();
+
+      return await _flushInFlightPromise;
+    }
+
+    async function mergeCollectionWithCloud(collectionName, localList, storageKey, pendingOps, isLegacyFn) {
+      const snap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', collectionName));
+      const cloudMap = new Map();
+
+      for (const d of snap.docs) {
+        const data = d.data();
+        if (!data || !data.id) continue;
+        if (isLegacyFn && isLegacyFn(data)) {
+          try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, d.id)); } catch (e) {}
+          continue;
+        }
+        if (collectionName === 'paket_ujian' || collectionName === 'jawaban_siswa') {
+          if (data.kelas) data.kelas = normalizeDummyKelasText(data.kelas);
+        }
+        cloudMap.set(data.id, data);
+      }
+
+      const localMap = new Map();
+      (localList || []).forEach(item => {
+        if (!item || !item.id) return;
+        if (isLegacyFn && isLegacyFn(item)) return;
+        localMap.set(item.id, item);
+      });
+
+      const merged = [];
+      const toQueuePush = [];
+      const allIds = new Set([...cloudMap.keys(), ...localMap.keys()]);
+
+      allIds.forEach(id => {
+        const pOp = pendingOps[makePendingKey(collectionName, id)];
+        if (pOp && pOp.op === 'delete') {
+          return; // Hormati penghapusan lokal yang menunggu flush
+        }
+
+        const c = cloudMap.get(id);
+        const l = localMap.get(id);
+
+        if (pOp && pOp.op === 'upsert') {
+          if (l) {
+            merged.push(l);
+            toQueuePush.push(l);
+          } else if (c) {
+            merged.push(c);
+          }
+          return;
+        }
+
+        if (l && c) {
+          const lTs = Number(l.updatedAt || 0);
+          const cTs = Number(c.updatedAt || 0);
+          if (lTs > cTs) {
+            merged.push(l);
+            toQueuePush.push(l);
+          } else {
+            merged.push(c);
+          }
+        } else if (c) {
+          merged.push(c);
+        } else if (l) {
+          merged.push(l);
+          toQueuePush.push(l);
+        }
+      });
+
+      let changed = false;
+      try {
+        const prevSerialized = JSON.stringify(localList || []);
+        const nextSerialized = JSON.stringify(merged);
+        changed = prevSerialized !== nextSerialized;
+      } catch (e) {
+        changed = (localList || []).length !== merged.length;
+      }
+
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(merged));
+      } catch (e) {}
+
+      if (toQueuePush.length > 0) {
+        const freshPending = loadPendingSyncOps();
+        const nowTs = Date.now();
+        toQueuePush.forEach(item => {
+          const k = makePendingKey(collectionName, item.id);
+          if (!freshPending[k]) {
+            freshPending[k] = { op: 'upsert', col: collectionName, id: String(item.id), queuedAt: nowTs };
+          }
+        });
+        savePendingSyncOps(freshPending);
+      }
+
+      return { list: merged, changed };
+    }
+
+    async function syncWithCloudNow({ fullPull = true, manual = false, silent = true, reason = '' } = {}) {
+      if (syncInFlightPromise) {
+        const prev = await syncInFlightPromise;
+        if (!manual) return prev;
+      }
+
+      syncInFlightPromise = (async () => {
+        cloudSyncState.syncing = true;
+        updateCloudStatusBadges();
+
+        let dataChanged = false;
+        try {
+          const ready = await ensureFirebaseSdkReady();
+          if (!ready) {
             isCloudConnected = false;
             cloudSyncState.readOk = false;
-            cloudSyncState.lastErrorCode = readErr?.code || 'firestore-read-error';
-            cloudSyncState.lastErrorMsg = readErr?.message || String(readErr || 'Gagal membaca Firestore');
-            console.warn('Firestore tidak dapat diakses (mode lokal aktif):', readErr);
-          }
-        } else {
-          cloudSyncState.sdkReady = false;
-          isCloudConnected = false;
-        }
-      } catch (err) {
-        isCloudConnected = false;
-        cloudSyncState.readOk = false;
-        cloudSyncState.lastErrorCode = err?.code || 'firebase-init-error';
-        cloudSyncState.lastErrorMsg = err?.message || String(err || 'Inisialisasi Firebase gagal');
-        console.warn('Firebase init fallback to local memory:', err);
-      }
-
-      updateCloudStatusBadges();
-
-      // Ambil data dari Firestore jika benar-benar terhubung
-      if (isCloudConnected && db && initialSettingsSnap) {
-        try {
-          // 0a. Pengaturan Aplikasi & Identitas Sekolah
-          try {
-            const generalDoc = initialSettingsSnap.docs.find(d => d.id === 'general');
-            if (generalDoc && generalDoc.data()) {
-              const rawGeneral = { ...generalDoc.data() };
-              delete rawGeneral.adminUser; // Jangan biarkan dokumen general lama menimpa akun admin
-              const cloudUpdated = Number(rawGeneral.updatedAt || 0);
-              const localUpdated = Number(appSettings.updatedAt || 0);
-              const cloudIsCustomSchool = Boolean(rawGeneral.namaSekolah && rawGeneral.namaSekolah !== 'MI Al-Hikmah Terpadu') || cloudUpdated > 0;
-              const localIsCustomSchool = Boolean(appSettings.namaSekolah && appSettings.namaSekolah !== 'MI Al-Hikmah Terpadu') || localUpdated > 0;
-
-              if (cloudIsCustomSchool && (!localIsCustomSchool || cloudUpdated >= localUpdated)) {
-                appSettings = { ...appSettings, ...rawGeneral };
-                delete appSettings.adminUser;
-                localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
-              } else if (localIsCustomSchool && (!cloudIsCustomSchool || localUpdated > cloudUpdated)) {
-                const { adminUser: _dropAdmin, ...cleanLocalSettings } = appSettings;
-                await saveDocToCloud('app_settings', 'general', cleanLocalSettings);
-              }
-            } else {
-              const localIsCustomSchool = Boolean(appSettings.namaSekolah && appSettings.namaSekolah !== 'MI Al-Hikmah Terpadu') || Number(appSettings.updatedAt || 0) > 0;
-              if (localIsCustomSchool) {
-                const { adminUser: _dropAdmin, ...cleanLocalSettings } = appSettings;
-                await saveDocToCloud('app_settings', 'general', cleanLocalSettings);
-              }
+            if (manual) {
+              const pending = getPendingSyncCount();
+              showToast(
+                IS_PREVIEW
+                  ? 'Aplikasi berada di Mode Pratinjau Lokal. Gunakan Unduh Cadangan (.json).'
+                  : `Perangkat sedang offline / Firebase belum terjangkau. ${pending > 0 ? pending + ' data tetap aman di antrean auto-sync.' : ''}`,
+                'info'
+              );
             }
-          } catch (e) {
-            console.warn('Firestore sync settings warning:', e);
+            return { ok: false, offline: true, reason };
           }
 
-          // 0b. Kredensial Admin (Sinkronisasi berbasis timestamp & prioritas kustom)
-          try {
-            const adminDoc = initialSettingsSnap.docs.find(d => d.id === 'admin_account');
-            const curLocalAdmin = getAdminCredentials();
-            const localIsCustom = Boolean(curLocalAdmin.isCustom) ||
-              (curLocalAdmin.password && curLocalAdmin.password !== 'admin123') ||
-              (curLocalAdmin.username && curLocalAdmin.username !== 'admin') ||
-              (curLocalAdmin.nama && curLocalAdmin.nama !== 'Administrator Madrasah');
+          // 1. Kirim semua antrean perubahan lokal ke Cloud terlebih dahulu (Outbox First)
+          const flushBefore = await flushPendingOpsToCloud();
 
-            if (adminDoc && adminDoc.data()) {
-              const cloudAdmin = adminDoc.data();
-              const cloudIsCustom = Boolean(cloudAdmin.isCustom) ||
-                (cloudAdmin.password && cloudAdmin.password !== 'admin123') ||
-                (cloudAdmin.username && cloudAdmin.username !== 'admin') ||
-                (cloudAdmin.nama && cloudAdmin.nama !== 'Administrator Madrasah');
-              const cloudTs = Number(cloudAdmin.updatedAt || 0);
-              const localTs = Number(curLocalAdmin.updatedAt || 0);
+          if (fullPull) {
+            // 2. Uji & sinkronkan app_settings (Identitas Sekolah & Akun Admin)
+            const pendingOps = loadPendingSyncOps();
+            const initialSettingsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'app_settings'));
+            isCloudConnected = true;
+            cloudSyncState.readOk = true;
+            if (!flushBefore.errorCode) {
+              cloudSyncState.lastErrorCode = '';
+              cloudSyncState.lastErrorMsg = '';
+            }
+            cloudSyncState.lastSyncedAt = Date.now();
+            lastPullAt = Date.now();
 
-              if (cloudIsCustom && (!localIsCustom || cloudTs >= localTs)) {
-                await saveAdminCredentials({ ...curLocalAdmin, ...cloudAdmin, isCustom: true }, true, true);
-              } else if (localIsCustom && (!cloudIsCustom || localTs > cloudTs)) {
-                await saveDocToCloud('app_settings', 'admin_account', curLocalAdmin);
-              }
-            } else if (localIsCustom) {
-              await saveDocToCloud('app_settings', 'admin_account', curLocalAdmin);
-            }
-          } catch (aErr) {
-            console.warn('Firestore sync admin warning:', aErr);
-          }
+            // 2a. Pengaturan Sekolah
+            try {
+              const generalDoc = initialSettingsSnap.docs.find(d => d.id === 'general');
+              const hasPendingGeneral = pendingOps[makePendingKey('app_settings', 'general')]?.op === 'upsert';
+              if (hasPendingGeneral) {
+                // Antrean lokal sudah menunggu dikirim; jangan ditimpa dari Cloud
+              } else if (generalDoc && generalDoc.data()) {
+                const rawGeneral = { ...generalDoc.data() };
+                delete rawGeneral.adminUser;
+                const cloudUpdated = Number(rawGeneral.updatedAt || 0);
+                const localUpdated = Number(appSettings.updatedAt || 0);
+                const cloudIsCustomSchool = Boolean(rawGeneral.namaSekolah && rawGeneral.namaSekolah !== 'MI Al-Hikmah Terpadu') || cloudUpdated > 0;
+                const localIsCustomSchool = Boolean(appSettings.namaSekolah && appSettings.namaSekolah !== 'MI Al-Hikmah Terpadu') || localUpdated > 0;
 
-          // 1. Paket Ujian
-          try {
-            const examSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'paket_ujian'));
-            const cloudExams = [];
-            for (const d of examSnap.docs) {
-              const data = d.data();
-              const title = (data.judulUjian || '').toLowerCase();
-              const kelas = (data.kelas || '').toLowerCase();
-              const isDummyKelas = /ganjil|\bvi\b/i.test(kelas);
-              if (data.id === 'ujian_pas_pai_6' || data.id === 'ujian_demo' || (title.includes('asesmen sumatif') && isDummyKelas)) {
-                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'paket_ujian', d.id)); } catch (e) {}
-              } else {
-                cloudExams.push(data);
-              }
-            }
-            const cloudIds = new Set(cloudExams.map(e => e.id));
-            const localOnly = (paketUjianList || []).filter(e => e && e.id && !cloudIds.has(e.id));
-            paketUjianList = [...cloudExams, ...localOnly].filter(e => {
-              const title = (e.judulUjian || '').toLowerCase();
-              const kelas = (e.kelas || '').toLowerCase();
-              const isDummyKelas = /ganjil|\bvi\b/i.test(kelas);
-              return !(title.includes('asesmen sumatif') && isDummyKelas) && e.id !== 'ujian_pas_pai_6' && e.id !== 'ujian_demo';
-            });
-            localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
-            if (localOnly.length > 0) {
-              Promise.allSettled(
-                localOnly.map(e => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'paket_ujian', e.id), e))
-              ).catch(() => {});
-            }
-          } catch (e) {
-            console.warn('Firestore fetch exams warning:', e);
-          }
-
-          // 2. Akun Guru (Murni Tenaga Pendidik, Admin dikelola terpisah)
-          try {
-            const accSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users_peserta'));
-            const cloudAccounts = [];
-            for (const d of accSnap.docs) {
-              const data = d.data();
-              if (['usr_g1', 'usr_g2', 'usr_g3', 'usr_admin'].includes(data.id) || ['guru1', 'guru2', 'sitiaminah'].includes((data.username || '').toLowerCase()) || data.role === 'admin') {
-                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', d.id)); } catch (e) {}
-              } else {
-                cloudAccounts.push(data);
-              }
-            }
-            if (cloudAccounts.length > 0) {
-              const localMap = new Map((pesertaAccounts || []).map(a => [a.id, a]));
-              const newerLocalToPush = [];
-              const mergedAccounts = cloudAccounts.map(c => {
-                const l = localMap.get(c.id);
-                if (!l) return c;
-                const lTs = Number(l.updatedAt || 0);
-                const cTs = Number(c.updatedAt || 0);
-                if (lTs > cTs) {
-                  newerLocalToPush.push(l);
-                  return l;
+                if (cloudIsCustomSchool && (!localIsCustomSchool || cloudUpdated >= localUpdated)) {
+                  const prevStr = JSON.stringify(appSettings);
+                  appSettings = { ...appSettings, ...rawGeneral };
+                  delete appSettings.adminUser;
+                  if (JSON.stringify(appSettings) !== prevStr) dataChanged = true;
+                  localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
+                } else if (localIsCustomSchool && (!cloudIsCustomSchool || localUpdated > cloudUpdated)) {
+                  queuePendingSyncOp('upsert', 'app_settings', 'general');
                 }
-                return c;
-              });
-              const cloudIds = new Set(cloudAccounts.map(a => a.id));
-              const localOnly = (pesertaAccounts || []).filter(a => a && a.id && !cloudIds.has(a.id));
-              pesertaAccounts = [...mergedAccounts, ...localOnly].filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
-              localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
-              const pushList = [...newerLocalToPush, ...localOnly].filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
-              if (pushList.length > 0) {
-                Promise.allSettled(
-                  pushList.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', a.id), a))
-                ).catch(() => {});
-              }
-            } else {
-              pesertaAccounts = (pesertaAccounts || []).filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
-              localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
-              if (pesertaAccounts.length > 0) {
-                Promise.allSettled(
-                  pesertaAccounts.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', a.id), a))
-                ).catch(() => {});
-              }
-            }
-          } catch (e) {
-            console.warn('Firestore fetch accounts warning:', e);
-          }
-
-          // 3. Master Siswa
-          try {
-            const siswaSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'master_siswa'));
-            const cloudSiswa = siswaSnap.docs.map(d => d.data());
-            if (cloudSiswa.length > 0) {
-              const cloudIds = new Set(cloudSiswa.map(s => s.id));
-              const localOnly = (masterSiswaList || []).filter(s => s && s.id && !cloudIds.has(s.id));
-              masterSiswaList = [...cloudSiswa, ...localOnly];
-              localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
-              if (localOnly.length > 0) {
-                Promise.allSettled(
-                  localOnly.map(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_siswa', s.id), s))
-                ).catch(() => {});
-              }
-            } else if (masterSiswaList && masterSiswaList.length > 0) {
-              Promise.allSettled(
-                masterSiswaList.map(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_siswa', s.id), s))
-              ).catch(() => {});
-            }
-          } catch (e) {
-            console.warn('Firestore fetch siswa warning:', e);
-          }
-
-          // 4. Jawaban Siswa
-          try {
-            const ansSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa'));
-            const cloudAnswers = [];
-            for (const d of ansSnap.docs) {
-              const data = d.data();
-              if (data.ujianId === 'ujian_pas_pai_6' || (data.id && data.id.startsWith('ans_') && Number(data.id.replace('ans_', '')) <= 8)) {
-                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa', d.id)); } catch (e) {}
               } else {
-                cloudAnswers.push(data);
+                const localIsCustomSchool = Boolean(appSettings.namaSekolah && appSettings.namaSekolah !== 'MI Al-Hikmah Terpadu') || Number(appSettings.updatedAt || 0) > 0;
+                if (localIsCustomSchool) {
+                  queuePendingSyncOp('upsert', 'app_settings', 'general');
+                }
+              }
+            } catch (sErr) {
+              console.warn('Firestore sync settings warning:', sErr);
+            }
+
+            // 2b. Kredensial Admin
+            try {
+              const adminDoc = initialSettingsSnap.docs.find(d => d.id === 'admin_account');
+              const hasPendingAdmin = pendingOps[makePendingKey('app_settings', 'admin_account')]?.op === 'upsert';
+              const curLocalAdmin = getAdminCredentials();
+              const localIsCustom = Boolean(curLocalAdmin.isCustom) ||
+                (curLocalAdmin.password && curLocalAdmin.password !== 'admin123') ||
+                (curLocalAdmin.username && curLocalAdmin.username !== 'admin') ||
+                (curLocalAdmin.nama && curLocalAdmin.nama !== 'Administrator Madrasah');
+
+              if (!hasPendingAdmin && adminDoc && adminDoc.data()) {
+                const cloudAdmin = adminDoc.data();
+                const cloudIsCustom = Boolean(cloudAdmin.isCustom) ||
+                  (cloudAdmin.password && cloudAdmin.password !== 'admin123') ||
+                  (cloudAdmin.username && cloudAdmin.username !== 'admin') ||
+                  (cloudAdmin.nama && cloudAdmin.nama !== 'Administrator Madrasah');
+                const cloudTs = Number(cloudAdmin.updatedAt || 0);
+                const localTs = Number(curLocalAdmin.updatedAt || 0);
+
+                if (cloudIsCustom && (!localIsCustom || cloudTs >= localTs)) {
+                  await saveAdminCredentials({ ...curLocalAdmin, ...cloudAdmin, isCustom: true }, true, true);
+                } else if (localIsCustom && (!cloudIsCustom || localTs > cloudTs)) {
+                  queuePendingSyncOp('upsert', 'app_settings', 'admin_account');
+                }
+              } else if (localIsCustom && !adminDoc) {
+                queuePendingSyncOp('upsert', 'app_settings', 'admin_account');
+              }
+            } catch (aErr) {
+              console.warn('Firestore sync admin warning:', aErr);
+            }
+
+            // 3. Sinkronisasi 4 koleksi utama berbasis timestamp & antrean lokal secara paralel
+            const latestPending = loadPendingSyncOps();
+            const [resExams, resGuru, resSiswa, resAnswers] = await Promise.all([
+              mergeCollectionWithCloud('paket_ujian', paketUjianList, 'smart_anabutir_exams_v2', latestPending, isLegacyDummyExamRecord),
+              mergeCollectionWithCloud('users_peserta', pesertaAccounts, 'smart_anabutir_guru_v2', latestPending, isLegacyDummyAccountRecord),
+              mergeCollectionWithCloud('master_siswa', masterSiswaList, 'smart_anabutir_siswa_v2', latestPending, null),
+              mergeCollectionWithCloud('jawaban_siswa', jawabanSiswaList, 'smart_anabutir_jawaban_v2', latestPending, isLegacyDummyAnswerRecord)
+            ]);
+
+            if (resExams.changed) { paketUjianList = resExams.list; dataChanged = true; }
+            if (resGuru.changed) { pesertaAccounts = resGuru.list; dataChanged = true; }
+            if (resSiswa.changed) { masterSiswaList = resSiswa.list; dataChanged = true; }
+            if (resAnswers.changed) { jawabanSiswaList = resAnswers.list; dataChanged = true; }
+
+            // 4. Push dokumen lokal yang baru terdeteksi belum ada / lebih baru di perangkat ini
+            const flushAfter = await flushPendingOpsToCloud();
+            cloudSyncState.lastSyncedAt = Date.now();
+
+            applyAppSettingsUI();
+            if (currentUser) {
+              restoreUserPreferredExam(currentUser);
+            } else {
+              if (paketUjianList.length > 0 && !paketUjianList.some(p => p.id === activeExamId)) {
+                activeExamId = paketUjianList[0].id;
+              } else if (paketUjianList.length === 0) {
+                activeExamId = '';
               }
             }
-            if (cloudAnswers.length > 0) {
-              const cloudIds = new Set(cloudAnswers.map(a => a.id));
-              const localOnly = (jawabanSiswaList || []).filter(a => a && a.id && !cloudIds.has(a.id));
-              jawabanSiswaList = [...cloudAnswers, ...localOnly];
-              localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
-              if (localOnly.length > 0) {
-                Promise.allSettled(
-                  localOnly.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa', a.id), a))
-                ).catch(() => {});
+
+            if (currentUser && (dataChanged || manual)) {
+              if (typeof updateAllExamSelectors === 'function') {
+                updateAllExamSelectors();
               }
-            } else if (jawabanSiswaList && jawabanSiswaList.length > 0) {
-              Promise.allSettled(
-                jawabanSiswaList.map(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa', a.id), a))
-              ).catch(() => {});
+              if (manual || !isUserActivelyEditingForm()) {
+                deferredRenderAfterTyping = false;
+                if (typeof renderAllViews === 'function') renderAllViews();
+              } else {
+                deferredRenderAfterTyping = true;
+              }
             }
-          } catch (e) {
-            console.warn('Firestore fetch answers warning:', e);
+
+            if (manual) {
+              const rem = getPendingSyncCount();
+              if (rem === 0 && flushAfter.failed === 0) {
+                showToast(
+                  `Sinkronisasi selesai! (${jawabanSiswaList.length} jawaban, ${paketUjianList.length} paket, ${masterSiswaList.length} siswa tersinkron)`,
+                  'success'
+                );
+              } else if (flushAfter.errorCode && (flushAfter.errorCode.includes('permission') || flushAfter.errorCode.includes('unauthenticated'))) {
+                showToast('Gagal mengunggah ke Cloud (permission-denied). Periksa Firestore Rules di Firebase Console.', 'error');
+              } else {
+                showToast(`Sebagian data masih di antrean sync (${rem} dokumen). Akan dicoba ulang otomatis.`, 'error');
+              }
+            }
+
+            return { ok: true, dataChanged, remaining: getPendingSyncCount() };
+          } else {
+            return { ok: flushBefore.failed === 0, flush: flushBefore };
           }
-
-          cloudSyncState.lastSyncedAt = Date.now();
-        } catch (e) {
-          console.warn('Firestore fetch error, fallback to local storage:', e);
+        } catch (err) {
+          const code = err?.code || 'sync-error';
+          const msg = err?.message || String(err || 'Gagal menyinkronkan ke Cloud');
+          isCloudConnected = false;
+          cloudSyncState.readOk = false;
+          cloudSyncState.lastErrorCode = code;
+          cloudSyncState.lastErrorMsg = msg;
+          console.warn('Cloud sync warning:', err);
+          if (manual) {
+            showToast(
+              code.includes('permission') || code.includes('unauthenticated')
+                ? 'Akses Firebase ditolak (permission-denied). Cek Firestore Rules di Firebase Console.'
+                : 'Gagal terhubung ke Cloud (' + code + '). Data tetap aman di browser ini.',
+              'error'
+            );
+          }
+          return { ok: false, errorCode: code, errorMsg: msg };
+        } finally {
+          cloudSyncState.syncing = false;
+          updateCloudStatusBadges();
+          syncInFlightPromise = null;
         }
-      }
+      })();
 
-      updateCloudStatusBadges();
+      return await syncInFlightPromise;
+    }
 
+    async function autoSetupDatabase() {
+      const seed = getInitialSeedData();
+      loadLocalSeed(seed);
+      const res = await syncWithCloudNow({ fullPull: true, manual: false, silent: true, reason: 'startup' });
       if (paketUjianList.length > 0 && !paketUjianList.some(p => p.id === activeExamId)) {
         activeExamId = paketUjianList[0].id;
       } else if (paketUjianList.length === 0) {
         activeExamId = '';
       }
+      return res;
     }
 
     function loadLocalSeed(seed) {
@@ -2734,17 +3377,10 @@
         const storedJawaban = localStorage.getItem('smart_anabutir_jawaban_v2');
         const storedSettings = localStorage.getItem('smart_anabutir_settings_v2');
 
-        paketUjianList = (storedExams ? JSON.parse(storedExams) : (seed.seedExams || [])).filter(e => {
-          const title = (e.judulUjian || '').toLowerCase();
-          const kelas = (e.kelas || '').toLowerCase();
-          const isDummyKelas = /ganjil|\bvi\b/i.test(kelas);
-          return !(title.includes('asesmen sumatif') && isDummyKelas) && e.id !== 'ujian_pas_pai_6' && e.id !== 'ujian_demo';
-        });
+        paketUjianList = (storedExams ? JSON.parse(storedExams) : (seed.seedExams || [])).filter(e => !isLegacyDummyExamRecord(e));
         pesertaAccounts = storedGuru ? JSON.parse(storedGuru) : (seed.seedAccounts || []);
         masterSiswaList = storedSiswa ? JSON.parse(storedSiswa) : (seed.seedSiswa || []);
-        jawabanSiswaList = (storedJawaban ? JSON.parse(storedJawaban) : (seed.rawStudentResponses || [])).filter(j => {
-          return j.ujianId !== 'ujian_pas_pai_6' && j.ujianId !== 'ujian_demo';
-        });
+        jawabanSiswaList = (storedJawaban ? JSON.parse(storedJawaban) : (seed.rawStudentResponses || [])).filter(j => !isLegacyDummyAnswerRecord(j));
         localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
         localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
         if (storedSettings) {
@@ -2765,45 +3401,36 @@
 
       // Bersihkan teks semester/tahun dari nama kelas paket ujian dan jawaban jika ada
       (paketUjianList || []).forEach(p => {
-        if (p.kelas && (p.kelas.toLowerCase().includes('ganjil') || p.kelas.toLowerCase().includes('genap') || p.kelas.includes('/'))) {
-          p.kelas = p.kelas.replace(/\s*\/\s*ganjil/i, '').replace(/\s*\/\s*genap/i, '').replace(/\s*\/\s*semester\s*\d*/i, '').trim();
-          if (p.kelas.toLowerCase() === 'kelas vi' || p.kelas.toLowerCase() === 'kelas vi-a') p.kelas = 'Kelas 6';
-        }
+        if (p && p.kelas) p.kelas = normalizeDummyKelasText(p.kelas);
       });
       (jawabanSiswaList || []).forEach(j => {
-        if (j.kelas && (j.kelas.toLowerCase().includes('ganjil') || j.kelas.toLowerCase().includes('genap') || j.kelas.includes('/'))) {
-          j.kelas = j.kelas.replace(/\s*\/\s*ganjil/i, '').replace(/\s*\/\s*genap/i, '').replace(/\s*\/\s*semester\s*\d*/i, '').trim();
-          if (j.kelas.toLowerCase() === 'kelas vi' || j.kelas.toLowerCase() === 'kelas vi-a') j.kelas = 'Kelas 6';
-        }
+        if (j && j.kelas) j.kelas = normalizeDummyKelasText(j.kelas);
       });
 
       // Bersihkan akun admin agar tidak tercampur di daftar guru
-      pesertaAccounts = (pesertaAccounts || []).filter(a => a.id !== 'usr_admin' && a.role !== 'admin');
+      pesertaAccounts = (pesertaAccounts || []).filter(a => a && a.id !== 'usr_admin' && a.role !== 'admin');
       localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
     }
 
     async function saveDocToCloud(collectionName, docId, dataObj) {
-      // 1. Selalu simpan ke localStorage secara instan (Offline-First Persistence)
-      try {
-        if (collectionName === 'users_peserta') {
-          localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
-        } else if (collectionName === 'master_siswa') {
-          localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
-        } else if (collectionName === 'paket_ujian') {
-          localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
-        } else if (collectionName === 'jawaban_siswa') {
-          localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
-        } else if (collectionName === 'app_settings') {
-          localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
+      // 1. Beri timestamp terbaru & simpan sinkron ke localStorage + antrean Outbox
+      if (dataObj && typeof dataObj === 'object') {
+        dataObj.updatedAt = Math.max(Date.now(), Number(dataObj.updatedAt || 0));
+        if (collectionName === 'app_settings' && docId === 'general') {
+          appSettings.updatedAt = dataObj.updatedAt;
         }
-      } catch (e) {
-        console.warn('LocalStorage save error:', e);
       }
+      persistCollectionToLocalStorage(collectionName);
+      queuePendingSyncOp('upsert', collectionName, docId);
+      updateCloudStatusBadges();
 
-      // 2. Sinkronisasi ke Firebase Firestore jika tersedia
-      if (!IS_PREVIEW && db && setDoc && doc) {
+      // 2. Coba kirim langsung ke Firebase Firestore (jika gagal, tetap di antrean untuk auto-sync berikutnya)
+      const ready = await ensureFirebaseSdkReady();
+      if (ready && db && setDoc && doc) {
         try {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, docId), dataObj);
+          const payload = sanitizeForFirestore(dataObj);
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, docId), payload);
+          removePendingSyncOp(collectionName, docId);
           isCloudConnected = true;
           cloudSyncState.readOk = true;
           cloudSyncState.writeOk = true;
@@ -2811,7 +3438,7 @@
           cloudSyncState.lastErrorMsg = '';
           cloudSyncState.lastSyncedAt = Date.now();
           updateCloudStatusBadges();
-          return { local: true, cloud: true };
+          return { local: true, cloud: true, queued: false };
         } catch (e) {
           const code = e?.code || 'write-error';
           const msg = e?.message || String(e || '');
@@ -2822,45 +3449,83 @@
             isCloudConnected = false;
           }
           updateCloudStatusBadges();
-          console.warn("Cloud save gagal (data tersimpan di browser/localStorage ini saja):", e);
-          return { local: true, cloud: false, errorCode: code, errorMsg: msg };
+          console.warn("Cloud save gagal, masuk antrean auto-sync:", e);
+          return { local: true, cloud: false, queued: true, errorCode: code, errorMsg: msg };
         }
       }
+
       updateCloudStatusBadges();
       return {
         local: true,
         cloud: false,
+        queued: true,
         errorCode: cloudSyncState.lastErrorCode || 'offline',
-        errorMsg: cloudSyncState.lastErrorMsg || 'Mode Lokal (Firebase belum terhubung)'
+        errorMsg: cloudSyncState.lastErrorMsg || 'Mode Lokal (menunggu koneksi untuk auto-sync)'
       };
     }
 
-    async function deleteDocFromCloud(collectionName, docId) {
-      // 1. Selalu perbarui localStorage secara instan
-      try {
-        if (collectionName === 'users_peserta') {
-          localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
-        } else if (collectionName === 'master_siswa') {
-          localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
-        } else if (collectionName === 'paket_ujian') {
-          localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
-        } else if (collectionName === 'jawaban_siswa') {
-          localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
-        } else if (collectionName === 'app_settings') {
-          localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
-        }
-      } catch (e) {
-        console.warn('LocalStorage delete error:', e);
-      }
+    async function saveBatchDocsToCloud(collectionName, items) {
+      const list = Array.isArray(items) ? items : [];
+      const nowTs = Date.now();
+      const pendingOps = loadPendingSyncOps();
 
-      // 2. Hapus di cloud jika terhubung
-      if (isCloudConnected && db && deleteDoc && doc) {
+      list.forEach(item => {
+        if (item && item.id) {
+          item.updatedAt = Math.max(nowTs, Number(item.updatedAt || 0));
+          pendingOps[makePendingKey(collectionName, item.id)] = {
+            op: 'upsert',
+            col: collectionName,
+            id: String(item.id),
+            queuedAt: nowTs
+          };
+        }
+      });
+
+      persistCollectionToLocalStorage(collectionName);
+      savePendingSyncOps(pendingOps);
+      updateCloudStatusBadges();
+      return await flushPendingOpsToCloud();
+    }
+
+    function queueAllLocalDocsForSync() {
+      const nowTs = Date.now();
+      const ops = loadPendingSyncOps();
+      const enqueue = (col, id) => {
+        if (!id) return;
+        ops[makePendingKey(col, id)] = { op: 'upsert', col, id: String(id), queuedAt: nowTs };
+      };
+      enqueue('app_settings', 'general');
+      const adminCreds = getAdminCredentials();
+      if (adminCreds) enqueue('app_settings', 'admin_account');
+      (pesertaAccounts || []).forEach(a => a && a.id && enqueue('users_peserta', a.id));
+      (masterSiswaList || []).forEach(s => s && s.id && enqueue('master_siswa', s.id));
+      (paketUjianList || []).forEach(p => p && p.id && enqueue('paket_ujian', p.id));
+      (jawabanSiswaList || []).forEach(j => j && j.id && enqueue('jawaban_siswa', j.id));
+      savePendingSyncOps(ops);
+      updateCloudStatusBadges();
+    }
+
+    async function deleteDocFromCloud(collectionName, docId) {
+      // 1. Selalu perbarui localStorage & antrekan penghapusan di Outbox
+      persistCollectionToLocalStorage(collectionName);
+      queuePendingSyncOp('delete', collectionName, docId);
+      updateCloudStatusBadges();
+
+      // 2. Hapus di cloud jika terhubung (bila gagal/offline tetap di antrean auto-sync)
+      const ready = await ensureFirebaseSdkReady();
+      if (ready && db && deleteDoc && doc) {
         try {
           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, docId));
+          removePendingSyncOp(collectionName, docId);
+          cloudSyncState.lastSyncedAt = Date.now();
+          updateCloudStatusBadges();
+          return { local: true, cloud: true };
         } catch (e) {
-          console.warn("Cloud delete note:", e);
+          console.warn("Cloud delete masuk antrean auto-sync:", e);
+          return { local: true, cloud: false, queued: true, errorCode: e?.code || 'delete-error' };
         }
       }
+      return { local: true, cloud: false, queued: true };
     }
 
     // =========================================================
@@ -2880,35 +3545,41 @@
     function evaluateStudentRecord(rawRec, examObj) {
       if (!examObj) return rawRec;
 
+      const pgKunciList = Array.isArray(examObj.pgKunci) ? examObj.pgKunci : [];
+      const bsKunciList = Array.isArray(examObj.bsKunci) ? examObj.bsKunci : [];
+      const isianKunciList = Array.isArray(examObj.isianKunci) ? examObj.isianKunci : [];
+      const isianMaksList = Array.isArray(examObj.isianMaks) ? examObj.isianMaks : [];
+      const uraianMaksList = Array.isArray(examObj.uraianMaks) ? examObj.uraianMaks : [];
+
       // 1. Evaluate PG
       const studentPG = parseCommaList(rawRec.pgRaw);
-      const pgScores = examObj.pgKunci.map((kunci, idx) => {
+      const pgScores = pgKunciList.map((kunci, idx) => {
         const ans = (studentPG[idx] || '').toUpperCase();
-        return ans === kunci.toUpperCase() ? 1 : 0;
+        return ans === String(kunci || '').toUpperCase() ? 1 : 0;
       });
       const pgBobotVal = (examObj.pgBobot !== undefined && examObj.pgBobot !== null && examObj.pgBobot !== '') ? (Number(examObj.pgBobot) || 0) : 0;
       const pgTotalBenar = pgScores.reduce((a, b) => a + b, 0);
       const pgSkorPerolehan = pgTotalBenar * pgBobotVal;
-      const pgSkorMaks = examObj.pgKunci.length * pgBobotVal;
+      const pgSkorMaks = pgKunciList.length * pgBobotVal;
 
       // 2. Evaluate Benar/Salah
       const studentBS = parseCommaList(rawRec.bsRaw);
-      const bsScores = examObj.bsKunci.map((kunci, idx) => {
+      const bsScores = bsKunciList.map((kunci, idx) => {
         const ans = (studentBS[idx] || '').toUpperCase();
-        return ans === kunci.toUpperCase() ? 1 : 0;
+        return ans === String(kunci || '').toUpperCase() ? 1 : 0;
       });
       const bsBobotVal = (examObj.bsBobot !== undefined && examObj.bsBobot !== null && examObj.bsBobot !== '') ? (Number(examObj.bsBobot) || 0) : 0;
       const bsTotalBenar = bsScores.reduce((a, b) => a + b, 0);
       const bsSkorPerolehan = bsTotalBenar * bsBobotVal;
-      const bsSkorMaks = examObj.bsKunci.length * bsBobotVal;
+      const bsSkorMaks = bsKunciList.length * bsBobotVal;
 
       // 3. Evaluate Isian Singkat (Supports either numeric score or exact keyword match)
       const studentIsianTokens = parseCommaList(rawRec.isianRaw, false);
-      const isianScores = examObj.isianMaks.map((maks, idx) => {
+      const isianScores = isianMaksList.map((maks, idx) => {
         const token = studentIsianTokens[idx] !== undefined ? studentIsianTokens[idx] : '0';
         const maxVal = Number(maks) || 0;
         const asNum = Number(token);
-        const kunciKata = (examObj.isianKunci[idx] || '').toUpperCase();
+        const kunciKata = String(isianKunciList[idx] || '').toUpperCase();
 
         // Check if token matches keyword first (if keyword is non-numeric or matches)
         if (kunciKata && token.toUpperCase() === kunciKata && isNaN(Number(token))) {
@@ -2924,17 +3595,17 @@
         return token.toUpperCase() === kunciKata ? maxVal : 0;
       });
       const isianSkorPerolehan = isianScores.reduce((a, b) => a + b, 0);
-      const isianSkorMaks = examObj.isianMaks.reduce((a, b) => a + (Number(b) || 0), 0);
+      const isianSkorMaks = isianMaksList.reduce((a, b) => a + (Number(b) || 0), 0);
 
       // 4. Evaluate Uraian
       const studentUraianTokens = parseCommaList(rawRec.uraianRaw, false);
-      const uraianScores = examObj.uraianMaks.map((maks, idx) => {
+      const uraianScores = uraianMaksList.map((maks, idx) => {
         const maxVal = Number(maks) || 0;
         const val = Number(studentUraianTokens[idx]) || 0;
         return Math.min(Math.max(0, val), maxVal);
       });
       const uraianSkorPerolehan = uraianScores.reduce((a, b) => a + b, 0);
-      const uraianSkorMaks = examObj.uraianMaks.reduce((a, b) => a + (Number(b) || 0), 0);
+      const uraianSkorMaks = uraianMaksList.reduce((a, b) => a + (Number(b) || 0), 0);
 
       // Total & Final Scale 100
       const totalSkorPerolehan = pgSkorPerolehan + bsSkorPerolehan + isianSkorPerolehan + uraianSkorPerolehan;
@@ -3069,16 +3740,20 @@
       }
 
       try {
-        // Pastikan sinkronisasi awal Firebase selesai agar kredensial & identitas terbaru sudah termuat
-        if (startupCloudPromise) {
-          try {
-            await startupCloudPromise;
-          } catch (syncWaitErr) {
-            console.warn('Startup sync wait warning:', syncWaitErr);
+        // Pastikan sinkronisasi terbaru selesai (ambil perubahan antar perangkat + kirim antrean pending jika baru online)
+        try {
+          if (startupCloudPromise) {
+            await Promise.race([startupCloudPromise, new Promise(r => setTimeout(r, 3500))]);
           }
-          applyAppSettingsUI();
-          updateCloudStatusBadges();
+          await Promise.race([
+            syncWithCloudNow({ fullPull: true, manual: false, silent: true, reason: 'login' }),
+            new Promise(r => setTimeout(r, 4000))
+          ]);
+        } catch (syncWaitErr) {
+          console.warn('Login sync wait warning:', syncWaitErr);
         }
+        applyAppSettingsUI();
+        updateCloudStatusBadges();
 
         // =========================================================
         // JALUR 1: LOGIN ADMINISTRATOR
@@ -3097,6 +3772,7 @@
               username: adminCreds.username || 'admin',
               kelas: 'Semua Mapel'
             };
+            restoreUserPreferredExam(currentUser);
             saveSessionState(currentUser, 'dashboard');
             applyUserSession('dashboard', true);
             showToast(`Selamat datang kembali, ${currentUser.nama}!`, 'success');
@@ -3130,6 +3806,7 @@
             kelas: foundTeacher.kelas || foundTeacher.jabatan || (teacherRole === 'wali_kelas' ? 'Wali Kelas' : 'Guru Mapel'),
             mapelDiampu: Array.isArray(foundTeacher.mapelDiampu) ? foundTeacher.mapelDiampu : (foundTeacher.mapelDiampu ? String(foundTeacher.mapelDiampu).split(',').map(s => s.trim()) : [])
           };
+          restoreUserPreferredExam(currentUser);
           saveSessionState(currentUser, 'dashboard');
           applyUserSession('dashboard', true);
           showToast(`Selamat datang kembali, ${foundTeacher.nama}!`, 'success');
@@ -3533,9 +4210,23 @@
       });
     }
 
-    window.handleLogout = function() {
+    window.handleLogout = async function() {
       const appShell = document.getElementById('app-shell');
       const loginScreen = document.getElementById('login-screen');
+
+      if (currentUser && activeExamId) {
+        saveUserLastExamId(currentUser, activeExamId);
+      }
+
+      // Pastikan seluruh antrean sync dicoba kirim sebelum sesi ditutup (maks 1.5 detik agar tetap responsif)
+      if (getPendingSyncCount() > 0) {
+        try {
+          await Promise.race([
+            flushPendingOpsToCloud(),
+            new Promise(resolve => setTimeout(resolve, 1500))
+          ]);
+        } catch (e) {}
+      }
 
       // Animasi transisi logout
       appShell.classList.add('animate-fade-out-scale');
@@ -3658,8 +4349,8 @@
       if (!allowedExams || allowedExams.length === 0) return null;
       const found = allowedExams.find(p => p.id === activeExamId);
       if (found) return found;
-      activeExamId = allowedExams[0].id;
-      return allowedExams[0];
+      const preferredId = restoreUserPreferredExam(currentUser);
+      return allowedExams.find(p => p.id === preferredId) || allowedExams[0];
     }
 
     function getActiveExamStudents() {
@@ -3679,6 +4370,7 @@
     window.handleChangeActiveExam = function(newExamId) {
       activeExamId = newExamId;
       if (currentUser) {
+        saveUserLastExamId(currentUser, newExamId);
         saveSessionState(currentUser, currentMenu);
       }
       const sSelect = document.getElementById('sidebar-exam-select');
@@ -4166,7 +4858,8 @@
           bsBobot: '',
           isianKunci: [],
           isianMaks: [],
-          uraianMaks: []
+          uraianMaks: [],
+          updatedAt: Date.now()
         };
         paketUjianList.push(exam);
         saveDocToCloud('paket_ujian', newId, exam);
@@ -4190,6 +4883,7 @@
       );
       if (matched) {
         activeExamId = matched.id;
+        saveUserLastExamId(currentUser, matched.id);
       }
       renderExamConfigView();
       renderAllViews();
@@ -4541,21 +5235,47 @@
         const num = Number(n);
         return isNaN(num) ? 0 : num;
       });
+      exam.updatedAt = Date.now();
 
-      await saveDocToCloud('paket_ujian', exam.id, exam);
+      const examSaveRes = await saveDocToCloud('paket_ujian', exam.id, exam);
 
       // Recalculate all students in this exam
+      const recalcAnswers = [];
+      const nowTs = Date.now();
       for (let i = 0; i < jawabanSiswaList.length; i++) {
         if (jawabanSiswaList[i].ujianId === exam.id) {
           jawabanSiswaList[i] = evaluateStudentRecord(jawabanSiswaList[i], exam);
-          await saveDocToCloud('jawaban_siswa', jawabanSiswaList[i].id, jawabanSiswaList[i]);
+          jawabanSiswaList[i].updatedAt = nowTs;
+          recalcAnswers.push(jawabanSiswaList[i]);
         }
       }
+      let ansBatchRes = { failed: 0 };
+      if (recalcAnswers.length > 0) {
+        ansBatchRes = await saveBatchDocsToCloud('jawaban_siswa', recalcAnswers);
+      }
 
+      saveUserLastExamId(currentUser, exam.id);
       renderAllViews();
       animateButtonSaveFeedback(e, 'Kunci Tersimpan!');
-      showToast('Kunci jawaban & bobot disimpan! Seluruh nilai siswa telah dihitung ulang.', 'success');
+      const combinedRes = examSaveRes.cloud && ansBatchRes.failed === 0
+        ? { cloud: true }
+        : { cloud: false, errorCode: examSaveRes.errorCode || ansBatchRes.errorCode || 'offline' };
+      notifySaveSyncToast(
+        combinedRes,
+        'Kunci jawaban & bobot disimpan ke browser & Cloud! Seluruh nilai siswa telah dihitung ulang.',
+        'Kunci jawaban & nilai siswa tersimpan di perangkat (masuk antrean Auto-Sync Cloud).'
+      );
     };
+
+    function notifySaveSyncToast(saveRes, cloudMsg, localMsg, permPrefix = 'Tersimpan di browser (antrean lokal)') {
+      if (saveRes && saveRes.cloud) {
+        showToast(cloudMsg, 'success');
+      } else if (saveRes?.errorCode && (saveRes.errorCode.includes('permission') || saveRes.errorCode.includes('unauthenticated'))) {
+        showToast(`${permPrefix}, namun DITOLAK Firebase (${saveRes.errorCode}). Klik status di atas untuk lihat panduan.`, 'error');
+      } else {
+        showToast(localMsg, 'info');
+      }
+    }
 
     window.syncNewExamTitle = function() {
       const jenis = document.getElementById('new-exam-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
@@ -4627,16 +5347,22 @@
         bsBobot: '',
         isianKunci: [],
         isianMaks: [],
-        uraianMaks: []
+        uraianMaks: [],
+        updatedAt: Date.now()
       };
 
       paketUjianList.push(newExam);
       activeExamId = newId;
-      await saveDocToCloud('paket_ujian', newId, newExam);
+      saveUserLastExamId(currentUser, newId);
+      const createRes = await saveDocToCloud('paket_ujian', newId, newExam);
       window.closeModalCreateExam();
       renderAllViews();
       animateButtonSaveFeedback(e, 'Paket Dibuat!');
-      showToast(`Paket ujian "${judul}" berhasil dibuat!`, 'success');
+      notifySaveSyncToast(
+        createRes,
+        `Paket ujian "${judul}" berhasil dibuat & tersinkron ke Cloud!`,
+        `Paket ujian "${judul}" dibuat di perangkat & masuk antrean Auto-Sync.`
+      );
     };
 
     // Modal Generate 13 Mapel Otomatis
@@ -4718,7 +5444,8 @@
             bsBobot: '',
             isianKunci: [],
             isianMaks: [],
-            uraianMaks: []
+            uraianMaks: [],
+            updatedAt: Date.now()
           };
 
           paketUjianList.push(newExam);
@@ -4727,6 +5454,7 @@
 
         if (lastCreatedId) {
           activeExamId = lastCreatedId;
+          saveUserLastExamId(currentUser, lastCreatedId);
         }
 
         window.closeModalGenerate13Mapel();
@@ -5139,6 +5867,7 @@
         isianRaw,
         uraianRaw
       }, exam);
+      evaluated.updatedAt = Date.now();
 
       if (existingIdx >= 0) {
         jawabanSiswaList[existingIdx] = evaluated;
@@ -5146,7 +5875,11 @@
         jawabanSiswaList.push(evaluated);
       }
 
-      await saveDocToCloud('jawaban_siswa', recordId, evaluated);
+      if (!exam.updatedAt) {
+        exam.updatedAt = Date.now();
+        await saveDocToCloud('paket_ujian', exam.id, exam);
+      }
+      const ansSaveRes = await saveDocToCloud('jawaban_siswa', recordId, evaluated);
 
       // Auto-sinkron ke Master Siswa jika belum terdaftar
       if (!masterSiswaList.some(s => s.nisn === nisn)) {
@@ -5155,15 +5888,22 @@
           nisn,
           nama: namaSiswa,
           kelas: studentClassVal,
-          jk: 'L'
+          jk: 'L',
+          updatedAt: Date.now()
         };
         masterSiswaList.push(newSiswa);
         await saveDocToCloud('master_siswa', newSiswa.id, newSiswa);
       }
 
+      saveUserLastExamId(currentUser, exam.id);
       renderAllViews();
       animateButtonSaveFeedback(e, 'Jawaban Tersimpan!');
-      showToast(`Jawaban & nilai ${namaSiswa} (${evaluated.nilaiAkhir}) berhasil disimpan!`, 'success');
+      notifySaveSyncToast(
+        ansSaveRes,
+        `Jawaban & nilai ${namaSiswa} (${evaluated.nilaiAkhir}) tersimpan ke browser & Cloud!`,
+        `Jawaban & nilai ${namaSiswa} (${evaluated.nilaiAkhir}) tersimpan di perangkat & masuk antrean Auto-Sync!`,
+        `Jawaban ${namaSiswa} tersimpan di browser (antrean lokal)`
+      );
 
       // Refresh status di dropdown siswa & auto-pindah ke siswa berikutnya
       window.syncAnsSelectSiswaOptions(nisn);
@@ -6135,12 +6875,8 @@
             'success'
           );
 
-          // 6. Sinkronisasi latar belakang ke Cloud tanpa memblokir UI
-          if (isCloudConnected && db && setDoc && doc) {
-            Promise.allSettled(
-              updatedSiswa.map(item => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_siswa', item.id), item))
-            ).catch(cErr => console.warn('Cloud sync error for siswa:', cErr));
-          }
+          // 6. Sinkronisasi latar belakang via Outbox Auto-Sync
+          saveBatchDocsToCloud('master_siswa', updatedSiswa).catch(cErr => console.warn('Cloud sync error for siswa:', cErr));
         } catch (err) {
           console.error('Import siswa error:', err);
           showToast('Gagal mengimpor file: ' + err.message, 'error');
@@ -6679,12 +7415,8 @@
           // 5. Notifikasi sukses
           showToast(`Berhasil mengimpor ${importedCount} data guru dari Excel!`, 'success');
 
-          // 6. Sinkronisasi latar belakang ke Cloud tanpa memblokir UI
-          if (isCloudConnected && db && setDoc && doc) {
-            Promise.allSettled(
-              updatedGuru.map(item => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', item.id), item))
-            ).catch(cErr => console.warn('Cloud sync error for guru:', cErr));
-          }
+          // 6. Sinkronisasi latar belakang via Outbox Auto-Sync
+          saveBatchDocsToCloud('users_peserta', updatedGuru).catch(cErr => console.warn('Cloud sync error for guru:', cErr));
         } catch (err) {
           console.error('Import guru error:', err);
           showToast('Gagal mengimpor file: ' + err.message, 'error');
@@ -6951,55 +7683,14 @@
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Menyinkronkan...';
       }
       try {
-        if (!cloudSyncState.sdkReady && !IS_PREVIEW) {
-          await autoSetupDatabase();
-        }
-        if (IS_PREVIEW || !db || !setDoc || !doc) {
-          applyAppSettingsUI();
-          showToast('Cloud Firebase belum tersedia di mode lokal/pratinjau. Gunakan tombol Unduh Cadangan (.json).', 'error');
-          return;
-        }
-
         const { adminUser: _dropAdmin, ...cleanGeneral } = appSettings;
-        cleanGeneral.updatedAt = Number(cleanGeneral.updatedAt || Date.now());
+        cleanGeneral.updatedAt = Math.max(Date.now(), Number(cleanGeneral.updatedAt || 0));
         appSettings.updatedAt = cleanGeneral.updatedAt;
-        const genRes = await saveDocToCloud('app_settings', 'general', cleanGeneral);
-        if (!genRes || !genRes.cloud) {
-          applyAppSettingsUI();
-          showToast('Gagal menulis ke Firebase (' + (genRes?.errorCode || 'error') + '). Cek status Cloud & Firestore Rules.', 'error');
-          return;
-        }
+        persistCollectionToLocalStorage('app_settings');
 
-        const adminCreds = getAdminCredentials();
-        adminCreds.updatedAt = Number(adminCreds.updatedAt || Date.now());
-        await saveDocToCloud('app_settings', 'admin_account', adminCreds);
-
-        const tasks = [];
-        (pesertaAccounts || []).forEach(a => {
-          if (a && a.id) tasks.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_peserta', a.id), a));
-        });
-        (masterSiswaList || []).forEach(s => {
-          if (s && s.id) tasks.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_siswa', s.id), s));
-        });
-        (paketUjianList || []).forEach(p => {
-          if (p && p.id) tasks.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'paket_ujian', p.id), p));
-        });
-        (jawabanSiswaList || []).forEach(j => {
-          if (j && j.id) tasks.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'jawaban_siswa', j.id), j));
-        });
-
-        const results = await Promise.allSettled(tasks);
-        const failCount = results.filter(r => r.status === 'rejected').length;
-        const okCount = results.length - failCount + 2;
-        cloudSyncState.lastSyncedAt = Date.now();
-        cloudSyncState.writeOk = failCount === 0;
+        queueAllLocalDocsForSync();
+        await syncWithCloudNow({ fullPull: true, manual: true, silent: false, reason: 'force-pengaturan' });
         applyAppSettingsUI();
-
-        if (failCount === 0) {
-          showToast(`Berhasil menyinkronkan ${okCount} dokumen (Pengaturan, Admin, Guru, Siswa, Ujian, Jawaban) ke Firebase!`, 'success');
-        } else {
-          showToast(`Tersinkron ${okCount} dokumen, namun ${failCount} dokumen gagal ditulis ke Cloud.`, 'error');
-        }
       } catch (err) {
         showToast('Gagal sinkronisasi ke Cloud: ' + (err?.message || err), 'error');
       } finally {
@@ -7071,30 +7762,39 @@
             'Pulihkan Data Cadangan (.json)?',
             `Data saat ini akan diperbarui dari file cadangan (${parsed.appSettings?.namaSekolah || appSettings.namaSekolah} | ${gCount} Guru, ${sCount} Siswa, ${pCount} Paket Ujian, ${jCount} Jawaban). Lanjutkan?`,
             async () => {
+              const restoreTs = Date.now();
               if (parsed.appSettings && typeof parsed.appSettings === 'object') {
                 const { adminUser: _dropAdmin, ...cleanImported } = parsed.appSettings;
-                appSettings = { ...appSettings, ...cleanImported, updatedAt: Date.now() };
+                appSettings = { ...appSettings, ...cleanImported, updatedAt: restoreTs };
                 delete appSettings.adminUser;
                 localStorage.setItem('smart_anabutir_settings_v2', JSON.stringify(appSettings));
               }
               if (parsed.adminAccount && typeof parsed.adminAccount === 'object') {
-                await saveAdminCredentials({ ...getAdminCredentials(), ...parsed.adminAccount, isCustom: true }, true, false);
+                await saveAdminCredentials({ ...getAdminCredentials(), ...parsed.adminAccount, isCustom: true, updatedAt: restoreTs }, true, false);
               }
               if (Array.isArray(parsed.pesertaAccounts)) {
-                pesertaAccounts = parsed.pesertaAccounts.filter(a => a && a.id !== 'usr_admin' && a.role !== 'admin');
+                pesertaAccounts = parsed.pesertaAccounts
+                  .filter(a => a && a.id !== 'usr_admin' && a.role !== 'admin')
+                  .map(a => ({ ...a, updatedAt: restoreTs }));
                 localStorage.setItem('smart_anabutir_guru_v2', JSON.stringify(pesertaAccounts));
               }
               if (Array.isArray(parsed.masterSiswaList)) {
-                masterSiswaList = parsed.masterSiswaList;
+                masterSiswaList = parsed.masterSiswaList
+                  .filter(Boolean)
+                  .map(s => ({ ...s, updatedAt: restoreTs }));
                 localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
               }
               if (Array.isArray(parsed.paketUjianList)) {
-                paketUjianList = parsed.paketUjianList;
+                paketUjianList = parsed.paketUjianList
+                  .filter(Boolean)
+                  .map(p => ({ ...p, updatedAt: restoreTs }));
                 localStorage.setItem('smart_anabutir_exams_v2', JSON.stringify(paketUjianList));
                 activeExamId = paketUjianList[0]?.id || '';
               }
               if (Array.isArray(parsed.jawabanSiswaList)) {
-                jawabanSiswaList = parsed.jawabanSiswaList;
+                jawabanSiswaList = parsed.jawabanSiswaList
+                  .filter(Boolean)
+                  .map(j => ({ ...j, updatedAt: restoreTs }));
                 localStorage.setItem('smart_anabutir_jawaban_v2', JSON.stringify(jawabanSiswaList));
               }
 
@@ -7117,9 +7817,8 @@
               }
               showToast('Data cadangan berhasil dipulihkan!', 'success');
 
-              if (isCloudConnected) {
-                await forceSyncAllToCloud();
-              }
+              queueAllLocalDocsForSync();
+              await syncWithCloudNow({ fullPull: false, manual: false, silent: true, reason: 'backup-restore' });
             }
           );
         } catch (err) {
@@ -7435,10 +8134,72 @@
     // =========================================================
     loadLocalSeed(getInitialSeedData());
 
+    function persistAllCollectionsQuietly() {
+      Object.keys(COLLECTION_STORAGE_KEYS).forEach(col => persistCollectionToLocalStorage(col));
+    }
+
+    function setupAutoSyncLifecycle() {
+      if (lifecycleListenersBound) return;
+      lifecycleListenersBound = true;
+
+      window.addEventListener('online', () => {
+        updateCloudStatusBadges();
+        syncWithCloudNow({ fullPull: true, manual: false, silent: true, reason: 'online' });
+      });
+
+      window.addEventListener('offline', () => {
+        isCloudConnected = false;
+        if (!cloudSyncState.lastErrorCode) {
+          cloudSyncState.lastErrorCode = 'offline';
+        }
+        updateCloudStatusBadges();
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          persistAllCollectionsQuietly();
+          if (getPendingSyncCount() > 0) {
+            flushPendingOpsToCloud();
+          }
+        } else {
+          if (getPendingSyncCount() > 0 || (Date.now() - lastPullAt >= 20000)) {
+            syncWithCloudNow({ fullPull: true, manual: false, silent: true, reason: 'visible' });
+          }
+        }
+      });
+
+      window.addEventListener('pagehide', () => {
+        persistAllCollectionsQuietly();
+        if (getPendingSyncCount() > 0) {
+          flushPendingOpsToCloud();
+        }
+      });
+
+      window.addEventListener('beforeunload', () => {
+        persistAllCollectionsQuietly();
+      });
+
+      if (!periodicSyncTimerId) {
+        periodicSyncTimerId = setInterval(() => {
+          if (deferredRenderAfterTyping && !isUserActivelyEditingForm() && currentUser) {
+            deferredRenderAfterTyping = false;
+            renderAllViews();
+          }
+          if (getPendingSyncCount() > 0) {
+            flushPendingOpsToCloud();
+          } else if (document.visibilityState === 'visible' && (Date.now() - lastPullAt >= 60000)) {
+            syncWithCloudNow({ fullPull: true, manual: false, silent: true, reason: 'periodic' });
+          }
+        }, 20000);
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', async () => {
       initSingleFilePWA();
+      loadLocalSeed(getInitialSeedData());
       applyAppSettingsUI();
       updateCloudStatusBadges();
+      setupAutoSyncLifecycle();
 
       // Cek apakah ada sesi login yang tersimpan agar saat di-refresh tidak kembali ke halaman login
       const savedSession = loadSessionState();
@@ -7446,11 +8207,13 @@
         currentUser = savedSession.user;
         if (savedSession.examId && paketUjianList.some(p => p.id === savedSession.examId)) {
           activeExamId = savedSession.examId;
+        } else {
+          restoreUserPreferredExam(currentUser);
         }
         applyUserSession(savedSession.menu || 'dashboard');
       }
 
-      startupCloudPromise = autoSetupDatabase();
+      startupCloudPromise = syncWithCloudNow({ fullPull: true, manual: false, silent: true, reason: 'startup' });
       await startupCloudPromise;
 
       applyAppSettingsUI();
@@ -7468,9 +8231,7 @@
           const badgeEl = document.getElementById('user-avatar-badge');
           if (badgeEl) badgeEl.textContent = initials || 'AD';
         }
-        if (activeExamId && !paketUjianList.some(p => p.id === activeExamId)) {
-          activeExamId = paketUjianList[0]?.id || '';
-        }
+        restoreUserPreferredExam(currentUser);
         renderAllViews();
       }
     });
