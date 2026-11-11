@@ -560,6 +560,35 @@
       </div>
     </div>
 
+    <!-- ==================== FORM MODAL DIALOG (MAPEL / SISWA / GURU) ==================== -->
+    <div id="form-modal-backdrop"
+      onclick="if (event.target === this) window.closeFormModal()"
+      class="hidden fixed inset-0 bg-slate-900/45 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div id="form-modal-card"
+        class="w-full max-w-lg glass-surface bg-white rounded-3xl p-6 md:p-7 shadow-2xl border border-slate-100 animate-pop-in max-h-[92vh] flex flex-col">
+        <div class="flex items-start justify-between gap-3 pb-4 border-b border-slate-100 shrink-0">
+          <div class="flex items-center gap-3 min-w-0">
+            <div id="form-modal-icon-wrap"
+              class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 id="form-modal-title" class="text-base md:text-lg font-extrabold text-slate-900">Kelola Data</h3>
+                <span id="form-modal-badge" class="hidden px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-extrabold uppercase">Mode Edit</span>
+              </div>
+              <p id="form-modal-subtitle" class="text-xs text-slate-500 mt-0.5"></p>
+            </div>
+          </div>
+          <button type="button" onclick="window.closeFormModal()"
+            class="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition shrink-0" title="Tutup">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div id="form-modal-body" class="pt-4 overflow-y-auto custom-scroll pr-1"></div>
+      </div>
+    </div>
+
     <!-- ==================== GLOBAL ACTION ANIMATION OVERLAY (LOGIN / LOGOUT / SIMPAN) ==================== -->
     <div id="action-anim-overlay"
       class="hidden fixed inset-0 z-[60] bg-slate-900/35 backdrop-blur-md flex items-center justify-center p-4 transition-opacity duration-300">
@@ -738,6 +767,8 @@
       deletedSubjectNames: [],
       studentClassFilter: 'ALL',
       studentSearchQuery: '',
+      subjectClassFilter: 'ALL',
+      editingSubjectId: null,
       editingStudentId: null,
       editingTeacherId: null,
       subjects: [],
@@ -1155,13 +1186,53 @@
       return `55555555-5555-4555-8555-5555555555${String(idx + 1).padStart(2, '0')}`;
     }
 
-    /** Gabungkan daftar Mapel bawaan Madrasah, mapel dari localStorage/tabel DB, serta pengampunya di tabel teachers. */
+    function normalizeSubjectClasses(rawClasses) {
+      let arr = [];
+      if (Array.isArray(rawClasses)) {
+        arr = rawClasses;
+      } else if (typeof rawClasses === 'string') {
+        arr = rawClasses.split(',');
+      }
+      const cleaned = arr.map(c => String(c || '').trim()).filter(Boolean);
+      if (cleaned.length === 0 || cleaned.some(c => /semua|all/i.test(c))) {
+        return ['Semua Kelas'];
+      }
+      const selected = new Set();
+      cleaned.forEach(c => {
+        const norm = normalizeGradeClass(c);
+        if (GRADE_CLASS_OPTIONS.includes(norm)) {
+          selected.add(norm);
+        }
+      });
+      if (selected.size === 0 || selected.size === GRADE_CLASS_OPTIONS.length) {
+        return ['Semua Kelas'];
+      }
+      return GRADE_CLASS_OPTIONS.filter(c => selected.has(c));
+    }
+
+    function subjectMatchesClassFilter(subj, classFilter) {
+      if (!classFilter || classFilter === 'ALL') return true;
+      const clsList = normalizeSubjectClasses(subj?.classes);
+      return clsList.includes('Semua Kelas') || clsList.includes(classFilter);
+    }
+
+    /** Gabungkan daftar Mapel Madrasah dari localStorage/tabel DB, beserta informasi kelas dan guru terkait. */
     function mergeSubjectsState({ dbSubjects = null, teachers = state.teachers, exams = state.exams } = {}) {
       const storedMeta = loadSubjectsMetaFromStorage();
       if (Array.isArray(storedMeta?.deletedNames) && state.deletedSubjectNames.length === 0) {
         state.deletedSubjectNames = storedMeta.deletedNames;
       }
       const deletedSet = new Set(state.deletedSubjectNames.map(n => n.toLowerCase()));
+
+      const savedClassesByLower = new Map();
+      const savedClassesById = new Map();
+      [...(storedMeta?.subjects || []), ...(state.subjects || [])].forEach(s => {
+        if (!s || !s.classes) return;
+        const clsArr = normalizeSubjectClasses(s.classes);
+        if (s.id) savedClassesById.set(s.id, clsArr);
+        const n = String(s.name || '').trim().toLowerCase();
+        if (n) savedClassesByLower.set(n, clsArr);
+      });
 
       const teacherBySubjectLower = new Map();
       (teachers || []).forEach(t => {
@@ -1179,14 +1250,23 @@
 
         const existing = byLowerName.get(lower);
         const teacherFromDb = teacherBySubjectLower.get(lower) || null;
+        const resolvedClasses = item.classes
+          ? normalizeSubjectClasses(item.classes)
+          : (savedClassesById.get(item.id) || savedClassesByLower.get(lower) || ['Semua Kelas']);
         if (!existing) {
           byLowerName.set(lower, {
             id: item.id || crypto.randomUUID(),
             name: cleanName,
-            teacher_id: allowTeacherOverwrite && teacherFromDb !== null ? teacherFromDb : (item.teacher_id || teacherFromDb || null)
+            teacher_id: allowTeacherOverwrite && teacherFromDb !== null ? teacherFromDb : (item.teacher_id || teacherFromDb || null),
+            classes: resolvedClasses
           });
-        } else if (allowTeacherOverwrite && teacherFromDb !== null) {
-          existing.teacher_id = teacherFromDb;
+        } else {
+          if (allowTeacherOverwrite && teacherFromDb !== null) {
+            existing.teacher_id = teacherFromDb;
+          }
+          if (item.classes && (!existing.classes || existing.classes[0] === 'Semua Kelas')) {
+            existing.classes = normalizeSubjectClasses(item.classes);
+          }
         }
       };
 
@@ -1247,7 +1327,16 @@
         if (subjectAction === 'delete') {
           enqueuePendingSync({ id: crypto.randomUUID(), table: 'subjects', action: 'delete', recordId: subjectRecord.id });
         } else {
-          enqueuePendingSync({ id: crypto.randomUUID(), table: 'subjects', action: 'upsert', record: { ...subjectRecord } });
+          enqueuePendingSync({
+            id: crypto.randomUUID(),
+            table: 'subjects',
+            action: 'upsert',
+            record: {
+              id: subjectRecord.id,
+              name: subjectRecord.name,
+              teacher_id: subjectRecord.teacher_id ?? null
+            }
+          });
         }
       }
       saveSubjectsMetaToStorage();
@@ -1943,6 +2032,98 @@
     }
     window.closeModal = closeModal;
 
+    let activeFormModalCancel = null;
+
+    function openFormModal({
+      title = 'Kelola Data',
+      subtitle = '',
+      icon = 'plus-circle',
+      iconClass = 'bg-indigo-50 text-indigo-600',
+      badgeText = '',
+      maxWidthClass = 'max-w-lg',
+      bodyHtml = '',
+      focusId = '',
+      onCancel = null
+    } = {}) {
+      const backdrop = document.getElementById('form-modal-backdrop');
+      const card = document.getElementById('form-modal-card');
+      const iconWrap = document.getElementById('form-modal-icon-wrap');
+      const titleEl = document.getElementById('form-modal-title');
+      const subEl = document.getElementById('form-modal-subtitle');
+      const badgeEl = document.getElementById('form-modal-badge');
+      const bodyEl = document.getElementById('form-modal-body');
+      if (!backdrop || !card || !bodyEl) return;
+
+      activeFormModalCancel = typeof onCancel === 'function' ? onCancel : null;
+      card.className = `w-full ${maxWidthClass} glass-surface bg-white rounded-3xl p-6 md:p-7 shadow-2xl border border-slate-100 animate-pop-in max-h-[92vh] flex flex-col`;
+      if (iconWrap) {
+        iconWrap.className = `w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${iconClass}`;
+        iconWrap.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i>`;
+      }
+      if (titleEl) titleEl.textContent = title;
+      if (subEl) subEl.textContent = subtitle;
+      if (badgeEl) {
+        if (badgeText) {
+          badgeEl.textContent = badgeText;
+          badgeEl.classList.remove('hidden');
+        } else {
+          badgeEl.classList.add('hidden');
+        }
+      }
+      bodyEl.innerHTML = bodyHtml;
+      backdrop.classList.remove('hidden');
+      lucide.createIcons({ nodes: [backdrop] });
+
+      if (focusId) {
+        requestAnimationFrame(() => {
+          const el = document.getElementById(focusId);
+          if (el) {
+            el.focus();
+            if (typeof el.setSelectionRange === 'function') {
+              const len = el.value?.length || 0;
+              el.setSelectionRange(len, len);
+            }
+          }
+        });
+      }
+    }
+
+    function closeFormModal({ resetEditState = true } = {}) {
+      const backdrop = document.getElementById('form-modal-backdrop');
+      if (backdrop) backdrop.classList.add('hidden');
+      const bodyEl = document.getElementById('form-modal-body');
+      if (bodyEl) bodyEl.innerHTML = '';
+      if (resetEditState) {
+        const hadEdit = state.editingSubjectId || state.editingStudentId || state.editingTeacherId;
+        state.editingSubjectId = null;
+        state.editingStudentId = null;
+        state.editingTeacherId = null;
+        if (activeFormModalCancel) {
+          const cb = activeFormModalCancel;
+          activeFormModalCancel = null;
+          cb();
+        } else if (hadEdit) {
+          renderCurrentMenu();
+        }
+      } else {
+        activeFormModalCancel = null;
+      }
+    }
+    window.closeFormModal = () => closeFormModal({ resetEditState: true });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const formModal = document.getElementById('form-modal-backdrop');
+      if (formModal && !formModal.classList.contains('hidden')) {
+        window.closeFormModal();
+        return;
+      }
+      const confirmModal = document.getElementById('custom-modal-backdrop');
+      if (confirmModal && !confirmModal.classList.contains('hidden')) {
+        window.closeModal();
+      }
+    });
+
     // ==================== AUTHENTICATION & HYBRID LOGIN ====================
     window.switchAuthRole = function (role) {
       state.authRoleTab = role;
@@ -2201,7 +2382,7 @@
       { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban PG, Benar Salah, Isian, dan Uraian', roles: ['admin', 'guru'] },
       { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Indeks tingkat kesukaran (P), daya pembeda (D), dan kualitas butir soal', roles: ['admin', 'guru'] },
       { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['admin', 'guru'] },
-      { id: 'manajemen_mapel', label: 'Mapel & Guru Pengampu', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Tambah mata pelajaran dan tentukan guru yang mengampu setiap mapel', roles: ['admin', 'guru'] },
+      { id: 'manajemen_mapel', label: 'Mapel & Kelas', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Kelola daftar mata pelajaran dan pembagian kelas untuk setiap mapel', roles: ['admin', 'guru'] },
       { id: 'manajemen_siswa', label: 'Data Siswa', shortLabel: 'Siswa', icon: 'graduation-cap', subtitle: 'Kelola data siswa per kelas, NIS/NISN, serta template, import & ekspor Excel', roles: ['admin', 'guru'] },
       { id: 'manajemen_guru', label: 'Data Guru', shortLabel: 'Guru', icon: 'users-round', subtitle: 'Manajemen akun guru, jenis ID, jabatan, kelas ampuan, serta template & ekspor Excel', roles: ['admin'] }
     ];
@@ -2244,7 +2425,9 @@
         showToast('Menu ini khusus untuk Administrator Kurikulum.', 'warning');
         return;
       }
+      closeFormModal({ resetEditState: false });
       state.activeMenu = menuId;
+      state.editingSubjectId = null;
       state.editingStudentId = null;
       state.editingTeacherId = null;
       saveSessionToStorage();
@@ -2793,16 +2976,14 @@
         : (state.subjects[0]?.name || '');
 
       const subjectOptions = state.subjects.length > 0
-        ? state.subjects.map(s => {
-          const pengampu = s.teacher_id ? state.teachers.find(t => t.id === s.teacher_id) : null;
-          const label = pengampu ? `${s.name} — ${pengampu.full_name}` : s.name;
-          return `<option value="${escapeHtml(s.name)}" ${s.name === defaultSubject ? 'selected' : ''}>${escapeHtml(label)}</option>`;
-        }).join('')
+        ? state.subjects.map(s =>
+          `<option value="${escapeHtml(s.name)}" ${s.name === defaultSubject ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
+        ).join('')
         : '<option value="">Belum ada mapel</option>';
 
       const defaultTeacherObj = getSubjectTeacher(defaultSubject) || (state.currentUser?.role === 'guru' ? state.teachers.find(t => t.id === state.currentUser.id) : null) || state.teachers[0];
       const teacherOptions = state.teachers.length > 0
-        ? `<option value="">-- Pilih Guru Pengampu --</option>` + state.teachers.map(t =>
+        ? `<option value="">-- Pilih Nama Guru --</option>` + state.teachers.map(t =>
           `<option value="${t.id}" ${defaultTeacherObj && t.id === defaultTeacherObj.id ? 'selected' : ''}>${escapeHtml(t.full_name)}</option>`
         ).join('')
         : '<option value="">Belum ada data guru</option>';
@@ -2820,7 +3001,7 @@
             </div>
             <div>
               <h3 class="text-base font-extrabold text-slate-900">Buat Paket Ulangan & Kunci</h3>
-              <p class="text-xs text-slate-500">Atur jenis soal, mapel pengampu, KKM, dan kunci jawaban</p>
+              <p class="text-xs text-slate-500">Atur jenis soal, mata pelajaran, KKM, dan kunci jawaban</p>
             </div>
           </div>
 
@@ -2845,7 +3026,7 @@
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Guru Pengampu</label>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Guru</label>
                 <select id="exam-teacher"
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
                   ${teacherOptions}
@@ -2930,7 +3111,7 @@
                       <span class="text-[11px] text-slate-400">• ${ex.exam_date}</span>
                     </div>
                     <h4 class="text-sm font-extrabold text-slate-900">${escapeHtml(ex.title)}</h4>
-                    ${teacherObj ? `<div class="text-[11px] text-slate-500 font-semibold">Pengampu: <span class="text-slate-700">${escapeHtml(teacherObj.full_name)}</span></div>` : ''}
+                    ${teacherObj ? `<div class="text-[11px] text-slate-500 font-semibold">Nama Guru: <span class="text-slate-700">${escapeHtml(teacherObj.full_name)}</span></div>` : ''}
                     <div class="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
                       <span>KKM: <strong>${ex.kkm}</strong></span>
                       <span>Soal: <strong>${ex.total_questions} ${exMeta.typeMeta.shortLabel}</strong></span>
@@ -3778,126 +3959,213 @@
       showToast('File CSV Analisis Nilai berhasil diunduh!', 'success');
     };
 
-    // ==================== 6. MANAJEMEN MAPEL & GURU PENGAMPU ====================
+    // ==================== 6. MANAJEMEN MAPEL & KELAS ====================
     function renderManajemenMapelView() {
       if (state.subjects.length === 0) mergeSubjectsState();
 
-      const teacherOptions = state.teachers.length > 0
-        ? `<option value="">-- Pilih Guru Pengampu (Opsional) --</option>` + state.teachers.map(t =>
-          `<option value="${t.id}">${escapeHtml(t.full_name)} (${escapeHtml(t.username)})</option>`
-        ).join('')
-        : '<option value="">Belum ada akun guru terdaftar</option>';
+      const classFilter = state.subjectClassFilter || 'ALL';
+      const sortedSubjects = state.subjects
+        .filter(subj => subjectMatchesClassFilter(subj, classFilter))
+        .slice();
 
-      const sortedSubjects = state.subjects.slice();
+      const filterOptionsHtml = `<option value="ALL" ${classFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
+        GRADE_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}" ${classFilter === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
 
       return `
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- Left Form: Tambah Mapel & Pilih Guru Pengampu -->
-        <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <i data-lucide="book-plus" class="w-5 h-5"></i>
+      <div class="glass-surface rounded-3xl p-6 space-y-5">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h3 class="text-base md:text-lg font-extrabold text-slate-900">Daftar Mapel & Kelas</h3>
+              <span class="px-3 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold">${sortedSubjects.length} Mapel</span>
             </div>
-            <div>
-              <h3 class="text-base font-extrabold text-slate-900">Tambah Mata Pelajaran</h3>
-              <p class="text-xs text-slate-500">Tambahkan mapel dan tentukan guru pengampunya</p>
-            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Kelola daftar mata pelajaran dan penempatan kelasnya (Semua Kelas atau Kelas 1–6)</p>
           </div>
 
-          <form onsubmit="window.handleSaveSubject(event)" class="space-y-4">
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Mata Pelajaran</label>
-              <input type="text" id="subj-name" required placeholder="Contoh: Bahasa Arab / Tahfidz"
-                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1.5">Pilih Guru yang Mengampu Mapel</label>
-              <select id="subj-teacher"
-                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                ${teacherOptions}
-              </select>
-            </div>
-
-            <div class="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-[11px] text-slate-600 leading-relaxed flex items-start gap-2.5">
-              <i data-lucide="info" class="w-4 h-4 text-indigo-600 shrink-0 mt-0.5"></i>
-              <span>Daftar mapel & guru pengampu otomatis muncul di form <strong>Paket Ulangan & Kunci</strong> serta terhubung dengan data pengampu di Supabase.</span>
-            </div>
-
-            <button type="submit" class="w-full py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
-              <i data-lucide="save" class="w-4 h-4"></i> Simpan Mapel & Pengampu
+          <div class="flex flex-wrap items-center gap-2.5">
+            <select id="subj-filter-class" onchange="window.handleFilterSubjects()"
+              class="px-3.5 py-2.5 rounded-full bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              ${filterOptionsHtml}
+            </select>
+            <button type="button" onclick="window.handleOpenAddSubjectModal()"
+              class="px-5 py-2.5 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-2 shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4"></i> Tambah Mapel
             </button>
-
-            ${state.currentUser?.role === 'admin' ? `
-              <button type="button" onclick="window.navigateMenu('manajemen_guru')" class="w-full py-2.5 px-4 rounded-full bg-slate-100 hover:bg-slate-200/70 text-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
-                <i data-lucide="users-round" class="w-3.5 h-3.5"></i> Kelola Daftar Akun Guru
-              </button>
-            ` : ''}
-          </form>
+          </div>
         </div>
 
-        <!-- Right List: Daftar Mapel & Pemilihan Guru Pengampu -->
-        <div class="lg:col-span-7 glass-surface rounded-3xl p-6 space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h3 class="text-base font-extrabold text-slate-900">Daftar Mapel & Guru Pengampu</h3>
-              <p class="text-xs text-slate-500">Ubah dropdown guru pada tiap mapel untuk menetapkan atau mengganti pengampu</p>
-            </div>
-            <span class="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold w-fit">${sortedSubjects.length} Mapel</span>
-          </div>
-
-          <div class="space-y-2.5 max-h-[540px] overflow-y-auto custom-scroll pr-1">
-            ${sortedSubjects.length === 0 ? `
-              <div class="py-10 text-center text-xs text-slate-400">Belum ada mata pelajaran terdaftar.</div>
-            ` : sortedSubjects.map(subj => {
-        const assignedTeacher = subj.teacher_id ? state.teachers.find(t => t.id === subj.teacher_id) : null;
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
+                <th class="py-3 px-3 w-12">No</th>
+                <th class="py-3 px-3">Nama Mata Pelajaran</th>
+                <th class="py-3 px-3">Kelas</th>
+                <th class="py-3 px-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-xs">
+              ${sortedSubjects.length === 0 ? `
+                <tr><td colspan="4" class="py-12 text-center text-slate-400">Belum ada mata pelajaran${classFilter !== 'ALL' ? ` untuk ${escapeHtml(classFilter)}` : ''}. Klik <strong>+ Tambah Mapel</strong> untuk menambahkan.</td></tr>
+              ` : sortedSubjects.map((subj, idx) => {
         const examCount = state.exams.filter(ex => (ex.subject || '').trim().toLowerCase() === subj.name.toLowerCase()).length;
-        const rowTeacherOptions = `<option value="">-- Belum Ada Pengampu --</option>` + state.teachers.map(t =>
-          `<option value="${t.id}" ${subj.teacher_id === t.id ? 'selected' : ''}>${escapeHtml(t.full_name)}</option>`
-        ).join('');
+        const clsList = normalizeSubjectClasses(subj.classes);
+        const classBadgesHtml = clsList.includes('Semua Kelas')
+          ? `<span class="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[11px] font-bold">Semua Kelas (1–6)</span>`
+          : clsList.map(c => `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">${escapeHtml(c)}</span>`).join(' ');
 
         return `
-                <div class="p-3.5 rounded-2xl bg-white border border-slate-200/80 hover:border-indigo-200 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div class="min-w-0">
+                <tr class="hover:bg-slate-50/80 transition">
+                  <td class="py-3.5 px-3 font-bold text-slate-400">${idx + 1}</td>
+                  <td class="py-3.5 px-3">
                     <div class="flex items-center gap-2 flex-wrap">
-                      <span class="text-xs font-extrabold text-slate-900">${escapeHtml(subj.name)}</span>
+                      <span class="font-extrabold text-slate-900">${escapeHtml(subj.name)}</span>
                       ${examCount > 0 ? `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">${examCount} Paket Ulangan</span>` : ''}
                     </div>
-                    <div class="text-[11px] mt-0.5 ${assignedTeacher ? 'text-emerald-600 font-semibold' : 'text-slate-400'}">
-                      ${assignedTeacher ? `Diampu oleh: ${escapeHtml(assignedTeacher.full_name)}` : 'Belum dipilih guru pengampu'}
+                  </td>
+                  <td class="py-3.5 px-3">
+                    <div class="flex flex-wrap items-center gap-1.5">${classBadgesHtml}</div>
+                  </td>
+                  <td class="py-3.5 px-3 text-right whitespace-nowrap">
+                    <div class="inline-flex items-center justify-end gap-1">
+                      <button type="button" onclick="window.handleEditSubject('${subj.id}')"
+                        class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit Mapel & Kelas">
+                        <i data-lucide="pencil" class="w-4 h-4"></i>
+                      </button>
+                      <button type="button" data-subject="${escapeHtml(subj.name)}" onclick="window.handleDeleteSubject(this.dataset.subject)"
+                        class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus Mapel">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                      </button>
                     </div>
-                  </div>
-
-                  <div class="flex items-center gap-2 shrink-0">
-                    <select data-subject="${escapeHtml(subj.name)}" onchange="window.handleAssignSubjectTeacher(this.dataset.subject, this.value)"
-                      class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[210px]">
-                      ${rowTeacherOptions}
-                    </select>
-                    <button type="button" data-subject="${escapeHtml(subj.name)}" onclick="window.handleDeleteSubject(this.dataset.subject)"
-                      class="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 transition" title="Hapus Mapel">
-                      <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    </button>
-                  </div>
-                </div>
+                  </td>
+                </tr>
               `;
       }).join('')}
-          </div>
+            </tbody>
+          </table>
         </div>
-
       </div>
     `;
     }
 
+    function openSubjectFormModal(editingSubject = null) {
+      const selectedClasses = editingSubject ? normalizeSubjectClasses(editingSubject.classes) : ['Semua Kelas'];
+      const isAllSelected = selectedClasses.includes('Semua Kelas');
+
+      const bodyHtml = `
+        <form onsubmit="window.handleSaveSubject(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Mata Pelajaran</label>
+            <input type="text" id="subj-name" required placeholder="Contoh: Bahasa Arab / Tahfidz"
+              value="${escapeHtml(editingSubject ? editingSubject.name : '')}"
+              class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
+          <div class="space-y-2.5">
+            <label class="block text-xs font-bold text-slate-700">Kelas yang Menggunakan Mapel Ini</label>
+            <label class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 cursor-pointer hover:bg-indigo-50 transition">
+              <input type="checkbox" id="subj-all-classes" ${isAllSelected ? 'checked' : ''}
+                onchange="window.handleToggleAllSubjectClasses(this.checked)"
+                class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shrink-0" />
+              <span class="text-xs font-extrabold text-indigo-900">Semua Kelas (Kelas 1 – Kelas 6)</span>
+            </label>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              ${GRADE_CLASS_OPTIONS.map(cls => {
+        const checked = isAllSelected || selectedClasses.includes(cls);
+        return `
+                <label class="flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/40 cursor-pointer transition">
+                  <input type="checkbox" name="subj-class-chk" value="${escapeHtml(cls)}" ${checked ? 'checked' : ''}
+                    onchange="window.handleToggleGradeSubjectClass()"
+                    class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shrink-0" />
+                  <span class="text-xs font-semibold text-slate-700">${escapeHtml(cls)}</span>
+                </label>
+              `;
+      }).join('')}
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2.5 pt-2">
+            <button type="button" onclick="window.closeFormModal()"
+              class="px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition shrink-0">
+              Batal
+            </button>
+            <button type="submit" class="flex-1 py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+              <i data-lucide="save" class="w-4 h-4"></i> ${editingSubject ? 'Simpan Perubahan' : 'Simpan Mapel'}
+            </button>
+          </div>
+        </form>
+      `;
+
+      openFormModal({
+        title: editingSubject ? 'Edit Mata Pelajaran' : 'Tambah Mata Pelajaran',
+        subtitle: editingSubject ? 'Perbarui nama mata pelajaran dan pilihan kelasnya' : 'Tambahkan mata pelajaran baru dan pilih kelas yang menggunakannya',
+        icon: editingSubject ? 'pencil' : 'book-plus',
+        iconClass: editingSubject ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600',
+        badgeText: editingSubject ? 'Mode Edit' : '',
+        maxWidthClass: 'max-w-lg',
+        bodyHtml,
+        focusId: 'subj-name'
+      });
+    }
+
+    window.handleFilterSubjects = function () {
+      const el = document.getElementById('subj-filter-class');
+      if (el) state.subjectClassFilter = el.value || 'ALL';
+      renderCurrentMenu();
+    };
+
+    window.handleOpenAddSubjectModal = function () {
+      state.editingSubjectId = null;
+      openSubjectFormModal(null);
+    };
+
+    window.handleEditSubject = function (subjectId) {
+      const target = state.subjects.find(s => s.id === subjectId);
+      if (!target) return;
+      state.editingSubjectId = subjectId;
+      openSubjectFormModal(target);
+    };
+
+    window.handleToggleAllSubjectClasses = function (isChecked) {
+      document.querySelectorAll('input[name="subj-class-chk"]').forEach(cb => {
+        cb.checked = Boolean(isChecked);
+      });
+    };
+
+    window.handleToggleGradeSubjectClass = function () {
+      const allChk = document.getElementById('subj-all-classes');
+      if (!allChk) return;
+      const gradeChecks = Array.from(document.querySelectorAll('input[name="subj-class-chk"]'));
+      allChk.checked = gradeChecks.length > 0 && gradeChecks.every(cb => cb.checked);
+    };
+
     window.handleSaveSubject = async function (e) {
       e.preventDefault();
+      const editingId = state.editingSubjectId;
+      const existingTarget = editingId ? state.subjects.find(s => s.id === editingId) : null;
       const nameInput = document.getElementById('subj-name');
-      const teacherSelect = document.getElementById('subj-teacher');
       const cleanName = nameInput?.value.trim() || '';
-      const teacherId = teacherSelect?.value || null;
 
       if (!cleanName) {
         showToast('Nama mata pelajaran wajib diisi.', 'warning');
+        return;
+      }
+
+      const isAllChecked = Boolean(document.getElementById('subj-all-classes')?.checked);
+      const checkedGrades = Array.from(document.querySelectorAll('input[name="subj-class-chk"]:checked')).map(cb => cb.value);
+      if (!isAllChecked && checkedGrades.length === 0) {
+        showToast('Pilih minimal satu kelas (atau centang Semua Kelas).', 'warning');
+        return;
+      }
+      const nextClasses = (isAllChecked || checkedGrades.length === GRADE_CLASS_OPTIONS.length)
+        ? ['Semua Kelas']
+        : normalizeSubjectClasses(checkedGrades);
+
+      const lower = cleanName.toLowerCase();
+      const duplicate = state.subjects.find(s => s.name.toLowerCase() === lower && (!existingTarget || s.id !== existingTarget.id));
+      if (duplicate) {
+        showToast(`Mata pelajaran "${duplicate.name}" sudah ada di daftar.`, 'warning');
         return;
       }
 
@@ -3905,39 +4173,30 @@
       setButtonLoading(submitterBtn, true, 'Menyimpan...');
       showActionOverlay({
         stateType: 'loading',
-        title: 'Menyimpan Mata Pelajaran...',
-        subtitle: 'Memperbarui mapel, pengampu, dan sinkronisasi Supabase'
+        title: existingTarget ? 'Memperbarui Mata Pelajaran...' : 'Menyimpan Mata Pelajaran...',
+        subtitle: 'Memperbarui daftar mapel & sinkronisasi Supabase'
       });
 
+      const prevSubjectsSnapshot = state.subjects.map(s => ({ ...s, classes: Array.isArray(s.classes) ? [...s.classes] : s.classes }));
+      const prevDeletedNames = [...state.deletedSubjectNames];
+
       try {
-        const lower = cleanName.toLowerCase();
         state.deletedSubjectNames = state.deletedSubjectNames.filter(n => n.toLowerCase() !== lower);
-        const existing = state.subjects.find(s => s.name.toLowerCase() === lower);
-        const affectedTeacherIds = [];
         let subjectRecord;
 
-        if (existing) {
-          if (existing.teacher_id) affectedTeacherIds.push(existing.teacher_id);
-          existing.name = cleanName;
-          existing.teacher_id = teacherId;
-          if (teacherId) affectedTeacherIds.push(teacherId);
-          subjectRecord = existing;
-        } else {
-          subjectRecord = { id: crypto.randomUUID(), name: cleanName, teacher_id: teacherId };
-          state.subjects.push(subjectRecord);
-          if (teacherId) affectedTeacherIds.push(teacherId);
-        }
-
-        if (state.currentUser?.role === 'guru' && affectedTeacherIds.includes(state.currentUser.id)) {
-          const updatedMe = state.teachers.find(t => t.id === state.currentUser.id);
-          if (updatedMe) {
-            state.currentUser.subject = buildTeacherSubjectString(updatedMe.id);
-            const subEl = document.getElementById('user-display-sub');
-            if (subEl) subEl.textContent = formatTeacherHeaderSub(state.currentUser);
+        if (existingTarget) {
+          if (existingTarget.name.toLowerCase() !== lower && !state.deletedSubjectNames.some(n => n.toLowerCase() === existingTarget.name.toLowerCase())) {
+            state.deletedSubjectNames.push(existingTarget.name);
           }
+          existingTarget.name = cleanName;
+          existingTarget.classes = nextClasses;
+          subjectRecord = existingTarget;
+        } else {
+          subjectRecord = { id: crypto.randomUUID(), name: cleanName, teacher_id: null, classes: nextClasses };
+          state.subjects.push(subjectRecord);
         }
 
-        queueSubjectTeacherSync(affectedTeacherIds, subjectRecord, 'upsert');
+        queueSubjectTeacherSync([], subjectRecord, 'upsert');
         saveSessionToStorage();
         updateSyncBadge('syncing');
 
@@ -3948,54 +4207,28 @@
         updateSyncBadge(pendingLeft > 0 ? 'pending' : 'synced');
 
         if (flushRes.fatalError) {
+          state.subjects = prevSubjectsSnapshot;
+          state.deletedSubjectNames = prevDeletedNames;
+          saveSubjectsMetaToStorage();
+          saveCacheToStorage();
           await hideActionOverlay();
           showToast('Gagal sinkron ke Supabase: ' + flushRes.fatalError.message, 'danger');
           return;
         }
 
+        state.editingSubjectId = null;
+        closeFormModal({ resetEditState: false });
         renderCurrentMenu();
         showActionOverlay({
           stateType: 'success',
-          title: existing ? 'Pengampu Mapel Diperbarui!' : 'Mapel Baru Tersimpan!',
+          title: existingTarget ? 'Mapel Diperbarui!' : 'Mapel Baru Tersimpan!',
           subtitle: pendingLeft > 0 ? 'Tersimpan lokal, menunggu sinkronisasi' : 'Tersinkronisasi dengan database Supabase'
         });
         await sleep(500);
         await hideActionOverlay();
-        showToast(existing ? `Mapel "${cleanName}" diperbarui dan tersinkron!` : `Mapel "${cleanName}" berhasil ditambahkan!`, 'success');
+        showToast(existingTarget ? `Mapel "${cleanName}" diperbarui dan tersinkron!` : `Mapel "${cleanName}" berhasil ditambahkan!`, 'success');
       } finally {
         setButtonLoading(submitterBtn, false);
-      }
-    };
-
-    window.handleAssignSubjectTeacher = async function (subjectName, newTeacherId) {
-      const target = state.subjects.find(s => s.name.toLowerCase() === String(subjectName || '').trim().toLowerCase());
-      if (!target) return;
-
-      const prevTeacherId = target.teacher_id || null;
-      const cleanTeacherId = newTeacherId || null;
-      if (prevTeacherId === cleanTeacherId) return;
-
-      target.teacher_id = cleanTeacherId;
-      queueSubjectTeacherSync([prevTeacherId, cleanTeacherId], target, 'upsert');
-
-      if (state.currentUser?.role === 'guru' && (state.currentUser.id === prevTeacherId || state.currentUser.id === cleanTeacherId)) {
-        state.currentUser.subject = buildTeacherSubjectString(state.currentUser.id);
-        const subEl = document.getElementById('user-display-sub');
-        if (subEl) subEl.textContent = formatTeacherHeaderSub(state.currentUser);
-      }
-      saveSessionToStorage();
-
-      updateSyncBadge('syncing');
-      const flushRes = await flushPendingSyncToSupabase();
-      state.lastSyncedAt = new Date();
-      saveCacheToStorage();
-      updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
-
-      renderCurrentMenu();
-      if (flushRes.fatalError) {
-        showToast('Gagal sinkron pengampu ke Supabase: ' + flushRes.fatalError.message, 'danger');
-      } else {
-        showToast(`Guru pengampu mapel "${target.name}" berhasil diperbarui & tersinkron.`, 'success');
       }
     };
 
@@ -4007,18 +4240,12 @@
         'Hapus Mata Pelajaran',
         `<p>Apakah Anda yakin ingin menghapus mata pelajaran <strong>${escapeHtml(target.name)}</strong> dari daftar pilihan?</p>`,
         async () => {
-          const prevTeacherId = target.teacher_id || null;
           if (!state.deletedSubjectNames.some(n => n.toLowerCase() === target.name.toLowerCase())) {
             state.deletedSubjectNames.push(target.name);
           }
+          if (state.editingSubjectId === target.id) state.editingSubjectId = null;
           state.subjects = state.subjects.filter(s => s.id !== target.id && s.name.toLowerCase() !== target.name.toLowerCase());
-          queueSubjectTeacherSync([prevTeacherId], target, 'delete');
-
-          if (state.currentUser?.role === 'guru' && state.currentUser.id === prevTeacherId) {
-            state.currentUser.subject = buildTeacherSubjectString(state.currentUser.id);
-            const subEl = document.getElementById('user-display-sub');
-            if (subEl) subEl.textContent = formatTeacherHeaderSub(state.currentUser);
-          }
+          queueSubjectTeacherSync([], target, 'delete');
           saveSessionToStorage();
 
           updateSyncBadge('syncing');
@@ -4049,15 +4276,103 @@
         .slice()
         .sort((a, b) => (a.class_name || '').localeCompare(b.class_name || '') || (a.full_name || '').localeCompare(b.full_name || ''));
 
-      let editingStudent = state.editingStudentId
-        ? (state.students || []).find(s => s.id === state.editingStudentId) || null
-        : null;
-      if (state.editingStudentId && !editingStudent) {
-        state.editingStudentId = null;
-      }
+      const filterOptionsHtml = `<option value="ALL" ${classFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
+        GRADE_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}" ${classFilter === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
 
+      return `
+      <div class="glass-surface rounded-3xl p-6 space-y-5">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h3 class="text-base md:text-lg font-extrabold text-slate-900">Daftar Data Siswa</h3>
+              <span class="px-3 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold">${filteredStudents.length} Siswa</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Kelola daftar siswa per kelas, NIS/NISN, atau impor massal via Excel (.xlsx)</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="window.handleOpenAddStudentModal()"
+              class="px-4 py-2 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Tambah Data Siswa
+            </button>
+            <button type="button" onclick="window.handleDownloadStudentTemplate()"
+              class="px-3 py-2 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
+              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i> Template (.xlsx)
+            </button>
+            <button type="button" onclick="document.getElementById('import-siswa-file').click()"
+              class="px-3 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 border border-indigo-200/80 transition">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i> Import
+            </button>
+            <input type="file" id="import-siswa-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="window.handleImportStudentsXlsx(event)" />
+            <button type="button" onclick="window.handleExportStudentsXlsx()"
+              class="px-3 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Ekspor
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <select id="stu-filter-class" onchange="window.handleFilterStudents()"
+            class="px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            ${filterOptionsHtml}
+          </select>
+          <input type="text" id="stu-search-input" value="${escapeHtml(state.studentSearchQuery || '')}" oninput="window.handleFilterStudents(this)"
+            placeholder="Cari nama siswa atau NIS/NISN..."
+            class="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
+                <th class="py-3 px-3 w-12">No</th>
+                <th class="py-3 px-3">NIS / NISN</th>
+                <th class="py-3 px-3">Nama Lengkap</th>
+                <th class="py-3 px-3 text-center">L/P</th>
+                <th class="py-3 px-3 text-center">Kelas</th>
+                <th class="py-3 px-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-xs">
+              ${filteredStudents.length === 0 ? `
+                <tr><td colspan="6" class="py-12 text-center text-slate-400">Belum ada data siswa${classFilter !== 'ALL' ? ` di ${escapeHtml(classFilter)}` : ''}. Klik <strong>+ Tambah Data Siswa</strong> atau <strong>Import</strong> Excel.</td></tr>
+              ` : filteredStudents.map((stu, idx) => `
+                <tr class="hover:bg-slate-50/80 transition">
+                  <td class="py-3 px-3 font-bold text-slate-400">${idx + 1}</td>
+                  <td class="py-3 px-3 font-mono font-bold text-indigo-700">${escapeHtml(stu.nis)}</td>
+                  <td class="py-3 px-3 font-bold text-slate-900">${escapeHtml(stu.full_name)}</td>
+                  <td class="py-3 px-3 text-center">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${stu.gender === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-sky-100 text-sky-700'}">
+                      ${stu.gender === 'P' ? 'P' : 'L'}
+                    </span>
+                  </td>
+                  <td class="py-3 px-3 text-center">
+                    <span class="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">${escapeHtml(stu.class_name)}</span>
+                  </td>
+                  <td class="py-3 px-3 text-right whitespace-nowrap">
+                    <div class="inline-flex items-center justify-end gap-1">
+                      <button type="button" onclick="window.handleEditStudent('${stu.id}')" class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit">
+                        <i data-lucide="pencil" class="w-4 h-4"></i>
+                      </button>
+                      <button type="button" onclick="window.handleDeleteStudent('${stu.id}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    }
+
+    function openStudentFormModal(editingStudent = null) {
       const teacherGrade = state.currentUser?.role === 'guru' ? decodeTeacherMeta(state.currentUser).classAssigned : '';
-      const defaultStuClass = GRADE_CLASS_OPTIONS.includes(teacherGrade) ? teacherGrade : GRADE_CLASS_OPTIONS[0];
+      const defaultStuClass = (state.studentClassFilter && state.studentClassFilter !== 'ALL' && GRADE_CLASS_OPTIONS.includes(state.studentClassFilter))
+        ? state.studentClassFilter
+        : (GRADE_CLASS_OPTIONS.includes(teacherGrade) ? teacherGrade : GRADE_CLASS_OPTIONS[0]);
       const selectedStuClass = editingStudent ? editingStudent.class_name : defaultStuClass;
       const stuClassList = selectedStuClass && !GRADE_CLASS_OPTIONS.includes(selectedStuClass)
         ? [...GRADE_CLASS_OPTIONS, selectedStuClass]
@@ -4066,155 +4381,62 @@
         `<option value="${escapeHtml(c)}" ${c === selectedStuClass ? 'selected' : ''}>${escapeHtml(c)}</option>`
       ).join('');
       const selectedGender = editingStudent?.gender === 'P' ? 'P' : 'L';
-      const filterOptionsHtml = `<option value="ALL" ${classFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
-        GRADE_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}" ${classFilter === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
 
-      return `
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- Left Form: Tambah / Edit Data Siswa -->
-        <div class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit ${editingStudent ? 'ring-2 ring-indigo-500/30 border-indigo-300' : ''}">
-          <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-2xl ${editingStudent ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'} flex items-center justify-center">
-                <i data-lucide="${editingStudent ? 'pencil' : 'graduation-cap'}" class="w-5 h-5"></i>
-              </div>
-              <div>
-                <h3 class="text-base font-extrabold text-slate-900">${editingStudent ? 'Edit Data Siswa' : 'Tambah Data Siswa'}</h3>
-                <p class="text-xs text-slate-500">${editingStudent ? 'Perbarui data peserta didik lalu simpan perubahan' : 'Input peserta didik per kelas untuk mempermudah koreksi'}</p>
-              </div>
-            </div>
-            ${editingStudent ? `<span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-extrabold uppercase shrink-0">Mode Edit</span>` : ''}
+      const bodyHtml = `
+        <form onsubmit="window.handleSaveStudent(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap Siswa</label>
+            <input type="text" id="stu-fullname" required value="${escapeHtml(editingStudent ? editingStudent.full_name : '')}" placeholder="Contoh: Ahmad Fauzi"
+              class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
 
-          <form onsubmit="window.handleSaveStudent(event)" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap Siswa</label>
-              <input type="text" id="stu-fullname" required value="${escapeHtml(editingStudent ? editingStudent.full_name : '')}" placeholder="Contoh: Ahmad Fauzi"
-                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">NIS / NISN</label>
+              <input type="text" id="stu-nis" inputmode="numeric" required value="${escapeHtml(editingStudent ? editingStudent.nis : '')}" placeholder="Hanya Angka"
+                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">NIS / NISN</label>
-                <input type="text" id="stu-nis" inputmode="numeric" required value="${escapeHtml(editingStudent ? editingStudent.nis : '')}" placeholder="Hanya Angka"
-                  oninput="this.value = this.value.replace(/[^0-9]/g, '')"
-                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Jenis Kelamin</label>
-                <select id="stu-gender" required
-                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="L" ${selectedGender === 'L' ? 'selected' : ''}>Laki-laki (L)</option>
-                  <option value="P" ${selectedGender === 'P' ? 'selected' : ''}>Perempuan (P)</option>
-                </select>
-              </div>
-            </div>
-
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1.5">Kelas</label>
-              <select id="stu-class" required
-                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                ${classOptionsHtml}
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">Jenis Kelamin</label>
+              <select id="stu-gender" required
+                class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="L" ${selectedGender === 'L' ? 'selected' : ''}>Laki-laki (L)</option>
+                <option value="P" ${selectedGender === 'P' ? 'selected' : ''}>Perempuan (P)</option>
               </select>
             </div>
-
-            <div class="flex items-center gap-2.5">
-              ${editingStudent ? `
-                <button type="button" onclick="window.handleCancelEditStudent()" class="px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition shrink-0">
-                  Batal
-                </button>
-              ` : ''}
-              <button type="submit" class="flex-1 py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
-                <i data-lucide="${editingStudent ? 'save' : 'user-plus'}" class="w-4 h-4"></i> ${editingStudent ? 'Simpan Perubahan' : 'Simpan Data Siswa'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- Right List: Daftar Data Siswa + Template/Import/Ekspor Excel -->
-        <div class="lg:col-span-7 glass-surface rounded-3xl p-6 space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h3 class="text-base font-extrabold text-slate-900">Daftar Data Siswa (${filteredStudents.length})</h3>
-              <p class="text-xs text-slate-500">Kelola daftar siswa atau impor massal via Excel (.xlsx)</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <button type="button" onclick="window.handleDownloadStudentTemplate()"
-                class="px-3 py-2 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
-                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i> Template (.xlsx)
-              </button>
-              <button type="button" onclick="document.getElementById('import-siswa-file').click()"
-                class="px-3 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 border border-indigo-200/80 transition">
-                <i data-lucide="upload" class="w-3.5 h-3.5"></i> Import
-              </button>
-              <input type="file" id="import-siswa-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="window.handleImportStudentsXlsx(event)" />
-              <button type="button" onclick="window.handleExportStudentsXlsx()"
-                class="px-3 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
-                <i data-lucide="download" class="w-3.5 h-3.5"></i> Ekspor
-              </button>
-            </div>
           </div>
 
-          <!-- Filter Bar -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <select id="stu-filter-class" onchange="window.handleFilterStudents()"
-              class="px-3.5 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              ${filterOptionsHtml}
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Kelas</label>
+            <select id="stu-class" required
+              class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              ${classOptionsHtml}
             </select>
-            <input type="text" id="stu-search-input" value="${escapeHtml(state.studentSearchQuery || '')}" oninput="window.handleFilterStudents(this)"
-              placeholder="Cari nama siswa atau NIS/NISN..."
-              class="sm:col-span-2 px-4 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
 
-          <div class="overflow-x-auto custom-scroll">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
-                  <th class="py-3 px-3">NIS / NISN</th>
-                  <th class="py-3 px-3">Nama Lengkap</th>
-                  <th class="py-3 px-3 text-center">L/P</th>
-                  <th class="py-3 px-3 text-center">Kelas</th>
-                  <th class="py-3 px-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100 text-xs">
-                ${filteredStudents.length === 0 ? `
-                  <tr><td colspan="5" class="py-10 text-center text-slate-400">Belum ada data siswa${classFilter !== 'ALL' ? ` di ${escapeHtml(classFilter)}` : ''}. Tambah manual atau klik <strong>Import</strong> Excel.</td></tr>
-                ` : filteredStudents.map(stu => {
-        const isEditingRow = editingStudent && stu.id === editingStudent.id;
-        return `
-                  <tr class="${isEditingRow ? 'bg-indigo-50/70' : 'hover:bg-slate-50/80'} transition">
-                    <td class="py-3 px-3 font-mono font-bold text-indigo-700">${escapeHtml(stu.nis)}</td>
-                    <td class="py-3 px-3 font-bold text-slate-900">${escapeHtml(stu.full_name)}</td>
-                    <td class="py-3 px-3 text-center">
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${stu.gender === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-sky-100 text-sky-700'}">
-                        ${stu.gender === 'P' ? 'P' : 'L'}
-                      </span>
-                    </td>
-                    <td class="py-3 px-3 text-center">
-                      <span class="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">${escapeHtml(stu.class_name)}</span>
-                    </td>
-                    <td class="py-3 px-3 text-right">
-                      <div class="inline-flex items-center justify-end gap-1">
-                        <button type="button" onclick="window.handleEditStudent('${stu.id}')" class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit">
-                          <i data-lucide="pencil" class="w-4 h-4"></i>
-                        </button>
-                        <button type="button" onclick="window.handleDeleteStudent('${stu.id}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus">
-                          <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                `;
-      }).join('')}
-              </tbody>
-            </table>
+          <div class="flex items-center gap-2.5 pt-2">
+            <button type="button" onclick="window.closeFormModal()"
+              class="px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition shrink-0">
+              Batal
+            </button>
+            <button type="submit" class="flex-1 py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+              <i data-lucide="${editingStudent ? 'save' : 'user-plus'}" class="w-4 h-4"></i> ${editingStudent ? 'Simpan Perubahan' : 'Simpan Data Siswa'}
+            </button>
           </div>
-        </div>
+        </form>
+      `;
 
-      </div>
-    `;
+      openFormModal({
+        title: editingStudent ? 'Edit Data Siswa' : 'Tambah Data Siswa',
+        subtitle: editingStudent ? 'Perbarui data peserta didik lalu simpan perubahan' : 'Input peserta didik per kelas untuk mempermudah koreksi',
+        icon: editingStudent ? 'pencil' : 'graduation-cap',
+        iconClass: editingStudent ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600',
+        badgeText: editingStudent ? 'Mode Edit' : '',
+        maxWidthClass: 'max-w-lg',
+        bodyHtml,
+        focusId: 'stu-fullname'
+      });
     }
 
     window.handleFilterStudents = function (searchInputEl = null) {
@@ -4234,20 +4456,20 @@
       }
     };
 
+    window.handleOpenAddStudentModal = function () {
+      state.editingStudentId = null;
+      openStudentFormModal(null);
+    };
+
     window.handleEditStudent = function (studentId) {
-      if (!state.students.some(s => s.id === studentId)) return;
+      const target = state.students.find(s => s.id === studentId);
+      if (!target) return;
       state.editingStudentId = studentId;
-      renderCurrentMenu();
-      const input = document.getElementById('stu-fullname');
-      if (input) {
-        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        input.focus();
-      }
+      openStudentFormModal(target);
     };
 
     window.handleCancelEditStudent = function () {
-      state.editingStudentId = null;
-      renderCurrentMenu();
+      closeFormModal({ resetEditState: true });
     };
 
     window.handleSaveStudent = async function (e) {
@@ -4300,6 +4522,7 @@
           updateSyncBadge(pendingLeft > 0 ? 'pending' : 'synced');
         }
 
+        closeFormModal({ resetEditState: false });
         renderCurrentMenu();
         showActionOverlay({
           stateType: 'success',
@@ -4476,12 +4699,96 @@
     function renderManajemenGuruView() {
       if (state.subjects.length === 0) mergeSubjectsState();
 
-      const editingTeacher = state.editingTeacherId
-        ? state.teachers.find(t => t.id === state.editingTeacherId) || null
-        : null;
-      if (state.editingTeacherId && !editingTeacher) {
-        state.editingTeacherId = null;
-      }
+      return `
+      <div class="glass-surface rounded-3xl p-6 space-y-5">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h3 class="text-base md:text-lg font-extrabold text-slate-900">Daftar Akun Guru Aktif</h3>
+              <span class="px-3 py-0.5 rounded-full bg-purple-50 text-purple-700 text-xs font-extrabold">${state.teachers.length} Guru</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Tabel tersinkron: <span class="font-semibold text-indigo-600">teachers</span> • Nomor Identitas berfungsi sebagai ID login Guru</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="window.handleOpenAddTeacherModal()"
+              class="px-4 py-2 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Tambah Data Guru
+            </button>
+            <button type="button" onclick="window.handleDownloadTeacherTemplate()"
+              class="px-3 py-2 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
+              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i> Template (.xlsx)
+            </button>
+            <button type="button" onclick="document.getElementById('import-guru-file').click()"
+              class="px-3 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 border border-indigo-200/80 transition">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i> Import
+            </button>
+            <input type="file" id="import-guru-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="window.handleImportTeachersXlsx(event)" />
+            <button type="button" onclick="window.handleExportTeachersXlsx()"
+              class="px-3 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Ekspor
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
+                <th class="py-3 px-3 w-12">No</th>
+                <th class="py-3 px-3">Nama & Jabatan</th>
+                <th class="py-3 px-3">Identitas / Password</th>
+                <th class="py-3 px-3">Mapel & Kelas Ampuan</th>
+                <th class="py-3 px-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-xs">
+              ${state.teachers.length === 0 ? `
+                <tr><td colspan="5" class="py-12 text-center text-slate-400">Belum ada akun guru terdaftar. Klik <strong>+ Tambah Data Guru</strong> atau <strong>Import</strong> Excel.</td></tr>
+              ` : state.teachers.map((t, idx) => {
+        const tMeta = decodeTeacherMeta(t);
+        const jabBadgeCls = tMeta.jabatan === 'Wali Kelas'
+          ? 'bg-emerald-100 text-emerald-700'
+          : 'bg-purple-100 text-purple-700';
+        return `
+                <tr class="hover:bg-slate-50/80 transition">
+                  <td class="py-3 px-3 font-bold text-slate-400">${idx + 1}</td>
+                  <td class="py-3 px-3">
+                    <div class="font-bold text-slate-900">${escapeHtml(t.full_name)}</div>
+                    <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${jabBadgeCls}">${escapeHtml(tMeta.jabatan)}</span>
+                  </td>
+                  <td class="py-3 px-3 font-mono">
+                    <div class="text-[10px] font-sans font-bold text-slate-400 uppercase">${escapeHtml(tMeta.idType)}</div>
+                    <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold">${escapeHtml(t.username)}</span>
+                    <div class="text-[11px] text-slate-400 mt-0.5">pw: ${escapeHtml(t.password)}</div>
+                  </td>
+                  <td class="py-3 px-3">
+                    <div class="font-semibold text-slate-800">${escapeHtml(t.subject)}</div>
+                    <div class="text-[11px] text-slate-500 font-semibold mt-0.5">${escapeHtml(tMeta.classAssigned)}</div>
+                  </td>
+                  <td class="py-3 px-3 text-right whitespace-nowrap">
+                    <div class="inline-flex items-center justify-end gap-1">
+                      <button type="button" onclick="window.handleEditTeacher('${t.id}')"
+                        class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit Guru">
+                        <i data-lucide="pencil" class="w-4 h-4"></i>
+                      </button>
+                      <button type="button" onclick="window.handleDeleteTeacher('${t.id}')"
+                        class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+      }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    }
+
+    function openTeacherFormModal(editingTeacher = null) {
+      if (state.subjects.length === 0) mergeSubjectsState();
 
       const editMeta = editingTeacher
         ? decodeTeacherMeta(editingTeacher)
@@ -4495,206 +4802,110 @@
         : TEACHER_CLASS_OPTIONS;
       const classAmpuanOptions = classPool.map(c => `<option value="${escapeHtml(c)}" ${c === editMeta.classAssigned ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
 
-      return `
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- Form Tambah / Edit Akun Guru -->
-        <div id="guru-form-card" class="lg:col-span-5 glass-surface rounded-3xl p-6 space-y-5 h-fit ${editingTeacher ? 'border-2 border-indigo-400/80 ring-2 ring-indigo-100' : ''}">
-          <div class="flex items-start justify-between gap-3">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-2xl ${editingTeacher ? 'bg-indigo-600 text-white shadow-sm' : 'bg-purple-100 text-purple-700'} flex items-center justify-center shrink-0">
-                <i data-lucide="${editingTeacher ? 'pencil' : 'user-cog'}" class="w-5 h-5"></i>
-              </div>
-              <div>
-                <div class="flex items-center gap-2">
-                  <h3 class="text-base font-extrabold text-slate-900">${editingTeacher ? 'Edit Akun Login Guru' : 'Kelola Akun Login Guru'}</h3>
-                  ${editingTeacher ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-700">Mode Edit</span>' : ''}
-                </div>
-                <p class="text-xs text-slate-500">${editingTeacher ? `Memperbarui data: ${escapeHtml(editingTeacher.full_name)}` : 'Nomor Identitas berfungsi sebagai ID login Guru'}</p>
-              </div>
-            </div>
+      const bodyHtml = `
+        <form onsubmit="window.handleSaveTeacher(event)" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap & Gelar Guru</label>
+            <input type="text" id="t-fullname" required placeholder="Contoh: Hendra Wijaya, S.Pd."
+              value="${escapeHtml(editingTeacher ? editingTeacher.full_name || '' : '')}"
+              class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
 
-          <form onsubmit="window.handleSaveTeacher(event)" class="space-y-3.5">
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap & Gelar Guru</label>
-              <input type="text" id="t-fullname" required placeholder="Contoh: Hendra Wijaya, S.Pd."
-                value="${escapeHtml(editingTeacher ? editingTeacher.full_name || '' : '')}"
+          <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-bold text-slate-700 mb-1">Jenis ID</label>
+              <select id="t-id-type" required
+                class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                ${idTypeOptions}
+              </select>
+            </div>
+            <div class="sm:col-span-3">
+              <label class="block text-xs font-bold text-slate-700 mb-1">Nomor Identitas</label>
+              <input type="text" id="t-id-number" inputmode="numeric" required placeholder="Hanya Angka"
+                value="${escapeHtml(editingTeacher ? editingTeacher.username || '' : '')}"
+                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                 class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
+          </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
-              <div class="sm:col-span-2">
-                <label class="block text-xs font-bold text-slate-700 mb-1">Jenis ID</label>
-                <select id="t-id-type" required
-                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  ${idTypeOptions}
-                </select>
-              </div>
-              <div class="sm:col-span-3">
-                <label class="block text-xs font-bold text-slate-700 mb-1">Nomor Identitas</label>
-                <input type="text" id="t-id-number" inputmode="numeric" required placeholder="Hanya Angka"
-                  value="${escapeHtml(editingTeacher ? editingTeacher.username || '' : '')}"
-                  oninput="this.value = this.value.replace(/[^0-9]/g, '')"
-                  class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Jabatan</label>
-                <select id="t-jabatan" required
-                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  ${jabatanOptions}
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Kelas Ampuan</label>
-                <select id="t-classes" required
-                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  ${classAmpuanOptions}
-                </select>
-              </div>
-            </div>
-
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Password Login</label>
-              <input type="text" id="t-password" required placeholder="123456"
-                value="${escapeHtml(editingTeacher ? editingTeacher.password || '' : '')}"
-                class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <label class="block text-xs font-bold text-slate-700 mb-1">Jabatan</label>
+              <select id="t-jabatan" required
+                class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                ${jabatanOptions}
+              </select>
             </div>
-
             <div>
-              <div class="flex items-center justify-between mb-1.5">
-                <label class="block text-xs font-bold text-slate-700">Mata Pelajaran yang Diampu</label>
-                <button type="button" onclick="window.navigateMenu('manajemen_mapel')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Kelola Mapel</button>
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto custom-scroll pr-1">
-                ${state.subjects.map(subj => `
-                  <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/40 cursor-pointer transition">
-                    <input type="checkbox" name="t-subject-chk" value="${escapeHtml(subj.name)}" ${editSubjectsSet.has(subj.name.toLowerCase()) ? 'checked' : ''}
-                      class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shrink-0" />
-                    <span class="text-xs font-semibold text-slate-700 truncate">${escapeHtml(subj.name)}</span>
-                  </label>
-                `).join('')}
-              </div>
-            </div>
-
-            <div class="${editingTeacher ? 'grid grid-cols-2 gap-2.5' : ''}">
-              ${editingTeacher ? `
-                <button type="button" onclick="window.handleCancelEditTeacher()"
-                  class="w-full py-3 px-4 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition">
-                  <i data-lucide="x" class="w-4 h-4"></i> Batal
-                </button>
-              ` : ''}
-              <button type="submit" class="w-full py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
-                <i data-lucide="${editingTeacher ? 'save' : 'user-plus'}" class="w-4 h-4"></i> ${editingTeacher ? 'Simpan Perubahan' : 'Tambah Akun Guru'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- Daftar Akun Guru Aktif + Template/Import/Ekspor Excel -->
-        <div class="lg:col-span-7 glass-surface rounded-3xl p-6 space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h3 class="text-base font-extrabold text-slate-900">Daftar Akun Guru Aktif (${state.teachers.length})</h3>
-              <p class="text-xs text-slate-500">Tabel tersinkron: <span class="font-semibold text-indigo-600">teachers</span></p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <button type="button" onclick="window.handleDownloadTeacherTemplate()"
-                class="px-3 py-2 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
-                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i> Template (.xlsx)
-              </button>
-              <button type="button" onclick="document.getElementById('import-guru-file').click()"
-                class="px-3 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 border border-indigo-200/80 transition">
-                <i data-lucide="upload" class="w-3.5 h-3.5"></i> Import
-              </button>
-              <input type="file" id="import-guru-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="window.handleImportTeachersXlsx(event)" />
-              <button type="button" onclick="window.handleExportTeachersXlsx()"
-                class="px-3 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
-                <i data-lucide="download" class="w-3.5 h-3.5"></i> Ekspor
-              </button>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Kelas Ampuan</label>
+              <select id="t-classes" required
+                class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                ${classAmpuanOptions}
+              </select>
             </div>
           </div>
 
-          <div class="overflow-x-auto custom-scroll">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
-                  <th class="py-3 px-3">Nama & Jabatan</th>
-                  <th class="py-3 px-3">Identitas / Password</th>
-                  <th class="py-3 px-3">Mapel & Kelas</th>
-                  <th class="py-3 px-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100 text-xs">
-                ${state.teachers.length === 0 ? `
-                  <tr><td colspan="4" class="py-10 text-center text-slate-400">Belum ada akun guru terdaftar. Tambah manual atau klik <strong>Import</strong> Excel.</td></tr>
-                ` : state.teachers.map(t => {
-        const tMeta = decodeTeacherMeta(t);
-        const jabBadgeCls = tMeta.jabatan === 'Wali Kelas'
-          ? 'bg-emerald-100 text-emerald-700'
-          : 'bg-purple-100 text-purple-700';
-        const isEditingRow = editingTeacher && editingTeacher.id === t.id;
-        return `
-                  <tr class="${isEditingRow ? 'bg-indigo-50/90 ring-1 ring-inset ring-indigo-300' : 'hover:bg-slate-50/80'} transition">
-                    <td class="py-3 px-3">
-                      <div class="font-bold text-slate-900">${escapeHtml(t.full_name)}</div>
-                      <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${jabBadgeCls}">${escapeHtml(tMeta.jabatan)}</span>
-                    </td>
-                    <td class="py-3 px-3 font-mono">
-                      <div class="text-[10px] font-sans font-bold text-slate-400 uppercase">${escapeHtml(tMeta.idType)}</div>
-                      <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold">${escapeHtml(t.username)}</span>
-                      <div class="text-[11px] text-slate-400 mt-0.5">pw: ${escapeHtml(t.password)}</div>
-                    </td>
-                    <td class="py-3 px-3">
-                      <div class="font-semibold text-slate-800">${escapeHtml(t.subject)}</div>
-                      <div class="text-[11px] text-slate-500 font-semibold mt-0.5">${escapeHtml(tMeta.classAssigned)}</div>
-                    </td>
-                    <td class="py-3 px-3 text-right whitespace-nowrap">
-                      <div class="inline-flex items-center justify-end gap-1">
-                        <button type="button" onclick="window.handleEditTeacher('${t.id}')"
-                          class="p-1.5 rounded-lg ${isEditingRow ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-indigo-50 text-slate-400 hover:text-indigo-600'} transition" title="Edit Guru">
-                          <i data-lucide="pencil" class="w-4 h-4"></i>
-                        </button>
-                        <button type="button" onclick="window.handleDeleteTeacher('${t.id}')"
-                          class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus">
-                          <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                `;
-      }).join('')}
-              </tbody>
-            </table>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Password Login</label>
+            <input type="text" id="t-password" required placeholder="123456"
+              value="${escapeHtml(editingTeacher ? editingTeacher.password || '' : '')}"
+              class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
-        </div>
 
-      </div>
-    `;
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-bold text-slate-700">Mata Pelajaran yang Diampu</label>
+              <button type="button" onclick="window.navigateMenu('manajemen_mapel')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Kelola Mapel</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto custom-scroll pr-1">
+              ${state.subjects.map(subj => `
+                <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/40 cursor-pointer transition">
+                  <input type="checkbox" name="t-subject-chk" value="${escapeHtml(subj.name)}" ${editSubjectsSet.has(subj.name.toLowerCase()) ? 'checked' : ''}
+                    class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shrink-0" />
+                  <span class="text-xs font-semibold text-slate-700 truncate">${escapeHtml(subj.name)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2.5 pt-2">
+            <button type="button" onclick="window.closeFormModal()"
+              class="px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0">
+              <i data-lucide="x" class="w-4 h-4"></i> Batal
+            </button>
+            <button type="submit" class="flex-1 py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+              <i data-lucide="${editingTeacher ? 'save' : 'user-plus'}" class="w-4 h-4"></i> ${editingTeacher ? 'Simpan Perubahan' : 'Simpan Data Guru'}
+            </button>
+          </div>
+        </form>
+      `;
+
+      openFormModal({
+        title: editingTeacher ? 'Edit Akun Login Guru' : 'Tambah Data Guru',
+        subtitle: editingTeacher ? `Memperbarui data: ${editingTeacher.full_name}` : 'Nomor Identitas berfungsi sebagai ID login Guru',
+        icon: editingTeacher ? 'pencil' : 'user-cog',
+        iconClass: editingTeacher ? 'bg-indigo-600 text-white shadow-sm' : 'bg-purple-100 text-purple-700',
+        badgeText: editingTeacher ? 'Mode Edit' : '',
+        maxWidthClass: 'max-w-2xl',
+        bodyHtml,
+        focusId: 't-fullname'
+      });
     }
 
+    window.handleOpenAddTeacherModal = function () {
+      state.editingTeacherId = null;
+      openTeacherFormModal(null);
+    };
+
     window.handleEditTeacher = function (teacherId) {
-      if (!state.teachers.some(t => t.id === teacherId)) return;
+      const target = state.teachers.find(t => t.id === teacherId);
+      if (!target) return;
       state.editingTeacherId = teacherId;
-      renderCurrentMenu();
-      requestAnimationFrame(() => {
-        const card = document.getElementById('guru-form-card');
-        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        const nameInput = document.getElementById('t-fullname');
-        if (nameInput) {
-          nameInput.focus();
-          const len = nameInput.value.length;
-          nameInput.setSelectionRange?.(len, len);
-        }
-      });
+      openTeacherFormModal(target);
     };
 
     window.handleCancelEditTeacher = function () {
-      state.editingTeacherId = null;
-      renderCurrentMenu();
+      closeFormModal({ resetEditState: true });
     };
 
     window.handleSaveTeacher = async function (e) {
@@ -4744,7 +4955,7 @@
       const prevCurrentUserCopy = (existingTarget && state.currentUser?.id === existingTarget.id) ? { ...state.currentUser } : null;
 
       const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
-      await saveRecordWithSync({
+      const savedOk = await saveRecordWithSync({
         submitterBtn,
         table: 'teachers',
         record: teacherRecord,
@@ -4802,6 +5013,9 @@
           }
         }
       });
+      if (savedOk) {
+        closeFormModal({ resetEditState: false });
+      }
     };
 
     window.handleDeleteTeacher = function (teacherId) {
