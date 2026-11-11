@@ -1580,8 +1580,17 @@
                   <!-- 3. Jabatan / Tugas -->
                   <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Jabatan / Tugas</label>
-                    <input type="text" id="acc-jabatan" placeholder="Cth: Wali Kelas 1 / Guru Mapel"
+                    <input type="text" id="acc-jabatan" list="datalist-jabatan-guru" placeholder="Cth: Wali Kelas 1 / Guru Mapel"
                            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:border-teal-600 focus:outline-none placeholder:text-slate-400" />
+                    <datalist id="datalist-jabatan-guru">
+                      <option value="Wali Kelas 1"></option>
+                      <option value="Wali Kelas 2"></option>
+                      <option value="Wali Kelas 3"></option>
+                      <option value="Wali Kelas 4"></option>
+                      <option value="Wali Kelas 5"></option>
+                      <option value="Wali Kelas 6"></option>
+                      <option value="Guru Mapel"></option>
+                    </datalist>
                   </div>
 
                   <!-- 4. Sandi Portal Guru -->
@@ -3162,9 +3171,9 @@
       if (currentUser.role === 'admin') {
         roleLabel = 'Administrator';
       } else if (currentUser.role === 'wali_kelas') {
-        roleLabel = `Wali Kelas (${currentUser.kelas || '-'})`;
+        roleLabel = `Wali Kelas (${getWaliAssignedClassLabel(currentUser)})`;
       } else if (currentUser.role === 'guru_mapel') {
-        const mStr = (currentUser.mapelDiampu && currentUser.mapelDiampu.length > 0) ? currentUser.mapelDiampu.slice(0, 2).join(', ') : (currentUser.kelas || 'Semua Kelas');
+        const mStr = (currentUser.mapelDiampu && currentUser.mapelDiampu.length > 0) ? currentUser.mapelDiampu.slice(0, 2).join(', ') : 'Kelas 1-6';
         roleLabel = `Guru Mapel (${mStr})`;
       } else {
         roleLabel = `Guru (${currentUser.kelas || '-'})`;
@@ -3177,6 +3186,15 @@
       // Terapkan pembatasan hak akses menu sesuai peran
       const safeMenu = (currentUser.role === 'admin' && ['paket', 'input'].includes(initialMenu)) ? 'dashboard' : (initialMenu || 'dashboard');
       applyRoleAccess();
+
+      if (withTransition) {
+        if (typeof window.resetSiswaForm === 'function') window.resetSiswaForm();
+        if (typeof window.resetStudentAnswerForm === 'function') window.resetStudentAnswerForm(true);
+        const aKelas = document.getElementById('analisis-filter-kelas');
+        if (aKelas) aKelas.value = '';
+        const fSiswa = document.getElementById('filter-siswa-kelas');
+        if (fSiswa) fSiswa.value = '';
+      }
 
       renderAllViews();
       navigateMenu(safeMenu);
@@ -3298,9 +3316,16 @@
         isImpersonated: true
       };
 
+      if (typeof window.resetSiswaForm === 'function') window.resetSiswaForm();
+      if (typeof window.resetStudentAnswerForm === 'function') window.resetStudentAnswerForm(true);
+      const aKelas = document.getElementById('analisis-filter-kelas');
+      if (aKelas) aKelas.value = '';
+      const fSiswa = document.getElementById('filter-siswa-kelas');
+      if (fSiswa) fSiswa.value = '';
+
       saveSessionState(currentUser, 'dashboard');
       applyUserSession('dashboard', false);
-      showToast(`Berhasil beralih ke akun ${teacher.nama} (${teacherRole === 'wali_kelas' ? 'Wali Kelas' : 'Guru Mapel'})!`, 'success');
+      showToast(`Berhasil beralih ke akun ${teacher.nama} (${teacherRole === 'wali_kelas' ? 'Wali Kelas ' + getWaliAssignedClassLabel(currentUser) : 'Guru Mapel (Kelas 1-6)'})!`, 'success');
     };
 
     window.handleRevertToAdmin = function() {
@@ -3330,26 +3355,130 @@
       };
 
       saveSessionState(currentUser, 'peserta');
+      if (typeof window.resetSiswaForm === 'function') window.resetSiswaForm();
+      if (typeof window.resetStudentAnswerForm === 'function') window.resetStudentAnswerForm(true);
       applyUserSession('peserta', false);
       showToast('Kembali ke Akun Administrator Utama.', 'info');
     };
+
+    const DAFTAR_KELAS_MADRASAH = ['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6'];
+
+    function extractClassLevelNumber(str) {
+      const s = String(str || '').trim();
+      if (!s) return '';
+      const numMatch = s.match(/\b([1-9]|1[0-2])\b/) || s.match(/\d+/);
+      if (numMatch) return String(parseInt(numMatch[1] || numMatch[0], 10));
+      const romanMap = { XII: '12', XI: '11', X: '10', IX: '9', VIII: '8', VII: '7', VI: '6', V: '5', IV: '4', III: '3', II: '2', I: '1' };
+      const romMatch = s.toUpperCase().match(/\b(XII|XI|X|IX|VIII|VII|VI|IV|V|III|II|I)\b/);
+      if (romMatch) return romanMap[romMatch[1]] || '';
+      return '';
+    }
+
+    function extractClassSection(str) {
+      const s = String(str || '').trim().toUpperCase();
+      if (!s) return '';
+      const secMatch = s.match(/(?:KELAS\s*)?(?:\d+|XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)\s*[-\s]\s*([A-Z])\b/)
+        || s.match(/\b(?:\d+|XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X)([A-Z])\b/);
+      return secMatch ? secMatch[1] : '';
+    }
+
+    function getWaliAssignedClassLabel(user) {
+      const raw = String(user?.kelas || user?.jabatan || '').trim();
+      const num = extractClassLevelNumber(raw);
+      const sec = extractClassSection(raw);
+      if (num) {
+        return sec ? `Kelas ${num}-${sec}` : `Kelas ${num}`;
+      }
+      const cleaned = raw.replace(/^wali\s*kelas\s*/i, '').trim();
+      return cleaned || 'Kelas 1';
+    }
+
+    function getTeacherAvailableClasses(user, options = {}) {
+      const includeStudentSubclasses = options.includeStudentSubclasses !== false;
+      const sortClasses = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => {
+        const na = parseInt(extractClassLevelNumber(a) || '99', 10);
+        const nb = parseInt(extractClassLevelNumber(b) || '99', 10);
+        return na - nb || a.localeCompare(b);
+      });
+
+      const normalizeCleanLabel = (c) => {
+        const str = String(c || '').trim();
+        if (!str) return '';
+        const lower = str.toLowerCase();
+        if (lower.includes('ganjil') || lower.includes('genap') || lower.includes('/') || lower.includes('semester')) return '';
+        const num = extractClassLevelNumber(str);
+        const sec = extractClassSection(str);
+        if (num && Number(num) >= 1 && Number(num) <= 6) {
+          return sec ? `Kelas ${num}-${sec}` : `Kelas ${num}`;
+        }
+        return /^kelas\b/i.test(str) ? str : `Kelas ${str}`;
+      };
+
+      if (user && user.role === 'wali_kelas') {
+        const assignedLabel = getWaliAssignedClassLabel(user);
+        if (includeStudentSubclasses) {
+          const matchedFromStudents = sortClasses(
+            (masterSiswaList || [])
+              .map(s => normalizeCleanLabel(s.kelas))
+              .filter(c => c && isClassMatch(c, user))
+          );
+          if (matchedFromStudents.length > 0) return matchedFromStudents;
+        }
+        return [assignedLabel];
+      }
+
+      // Guru Mapel (dan Admin): tampilkan seluruh Kelas 1-6 + rombel siswa jika ada
+      const merged = [...DAFTAR_KELAS_MADRASAH];
+      if (includeStudentSubclasses) {
+        (masterSiswaList || []).forEach(s => {
+          const norm = normalizeCleanLabel(s.kelas);
+          if (norm) merged.push(norm);
+        });
+      }
+      return sortClasses(merged);
+    }
+
+    function lockClassControl(el, isLocked) {
+      if (!el) return;
+      const isSelect = el.tagName === 'SELECT';
+      if (isSelect) {
+        el.disabled = Boolean(isLocked);
+      } else {
+        el.readOnly = Boolean(isLocked);
+      }
+      if (isLocked) {
+        el.classList.remove('bg-white', 'cursor-pointer');
+        el.classList.add('bg-slate-100', 'text-slate-600', 'cursor-not-allowed', 'border-slate-300');
+        el.title = 'Terkunci sesuai kelas yang diampu Wali Kelas';
+      } else {
+        el.classList.remove('bg-slate-100', 'text-slate-600', 'cursor-not-allowed', 'border-slate-300');
+        el.classList.add('bg-white');
+        if (isSelect) el.classList.add('cursor-pointer');
+        el.title = '';
+      }
+    }
 
     // Helper: Pencocokan Kelas untuk Wali Kelas
     function isClassMatch(targetClass, user) {
       if (!user || user.role === 'admin' || user.role === 'guru_mapel') return true;
       if (user.role === 'wali_kelas') {
-        const userKl = (user.kelas || user.jabatan || '').toLowerCase().trim();
-        const targetKl = (targetClass || '').toLowerCase().trim();
-        if (!targetKl) return false;
+        const userRaw = String(user.kelas || user.jabatan || '').trim();
+        const targetRaw = String(targetClass || '').trim();
+        if (!targetRaw) return false;
 
-        if (userKl.includes(targetKl) || targetKl.includes(userKl)) return true;
-
-        const userDigit = userKl.match(/\b([1-9]|1[0-2])\b/)?.[1] || userKl.match(/\d+/)?.[0];
-        const targetDigit = targetKl.match(/\b([1-9]|1[0-2])\b/)?.[1] || targetKl.match(/\d+/)?.[0];
+        const userDigit = extractClassLevelNumber(userRaw);
+        const targetDigit = extractClassLevelNumber(targetRaw);
         if (userDigit && targetDigit) {
-          return userDigit === targetDigit;
+          if (userDigit !== targetDigit) return false;
+          const userSec = extractClassSection(userRaw);
+          const targetSec = extractClassSection(targetRaw);
+          if (userSec && targetSec) return userSec === targetSec;
+          return true;
         }
-        return false;
+
+        const userKl = userRaw.toLowerCase();
+        const targetKl = targetRaw.toLowerCase();
+        return userKl.includes(targetKl) || targetKl.includes(userKl);
       }
       return true;
     }
@@ -3562,6 +3691,25 @@
       if (aSelect) aSelect.value = newExamId;
       if (rSelect) rSelect.value = newExamId;
       if (iSelect) iSelect.value = newExamId;
+      // Sinkronkan filter Master Paket Ujian bila paket baru berbeda kelas/jenis
+      const chosenExam = (paketUjianList || []).find(p => p.id === newExamId);
+      if (chosenExam) {
+        const selK = document.getElementById('paket-filter-kelas');
+        if (selK && chosenExam.kelas) {
+          const matchedOpt = Array.from(selK.options).find(o => o.value === chosenExam.kelas || isClassMatch(chosenExam.kelas, { role: 'wali_kelas', kelas: o.value }));
+          if (matchedOpt) selK.value = matchedOpt.value;
+        }
+        const selJ = document.getElementById('paket-filter-jenis');
+        if (selJ && chosenExam.judulUjian) {
+          const titleLow = chosenExam.judulUjian.toLowerCase();
+          const matchedJenis = Array.from(selJ.options).find(o => {
+            const code = (o.value.match(/\(([^)]+)\)/)?.[1] || o.value).toLowerCase();
+            return titleLow.includes(code) || titleLow.includes(o.value.toLowerCase());
+          });
+          if (matchedJenis) selJ.value = matchedJenis.value;
+        }
+      }
+
       renderAllViews();
       showToast('Paket ujian aktif berhasil diganti.', 'info');
     };
@@ -3573,10 +3721,11 @@
       const exam = getActiveExam();
       if (!exam) return [];
 
-      // Always use all students in that exam for valid psychometric item analysis
-      const allStudents = (jawabanSiswaList || [])
-        .filter(j => j.ujianId === exam.id)
-        .map(s => evaluateStudentRecord(s, exam));
+      // Gunakan siswa sesuai hak akses (untuk Wali Kelas, batasi ke kelas yang diampu)
+      const sourceRecords = (currentUser && currentUser.role === 'wali_kelas')
+        ? getActiveExamStudents()
+        : (jawabanSiswaList || []).filter(j => j.ujianId === exam.id);
+      const allStudents = sourceRecords.map(s => evaluateStudentRecord(s, exam));
 
       const N = allStudents.length;
       // Sort descending by totalSkorPerolehan for Upper & Lower Group calculation
@@ -3982,13 +4131,18 @@
     }
 
     function getOrCreateExamForMapel(mapelName, jenisAsesmen, tingkatKelas) {
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
       const jenis = jenisAsesmen || document.getElementById('paket-filter-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
-      const kelas = tingkatKelas || document.getElementById('paket-filter-kelas')?.value || (currentUser?.kelas || 'Kelas 6');
+      const kelas = isWali
+        ? getWaliAssignedClassLabel(currentUser)
+        : (tingkatKelas || document.getElementById('paket-filter-kelas')?.value || 'Kelas 6');
       const jenisKey = (jenis.match(/\(([^)]+)\)/)?.[1] || jenis).toLowerCase();
 
       let exam = (paketUjianList || []).find(p => {
         const matchMapel = (p.mapel || '').toLowerCase().trim() === mapelName.toLowerCase().trim();
-        const matchKelas = (p.kelas || '').toLowerCase().trim() === kelas.toLowerCase().trim();
+        const matchKelas = isWali
+          ? isClassMatch(p.kelas, currentUser)
+          : (p.kelas || '').toLowerCase().trim() === kelas.toLowerCase().trim();
         const titleLower = (p.judulUjian || '').toLowerCase();
         const matchJenis = titleLower.includes(jenisKey) || titleLower.includes(jenis.toLowerCase());
         return matchMapel && matchKelas && matchJenis;
@@ -4021,14 +4175,17 @@
     }
 
     window.handlePaketFilterChange = function() {
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
       const jenis = document.getElementById('paket-filter-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
-      const kelas = document.getElementById('paket-filter-kelas')?.value || 'Kelas 6';
+      const kelas = isWali
+        ? getWaliAssignedClassLabel(currentUser)
+        : (document.getElementById('paket-filter-kelas')?.value || 'Kelas 6');
       const jenisKey = (jenis.match(/\(([^)]+)\)/)?.[1] || jenis).toLowerCase();
       // Sinkronkan activeExamId jika ada yang cocok dengan filter baru
       const allowed = getTeacherAllowedMapels();
       const matched = (paketUjianList || []).find(p =>
         allowed.some(m => m.toLowerCase() === (p.mapel || '').toLowerCase()) &&
-        (p.kelas || '').toLowerCase() === kelas.toLowerCase() &&
+        (isWali ? isClassMatch(p.kelas, currentUser) : (p.kelas || '').toLowerCase() === kelas.toLowerCase()) &&
         ((p.judulUjian || '').toLowerCase().includes(jenisKey) || (p.judulUjian || '').toLowerCase().includes(jenis.toLowerCase()))
       );
       if (matched) {
@@ -4131,53 +4288,52 @@
 
       const currentJenis = document.getElementById('paket-filter-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
 
-      // Filter Tingkat Kelas: Wali Kelas hanya melihat kelas yang diampu, Guru Mapel bisa pilih Kelas 1-6
+      // Filter Tingkat Kelas: Wali Kelas terkunci pada kelas yang dipimpin; Guru Mapel tampil Kelas 1-6
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
       const selK = document.getElementById('paket-filter-kelas');
-      let currentKelas = selK?.value || 'Kelas 6';
+      let currentKelas = isWali ? getWaliAssignedClassLabel(currentUser) : (selK?.value || 'Kelas 6');
       if (selK) {
-        const allKelasOpts = ['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6'];
-        let allowedKelasOpts = allKelasOpts;
-        if (currentUser && currentUser.role === 'wali_kelas') {
-          const matchedKelas = allKelasOpts.filter(k => isClassMatch(k, currentUser));
-          if (matchedKelas.length > 0) {
-            allowedKelasOpts = matchedKelas;
-          }
-        }
+        const allowedKelasOpts = isWali
+          ? [getWaliAssignedClassLabel(currentUser)]
+          : [...DAFTAR_KELAS_MADRASAH];
         const prevVal = selK.value;
         selK.innerHTML = allowedKelasOpts.map(k => `<option value="${k}">${k}</option>`).join('');
-        if (allowedKelasOpts.includes(prevVal)) {
-          selK.value = prevVal;
-        } else if (currentUser && currentUser.role === 'guru_mapel') {
-          selK.value = allowedKelasOpts.includes('Kelas 6') ? 'Kelas 6' : allowedKelasOpts[0];
-        } else {
+        if (isWali) {
           selK.value = allowedKelasOpts[0];
+        } else if (allowedKelasOpts.includes(prevVal)) {
+          selK.value = prevVal;
+        } else {
+          selK.value = allowedKelasOpts.includes('Kelas 6') ? 'Kelas 6' : allowedKelasOpts[0];
         }
+        lockClassControl(selK, isWali);
         currentKelas = selK.value;
       }
+      lockClassControl(document.getElementById('cfg-kelas'), isWali);
 
       const allowedMapels = getTeacherAllowedMapels();
 
       if (labelChecklist) {
-        labelChecklist.textContent = `Ceklist Mapel yang Diampu (${currentUser?.nama || 'Guru'}):`;
+        labelChecklist.textContent = isWali
+          ? `Ceklist Mapel yang Diampu (${currentUser?.nama || 'Wali Kelas'} • Terkunci: ${currentKelas}):`
+          : `Ceklist Mapel yang Diampu (${currentUser?.nama || 'Guru'} • Kelas 1-6):`;
       }
 
       const jenisKey = (currentJenis.match(/\(([^)]+)\)/)?.[1] || currentJenis).toLowerCase();
       const findExamByFilter = (m) => (paketUjianList || []).find(p => {
         const matchMapel = (p.mapel || '').toLowerCase().trim() === m.toLowerCase().trim();
-        const matchKelas = (p.kelas || '').toLowerCase().trim() === currentKelas.toLowerCase().trim();
+        const matchKelas = isWali
+          ? isClassMatch(p.kelas, currentUser)
+          : (p.kelas || '').toLowerCase().trim() === currentKelas.toLowerCase().trim();
         const titleLower = (p.judulUjian || '').toLowerCase();
         const matchJenis = titleLower.includes(jenisKey) || titleLower.includes(currentJenis.toLowerCase());
         return matchMapel && matchKelas && matchJenis;
       });
 
-      // Sinkronkan activeExamId jika ada paket yang cocok (tanpa auto-create agar ceklist tetap kendali guru)
-      let exam = getActiveExam();
-      if (!exam && allowedMapels.length > 0) {
-        const found = allowedMapels.map(m => findExamByFilter(m)).find(Boolean);
-        if (found) {
-          activeExamId = found.id;
-          exam = found;
-        }
+      // Sinkronkan paket yang tampil di editor dengan filter kelas/jenis aktif
+      const examsInCurrentFilter = allowedMapels.map(m => findExamByFilter(m)).filter(Boolean);
+      let exam = examsInCurrentFilter.find(p => p.id === activeExamId) || examsInCurrentFilter[0] || null;
+      if (exam && exam.id !== activeExamId) {
+        activeExamId = exam.id;
       }
 
       // Render Ceklist Mapel Pills
@@ -4186,7 +4342,12 @@
           const ex = findExamByFilter(m);
           const isCreated = Boolean(ex);
           const isSelected = ex && ex.id === activeExamId;
-          const countSiswa = ex ? (jawabanSiswaList || []).filter(j => j.ujianId === ex.id).length : 0;
+          const countSiswa = ex ? (jawabanSiswaList || []).filter(j => {
+            if (j.ujianId !== ex.id) return false;
+            if (!isWali) return true;
+            const ms = (masterSiswaList || []).find(s => String(s.nisn).trim() === String(j.nisn).trim());
+            return isClassMatch(ms ? ms.kelas : (j.kelas || ''), currentUser);
+          }).length : 0;
 
           return `
             <div onclick="handleToggleMapelPill('${m}', ${isCreated ? `'${ex.id}'` : 'null'})"
@@ -4352,7 +4513,10 @@
 
       exam.judulUjian = document.getElementById('cfg-judul').value.trim();
       exam.mapel = document.getElementById('cfg-mapel').value.trim();
-      exam.kelas = document.getElementById('cfg-kelas').value.trim();
+      const rawCfgKelas = document.getElementById('cfg-kelas').value.trim();
+      exam.kelas = (currentUser && currentUser.role === 'wali_kelas')
+        ? getWaliAssignedClassLabel(currentUser)
+        : rawCfgKelas;
       exam.kkm = Number(document.getElementById('cfg-kkm').value) || 75;
       exam.guruMapel = document.getElementById('cfg-guru').value.trim();
       exam.waliKelas = document.getElementById('cfg-wali').value.trim();
@@ -4409,20 +4573,20 @@
       modal.classList.remove('hidden');
       modal.classList.add('flex');
 
-      // Pre-fill otomatis sesuai hak akses guru aktif
-      if (currentUser) {
-        const inputKelas = document.getElementById('new-exam-kelas');
-        const inputMapel = document.getElementById('new-exam-mapel');
-        if (currentUser.role === 'wali_kelas') {
-          if (inputKelas && (currentUser.kelas || currentUser.jabatan)) {
-            inputKelas.value = currentUser.kelas || currentUser.jabatan;
-          }
-        }
-        if (currentUser.role === 'guru_mapel') {
-          const mapels = Array.isArray(currentUser.mapelDiampu) ? currentUser.mapelDiampu : (currentUser.mapelDiampu ? String(currentUser.mapelDiampu).split(',') : []);
-          if (inputMapel && mapels.length > 0) {
-            inputMapel.value = mapels[0].trim();
-          }
+      const inputKelas = document.getElementById('new-exam-kelas');
+      const inputMapel = document.getElementById('new-exam-mapel');
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
+      if (inputKelas) {
+        const classOpts = getTeacherAvailableClasses(currentUser, { includeStudentSubclasses: false });
+        inputKelas.innerHTML = classOpts.map(k => `<option value="${k}">${k}</option>`).join('');
+        inputKelas.value = isWali ? classOpts[0] : (document.getElementById('paket-filter-kelas')?.value || 'Kelas 6');
+        lockClassControl(inputKelas, isWali);
+      }
+
+      if (currentUser && currentUser.role === 'guru_mapel') {
+        const mapels = Array.isArray(currentUser.mapelDiampu) ? currentUser.mapelDiampu : (currentUser.mapelDiampu ? String(currentUser.mapelDiampu).split(',') : []);
+        if (inputMapel && mapels.length > 0) {
+          inputMapel.value = mapels[0].trim();
         }
       }
       syncNewExamTitle();
@@ -4442,7 +4606,10 @@
       const jenis = (document.getElementById('new-exam-jenis')?.value || 'Sumatif Akhir Semester (SAS)').trim();
       const judulInput = (document.getElementById('new-exam-judul')?.value || '').trim();
       const judul = judulInput || `${mapel} - ${jenis}`;
-      const kelas = (document.getElementById('new-exam-kelas')?.value || 'Kelas 6').trim();
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
+      const kelas = isWali
+        ? getWaliAssignedClassLabel(currentUser)
+        : (document.getElementById('new-exam-kelas')?.value || 'Kelas 6').trim();
 
       const newExam = {
         id: newId,
@@ -4478,6 +4645,15 @@
       if (!modal) return;
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+
+      const genKelasSel = document.getElementById('gen-batch-kelas');
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
+      if (genKelasSel) {
+        const classOpts = getTeacherAvailableClasses(currentUser, { includeStudentSubclasses: false });
+        genKelasSel.innerHTML = classOpts.map(k => `<option value="${k}">${k}</option>`).join('');
+        genKelasSel.value = isWali ? classOpts[0] : (document.getElementById('paket-filter-kelas')?.value || 'Kelas 6');
+        lockClassControl(genKelasSel, isWali);
+      }
     };
 
     window.closeModalGenerate13Mapel = function() {
@@ -4490,7 +4666,10 @@
     window.handleGenerate13MapelSubmit = async function(e) {
       e.preventDefault();
       const jenis = document.getElementById('gen-batch-jenis')?.value || 'Sumatif Akhir Semester (SAS)';
-      const kelas = document.getElementById('gen-batch-kelas')?.value || 'Kelas 6';
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
+      const kelas = isWali
+        ? getWaliAssignedClassLabel(currentUser)
+        : (document.getElementById('gen-batch-kelas')?.value || 'Kelas 6');
       const kkm = Number(document.getElementById('gen-batch-kkm')?.value) || 75;
 
       const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -4615,19 +4794,17 @@
     window.syncAnsSelectKelasOptions = function(preferredKelas) {
       const selectKelas = document.getElementById('ans-select-kelas');
       if (!selectKelas) return;
-      let distinctClasses = [...new Set((masterSiswaList || []).map(s => s.kelas).filter(Boolean))].sort();
-
-      if (currentUser && currentUser.role === 'wali_kelas') {
-        distinctClasses = distinctClasses.filter(k => isClassMatch(k, currentUser));
-      }
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
+      const distinctClasses = getTeacherAvailableClasses(currentUser, { includeStudentSubclasses: true });
 
       const currentVal = selectKelas.value || '';
       let toSelect = preferredKelas !== undefined ? preferredKelas : currentVal;
 
       const exam = getActiveExam();
       if (!toSelect && exam && exam.kelas) {
-        const examKl = exam.kelas.toLowerCase();
-        const matched = distinctClasses.find(k => examKl.includes(k.toLowerCase()) || k.toLowerCase().includes(examKl));
+        const matched = distinctClasses.find(k =>
+          k === exam.kelas || isClassMatch(exam.kelas, { role: 'wali_kelas', kelas: k })
+        );
         if (matched) toSelect = matched;
       }
       if (!toSelect && distinctClasses.length > 0) {
@@ -4635,7 +4812,7 @@
       }
 
       let html = '';
-      if (!currentUser || currentUser.role !== 'wali_kelas') {
+      if (!isWali) {
         html += '<option value="">Semua Kelas</option>';
       }
       distinctClasses.forEach(k => {
@@ -4645,11 +4822,14 @@
 
       if (toSelect && distinctClasses.includes(toSelect)) {
         selectKelas.value = toSelect;
-      } else if (distinctClasses.length > 0) {
-        selectKelas.value = distinctClasses[0];
+      } else if (toSelect) {
+        const levelMatched = distinctClasses.find(k => isClassMatch(toSelect, { role: 'wali_kelas', kelas: k }));
+        selectKelas.value = levelMatched || distinctClasses[0] || '';
       } else {
-        selectKelas.value = '';
+        selectKelas.value = distinctClasses[0] || '';
       }
+
+      lockClassControl(selectKelas, isWali && distinctClasses.length <= 1);
     };
 
     window.syncAnsSelectSiswaOptions = function(selectedNisn) {
@@ -4675,7 +4855,9 @@
         students = students.filter(s => isClassMatch(s.kelas, currentUser));
       }
       if (kelasVal) {
-        students = students.filter(s => s.kelas === kelasVal);
+        students = students.filter(s =>
+          s.kelas === kelasVal || isClassMatch(s.kelas, { role: 'wali_kelas', kelas: kelasVal })
+        );
       }
       students = [...students].sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
 
@@ -4792,7 +4974,14 @@
       const exam = getActiveExam();
 
       window.syncAnsSelectKelasOptions();
-      const currentSelectedNisn = document.getElementById('ans-nisn')?.value || '';
+      let currentSelectedNisn = document.getElementById('ans-nisn')?.value || '';
+      if (currentSelectedNisn && currentUser && currentUser.role === 'wali_kelas') {
+        const curStudent = (masterSiswaList || []).find(x => String(x.nisn).trim() === String(currentSelectedNisn).trim());
+        if (curStudent && !isClassMatch(curStudent.kelas, currentUser)) {
+          window.resetStudentAnswerForm(false);
+          currentSelectedNisn = '';
+        }
+      }
       window.syncAnsSelectSiswaOptions(currentSelectedNisn);
 
       if (!exam) {
@@ -4926,6 +5115,14 @@
       const isianRaw = document.getElementById('ans-isian-input').value;
       const uraianRaw = document.getElementById('ans-uraian-input').value;
 
+      const studentObj = (masterSiswaList || []).find(s => String(s.nisn).trim() === nisn);
+      const selectedKelasUi = document.getElementById('ans-select-kelas')?.value || '';
+      const studentClassVal = studentObj?.kelas || selectedKelasUi || exam.kelas;
+      if (currentUser && currentUser.role === 'wali_kelas' && !isClassMatch(studentClassVal, currentUser)) {
+        showToast('Wali Kelas hanya dapat menyimpan jawaban untuk siswa di kelas yang diampu.', 'error');
+        return;
+      }
+
       const existingIdx = jawabanSiswaList.findIndex(
         j => j.id === editId || (j.ujianId === exam.id && j.nisn === nisn)
       );
@@ -4936,7 +5133,7 @@
         ujianId: exam.id,
         nisn,
         namaSiswa,
-        kelas: exam.kelas,
+        kelas: studentClassVal,
         pgRaw,
         bsRaw,
         isianRaw,
@@ -4957,7 +5154,7 @@
           id: 'sis_' + Date.now(),
           nisn,
           nama: namaSiswa,
-          kelas: exam.kelas,
+          kelas: studentClassVal,
           jk: 'L'
         };
         masterSiswaList.push(newSiswa);
@@ -4979,7 +5176,11 @@
       document.getElementById('ans-nama').value = '';
       if (resetClass) {
         const selectKelas = document.getElementById('ans-select-kelas');
-        if (selectKelas) selectKelas.value = '';
+        if (currentUser && currentUser.role === 'wali_kelas') {
+          window.syncAnsSelectKelasOptions();
+        } else if (selectKelas) {
+          selectKelas.value = '';
+        }
         window.syncAnsSelectSiswaOptions('');
       } else {
         const selectSiswa = document.getElementById('ans-select-siswa');
@@ -5008,7 +5209,9 @@
 
       const selectKelas = document.getElementById('ans-select-kelas');
       if (selectKelas && studentClass) {
-        selectKelas.value = studentClass;
+        const exactOpt = Array.from(selectKelas.options).find(o => o.value === studentClass);
+        const levelOpt = exactOpt || Array.from(selectKelas.options).find(o => o.value && isClassMatch(studentClass, { role: 'wali_kelas', kelas: o.value }));
+        if (levelOpt) selectKelas.value = levelOpt.value;
       }
       window.syncAnsSelectSiswaOptions(rec.nisn);
 
@@ -5147,51 +5350,37 @@
       const selectKelas = document.getElementById('analisis-filter-kelas');
       if (selectKelas) {
         const curKelasVal = selectKelas.value || '';
+        const isWali = currentUser && currentUser.role === 'wali_kelas';
+        const isAdmin = currentUser && currentUser.role === 'admin';
 
-        let rawClasses = [...new Set([
-          ...(masterSiswaList || []).map(s => s.kelas),
-          ...getActiveExamStudents().map(s => {
+        // Gabungkan kelas dasar sesuai peran dengan kelas bersih dari jawaban ujian aktif
+        const baseClasses = getTeacherAvailableClasses(currentUser, { includeStudentSubclasses: true });
+        const examStudentClasses = [];
+        if (!isWali) {
+          getActiveExamStudents().forEach(s => {
             const ms = (masterSiswaList || []).find(m => String(m.nisn).trim() === String(s.nisn).trim());
-            return ms ? ms.kelas : s.kelas;
-          })
-        ].filter(Boolean))];
-
-        // Format dan bersihkan kelas: buang semester 'Ganjil', 'Genap', '/', 'Semester', dll
-        let distinctClasses = rawClasses
-          .map(c => String(c).trim())
-          .filter(c => {
-            const lower = c.toLowerCase();
-            return !lower.includes('ganjil') && !lower.includes('genap') && !lower.includes('/') && !lower.includes('semester');
+            const rawC = String(ms ? ms.kelas : (s.kelas || '')).trim();
+            if (!rawC) return;
+            const low = rawC.toLowerCase();
+            if (low.includes('ganjil') || low.includes('genap') || low.includes('/') || low.includes('semester')) return;
+            const num = extractClassLevelNumber(rawC);
+            const sec = extractClassSection(rawC);
+            const norm = (num && Number(num) >= 1 && Number(num) <= 6)
+              ? (sec ? `Kelas ${num}-${sec}` : `Kelas ${num}`)
+              : (/^kelas\b/i.test(rawC) ? rawC : `Kelas ${rawC}`);
+            examStudentClasses.push(norm);
           });
+        }
 
-        // Format nama kelas agar tidak ada duplikasi 'Kelas Kelas 1'
-        const formatClassLabel = (c) => {
-          if (!c) return '';
-          const str = String(c).trim();
-          return /^kelas\b/i.test(str) ? str : `Kelas ${str}`;
-        };
-
-        // Buang duplikasi setelah diformat (misal '1' dan 'Kelas 1' menjadi satu 'Kelas 1')
-        distinctClasses = [...new Set(distinctClasses.map(c => formatClassLabel(c)))].sort((a, b) => {
-          const numA = parseInt(a.replace(/\D/g, '') || '0', 10);
-          const numB = parseInt(b.replace(/\D/g, '') || '0', 10);
+        const distinctClasses = [...new Set([...baseClasses, ...examStudentClasses])].sort((a, b) => {
+          const numA = parseInt(extractClassLevelNumber(a) || '99', 10);
+          const numB = parseInt(extractClassLevelNumber(b) || '99', 10);
           return numA - numB || a.localeCompare(b);
         });
 
-        // Jika master siswa belum ada kelas, default kelas 1 - 6
-        if (distinctClasses.length === 0) {
-          distinctClasses = ['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6'];
-        }
-
-        if (currentUser && currentUser.role === 'wali_kelas') {
-          distinctClasses = distinctClasses.filter(c => isClassMatch(c, currentUser));
-        }
-
-        const isAdmin = currentUser && currentUser.role === 'admin';
-
-        // PENTING: Untuk user admin hilangkan opsi 'Semua Kelas' (tampilkan per kelas langsung).
-        // Begitu juga untuk wali kelas (hanya kelas yang diampu).
-        let optHtml = (isAdmin || (currentUser && currentUser.role === 'wali_kelas'))
+        // Admin (sesuai aturan tanpa Semua Kelas) & Wali Kelas (terkunci kelas diampu) tidak tampil 'Semua Kelas'.
+        // Guru Mapel tampil 'Semua Kelas' + Kelas 1-6 secara penuh.
+        let optHtml = (isAdmin || isWali)
           ? ''
           : '<option value="ALL">Semua Kelas</option>';
 
@@ -5200,14 +5389,21 @@
         });
         selectKelas.innerHTML = optHtml;
 
-        // Jika pada admin atau wali kelas, jika curKelasVal kosong, 'ALL', atau tidak ada di list, otomatis pilih kelas pertama
-        if (isAdmin || (currentUser && currentUser.role === 'wali_kelas')) {
+        if (isAdmin || isWali) {
           if (!curKelasVal || curKelasVal === 'ALL' || !distinctClasses.includes(curKelasVal)) {
             selectKelas.value = distinctClasses[0] || '';
           } else {
             selectKelas.value = curKelasVal;
           }
+        } else {
+          if (curKelasVal && (curKelasVal === 'ALL' || distinctClasses.includes(curKelasVal))) {
+            selectKelas.value = curKelasVal;
+          } else {
+            selectKelas.value = 'ALL';
+          }
         }
+
+        lockClassControl(selectKelas, isWali && distinctClasses.length <= 1);
       }
 
       const filterKelas = selectKelas ? selectKelas.value : '';
@@ -5484,25 +5680,36 @@
     function renderSiswaView() {
       populateSiswaKelasFilter();
       renderSiswaTable();
+      const inpKelas = document.getElementById('siswa-kelas');
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
+      if (inpKelas) {
+        if (isWali && !document.getElementById('siswa-edit-id')?.value) {
+          inpKelas.value = getWaliAssignedClassLabel(currentUser);
+        }
+        lockClassControl(inpKelas, isWali);
+      }
     }
 
     function populateSiswaKelasFilter() {
       const select = document.getElementById('filter-siswa-kelas');
       if (!select) return;
       const curVal = select.value || 'ALL';
-      let distinctClasses = [...new Set((masterSiswaList || []).map(s => s.kelas).filter(Boolean))].sort();
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
 
-      if (currentUser && currentUser.role === 'wali_kelas') {
-        distinctClasses = distinctClasses.filter(c => isClassMatch(c, currentUser));
+      if (isWali) {
+        const distinctClasses = getTeacherAvailableClasses(currentUser, { includeStudentSubclasses: true });
         select.innerHTML = distinctClasses.map(c => `<option value="${c}">${c}</option>`).join('');
-        if (distinctClasses.length > 0 && (!curVal || curVal === 'ALL' || !distinctClasses.includes(curVal))) {
-          select.value = distinctClasses[0];
-        }
+        select.value = (curVal && curVal !== 'ALL' && distinctClasses.includes(curVal))
+          ? curVal
+          : (distinctClasses[0] || '');
+        lockClassControl(select, distinctClasses.length <= 1);
         return;
       }
 
+      const distinctClasses = [...new Set((masterSiswaList || []).map(s => s.kelas).filter(Boolean))].sort();
       select.innerHTML = '<option value="ALL">Semua Kelas</option>' +
         distinctClasses.map(c => `<option value="${c}" ${c === curVal ? 'selected' : ''}>${c}</option>`).join('');
+      lockClassControl(select, false);
     }
 
     let currentSiswaPage = 1;
@@ -5528,9 +5735,10 @@
         baseList = baseList.filter(s => isClassMatch(s.kelas, currentUser));
       }
 
+      const filterKelasVal = document.getElementById('filter-siswa-kelas')?.value || 'ALL';
       const filtered = baseList.filter(s => {
         const matchKey = (s.nama || '').toLowerCase().includes(keyword) || (s.nisn || '').toLowerCase().includes(keyword);
-        const matchKelas = filterKelas === 'ALL' || s.kelas === filterKelas;
+        const matchKelas = filterKelasVal === 'ALL' || s.kelas === filterKelasVal || isClassMatch(s.kelas, { role: 'wali_kelas', kelas: filterKelasVal });
         return matchKey && matchKelas;
       });
 
@@ -5664,7 +5872,16 @@
       const editId = document.getElementById('siswa-edit-id').value;
       const nisn = document.getElementById('siswa-nisn').value.trim();
       const nama = document.getElementById('siswa-nama').value.trim();
-      const kelas = document.getElementById('siswa-kelas').value.trim();
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
+      let kelas = document.getElementById('siswa-kelas').value.trim();
+      if (isWali) {
+        const assignedWaliClass = getWaliAssignedClassLabel(currentUser);
+        if (!kelas) kelas = assignedWaliClass;
+        if (!isClassMatch(kelas, currentUser)) {
+          showToast(`Wali Kelas hanya dapat mengelola data siswa ${assignedWaliClass}.`, 'error');
+          return;
+        }
+      }
       const jk = document.getElementById('siswa-jk').value;
 
       if (!nisn || !nama || !kelas) {
@@ -5692,10 +5909,17 @@
     window.editSiswa = function(id) {
       const s = masterSiswaList.find(x => x.id === id);
       if (!s) return;
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
+      if (isWali && !isClassMatch(s.kelas, currentUser)) {
+        showToast('Anda hanya dapat mengedit siswa di kelas yang Anda pimpin.', 'error');
+        return;
+      }
       document.getElementById('siswa-edit-id').value = s.id;
       document.getElementById('siswa-nisn').value = s.nisn;
       document.getElementById('siswa-nama').value = s.nama;
-      document.getElementById('siswa-kelas').value = s.kelas;
+      const inpKelas = document.getElementById('siswa-kelas');
+      inpKelas.value = s.kelas;
+      lockClassControl(inpKelas, isWali);
       document.getElementById('siswa-jk').value = s.jk || 'L';
       document.getElementById('siswa-form-title').textContent = `Edit Siswa: ${s.nama}`;
       document.getElementById('btn-save-siswa-label').textContent = 'Perbarui Data Siswa';
@@ -5706,8 +5930,11 @@
       document.getElementById('siswa-edit-id').value = '';
       document.getElementById('siswa-nisn').value = '';
       document.getElementById('siswa-nama').value = '';
-      const defaultKelas = (currentUser && currentUser.role === 'wali_kelas') ? (currentUser.kelas || currentUser.jabatan || '') : '';
-      document.getElementById('siswa-kelas').value = defaultKelas;
+      const isWali = currentUser && currentUser.role === 'wali_kelas';
+      const defaultKelas = isWali ? getWaliAssignedClassLabel(currentUser) : '';
+      const inpKelas = document.getElementById('siswa-kelas');
+      inpKelas.value = defaultKelas;
+      lockClassControl(inpKelas, isWali);
       document.getElementById('siswa-jk').value = 'L';
       document.getElementById('siswa-form-title').textContent = 'Tambah Siswa Baru';
       document.getElementById('btn-save-siswa-label').textContent = 'Simpan Data Siswa';
@@ -5841,7 +6068,10 @@
           }
 
           let importedCount = 0;
+          let skippedOtherClass = 0;
           const updatedSiswa = [];
+          const isWali = currentUser && currentUser.role === 'wali_kelas';
+          const defaultImportKelas = isWali ? getWaliAssignedClassLabel(currentUser) : 'Kelas 6';
 
           for (let i = headerIdx + 1; i < rows.length; i++) {
             const row = rows[i];
@@ -5851,11 +6081,15 @@
             if (rawNisn.endsWith('.0')) rawNisn = rawNisn.slice(0, -2);
 
             const nama = String(namaCol >= 0 ? (row[namaCol] ?? '') : '').trim();
-            const kelas = String(kelasCol >= 0 ? (row[kelasCol] ?? 'Kelas VI') : 'Kelas VI').trim() || 'Kelas VI';
+            const kelas = String(kelasCol >= 0 ? (row[kelasCol] ?? defaultImportKelas) : defaultImportKelas).trim() || defaultImportKelas;
             let rawJk = String(jkCol >= 0 ? (row[jkCol] ?? 'L') : 'L').toUpperCase().trim();
             const jk = rawJk.startsWith('P') ? 'P' : 'L';
 
             if (!nama && !rawNisn) continue;
+            if (isWali && !isClassMatch(kelas, currentUser)) {
+              skippedOtherClass++;
+              continue;
+            }
 
             const finalNisn = rawNisn || ('0' + Math.floor(100000000 + Math.random() * 900000000));
             const existingIdx = masterSiswaList.findIndex(s => s.nisn === finalNisn || (s.nama.toLowerCase() === nama.toLowerCase() && s.kelas === kelas));
@@ -5872,7 +6106,7 @@
           }
 
           if (importedCount === 0) {
-            showToast('Tidak ada data siswa yang valid dalam file Excel.', 'warning');
+            showToast(skippedOtherClass > 0 ? `Tidak ada siswa ${defaultImportKelas} pada file Excel (${skippedOtherClass} baris kelas lain dilewati).` : 'Tidak ada data siswa yang valid dalam file Excel.', 'error');
             event.target.value = '';
             return;
           }
@@ -5880,9 +6114,9 @@
           // 1. Simpan langsung ke LocalStorage secara instan
           localStorage.setItem('smart_anabutir_siswa_v2', JSON.stringify(masterSiswaList));
 
-          // 2. Reset filter dan pencarian agar semua data langsung terlihat
+          // 2. Reset filter dan pencarian (khusus Wali Kelas tetap terkunci di kelasnya)
           const filterKelas = document.getElementById('filter-siswa-kelas');
-          if (filterKelas) filterKelas.value = 'ALL';
+          if (filterKelas && !isWali) filterKelas.value = 'ALL';
           const searchInput = document.getElementById('search-siswa');
           if (searchInput) searchInput.value = '';
 
@@ -5894,7 +6128,12 @@
           event.target.value = '';
 
           // 5. Berikan notifikasi sukses
-          showToast(`Berhasil mengimpor ${importedCount} data siswa dari Excel!`, 'success');
+          showToast(
+            skippedOtherClass > 0
+              ? `Berhasil mengimpor ${importedCount} siswa ${defaultImportKelas} (${skippedOtherClass} baris kelas lain dilewati).`
+              : `Berhasil mengimpor ${importedCount} data siswa dari Excel!`,
+            'success'
+          );
 
           // 6. Sinkronisasi latar belakang ke Cloud tanpa memblokir UI
           if (isCloudConnected && db && setDoc && doc) {
@@ -6036,6 +6275,12 @@
 
       if (!nama) {
         showToast('Mohon lengkapi Nama Lengkap & Gelar guru.', 'error');
+        return;
+      }
+
+      if (role === 'wali_kelas' && !extractClassLevelNumber(jabatan)) {
+        showToast('Untuk peran Wali Kelas, isi kolom Jabatan / Tugas dengan tingkat kelasnya (Contoh: Wali Kelas 1 s.d. Wali Kelas 6).', 'error');
+        document.getElementById('acc-jabatan')?.focus();
         return;
       }
 
