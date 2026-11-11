@@ -505,11 +505,16 @@
             </button>
 
             <div
-              class="hidden md:flex items-center gap-2 bg-slate-100/90 border border-slate-200/80 px-3.5 py-2 rounded-full">
-              <i data-lucide="book-open-check" class="w-4 h-4 text-indigo-600"></i>
-              <span class="text-xs font-semibold text-slate-500">Ulangan Aktif:</span>
+              class="hidden md:flex items-center gap-2 bg-slate-100/90 border border-slate-200/80 px-3 py-1.5 rounded-full">
+              <i data-lucide="book-open-check" class="w-4 h-4 text-indigo-600 shrink-0"></i>
+              <span class="text-xs font-semibold text-slate-500 shrink-0">Ulangan Aktif:</span>
+              <select id="global-exam-class-filter" onchange="window.handleHeaderClassFilterChange(this.value)"
+                class="hidden bg-white border border-slate-200/90 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 focus:outline-none cursor-pointer shrink-0"
+                title="Filter ulangan aktif berdasarkan kelas">
+                <option value="ALL">Semua Kelas</option>
+              </select>
               <select id="global-exam-selector" onchange="window.handleChangeActiveExam(this.value)"
-                class="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer pr-2">
+                class="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer pr-2 max-w-[200px] xl:max-w-[270px] truncate">
                 <!-- Populated dynamically -->
               </select>
             </div>
@@ -531,12 +536,18 @@
         <!-- Mobile Active Exam Selector Bar -->
         <div
           class="no-print md:hidden px-4 py-2 bg-indigo-50/90 border-b border-indigo-100 flex items-center justify-between gap-2">
-          <span class="text-[11px] font-bold text-indigo-800 flex items-center gap-1">
-            <i data-lucide="layers" class="w-3.5 h-3.5"></i> Paket Ulangan:
+          <span class="text-[11px] font-bold text-indigo-800 flex items-center gap-1 shrink-0">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i> Paket:
           </span>
-          <select id="mobile-exam-selector" onchange="window.handleChangeActiveExam(this.value)"
-            class="bg-white border border-indigo-200 rounded-full px-3 py-1 text-xs font-bold text-slate-800 focus:outline-none max-w-[220px] truncate">
-          </select>
+          <div class="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
+            <select id="mobile-exam-class-filter" onchange="window.handleHeaderClassFilterChange(this.value)"
+              class="hidden bg-white border border-indigo-200 rounded-full px-2.5 py-1 text-[11px] font-bold text-indigo-700 focus:outline-none shrink-0">
+              <option value="ALL">Semua</option>
+            </select>
+            <select id="mobile-exam-selector" onchange="window.handleChangeActiveExam(this.value)"
+              class="bg-white border border-indigo-200 rounded-full px-3 py-1 text-xs font-bold text-slate-800 focus:outline-none min-w-0 max-w-[210px] truncate">
+            </select>
+          </div>
         </div>
 
         <!-- Scrollable Dynamic Section Content -->
@@ -789,6 +800,10 @@
       hasSubjectsTable: null,
       hasStudentsTable: null,
       deletedSubjectNames: [],
+      headerExamClassFilter: 'ALL',
+      examClassFilter: 'ALL',
+      examSubjectFilter: 'ALL',
+      examSearchQuery: '',
       studentClassFilter: 'ALL',
       studentSearchQuery: '',
       pagination: {
@@ -1038,14 +1053,22 @@
         .filter(n => Number.isFinite(n) && n >= 0);
     }
 
+    function normalizeItemScoreWeight(rawScore) {
+      const n = Number(rawScore);
+      return Number.isFinite(n) && n > 0 ? Number(n.toFixed(2)) : 1;
+    }
+
     /** Encode jenis soal dan kunci jawaban ke kolom answer_key agar tetap kompatibel dengan skema Supabase. */
-    function encodeExamAnswerKey(qType, rawKey, expectedCount = null) {
+    function encodeExamAnswerKey(qType, rawKey, expectedCount = null, scorePerItem = 1) {
       const upperType = QUESTION_TYPES[qType] ? qType : 'PG';
+      const itemWeight = normalizeItemScoreWeight(scorePerItem);
       if (upperType === 'PG') {
-        return sanitizeAnswerInputValue('PG', rawKey);
+        const cleanKey = sanitizeAnswerInputValue('PG', rawKey);
+        return itemWeight !== 1 ? `PG@${itemWeight}:${cleanKey}` : cleanKey;
       }
       if (upperType === 'BS') {
-        return `BS:${sanitizeAnswerInputValue('BS', rawKey)}`;
+        const cleanKey = sanitizeAnswerInputValue('BS', rawKey);
+        return itemWeight !== 1 ? `BS@${itemWeight}:${cleanKey}` : `BS:${cleanKey}`;
       }
       const scores = parseNumericScores(rawKey, expectedCount);
       return `${upperType}:${scores.join(',')}`;
@@ -1056,12 +1079,14 @@
       if (!Array.isArray(sections) || sections.length === 0) return '';
       if (sections.length === 1) {
         const only = sections[0];
-        return encodeExamAnswerKey(only.questionType, only.rawKey, only.count);
+        return encodeExamAnswerKey(only.questionType, only.rawKey, only.count, only.scorePerItem);
       }
       const encodedParts = sections.map(sec => {
         const upperType = QUESTION_TYPES[sec.questionType] ? sec.questionType : 'PG';
         if (upperType === 'PG' || upperType === 'BS') {
-          return `${upperType}:${sanitizeAnswerInputValue(upperType, sec.rawKey)}`;
+          const itemWeight = normalizeItemScoreWeight(sec.scorePerItem);
+          const cleanKey = sanitizeAnswerInputValue(upperType, sec.rawKey);
+          return itemWeight !== 1 ? `${upperType}@${itemWeight}:${cleanKey}` : `${upperType}:${cleanKey}`;
         }
         const scores = parseNumericScores(sec.rawKey, sec.count);
         return `${upperType}(${scores.length}):${scores.join(',')}`;
@@ -1069,18 +1094,19 @@
       return `MULTI:${encodedParts.join('|')}`;
     }
 
-    function parseSingleSectionKey(qType, rawKey, declaredCount = null) {
+    function parseSingleSectionKey(qType, rawKey, declaredCount = null, scorePerItem = 1) {
       const typeKey = QUESTION_TYPES[String(qType || '').toUpperCase()] ? String(qType).toUpperCase() : 'PG';
       const typeMeta = QUESTION_TYPES[typeKey];
 
       if (isNumericQuestionType(typeKey)) {
         const keyScores = parseNumericScores(rawKey, declaredCount);
-        const maxTotalScore = keyScores.reduce((acc, v) => acc + v, 0);
+        const maxTotalScore = Number(keyScores.reduce((acc, v) => acc + v, 0).toFixed(2));
         const count = declaredCount || keyScores.length;
         return {
           questionType: typeKey,
           typeMeta,
           count,
+          scorePerItem: 1,
           rawKey: keyScores.join(','),
           keyItems: keyScores.map(String),
           keyScores,
@@ -1092,14 +1118,17 @@
       const cleanStr = sanitizeAnswerInputValue(typeKey, rawKey);
       const items = cleanStr.split('');
       const count = declaredCount || items.length;
+      const itemWeight = normalizeItemScoreWeight(scorePerItem);
+      const maxTotalScore = Number((count * itemWeight).toFixed(2));
       return {
         questionType: typeKey,
         typeMeta,
         count,
+        scorePerItem: itemWeight,
         rawKey: cleanStr,
         keyItems: items,
-        keyScores: Array.from({ length: count }, () => 1),
-        maxTotalScore: count,
+        keyScores: Array.from({ length: count }, () => itemWeight),
+        maxTotalScore,
         displayKey: cleanStr
       };
     }
@@ -1114,22 +1143,24 @@
       if (multiMatch) {
         const parts = multiMatch[1].split('|').map(p => p.trim()).filter(Boolean);
         parts.forEach(part => {
-          const secMatch = part.match(/^(PG|BS|ISIAN|URAIAN)(?:\((\d+)\))?:(.*)$/i);
+          const secMatch = part.match(/^(PG|BS|ISIAN|URAIAN)(?:\((\d+)\))?(?:@(\d+(?:\.\d+)?))?:(.*)$/i);
           if (secMatch) {
             const secType = secMatch[1].toUpperCase();
             const secCount = secMatch[2] ? Number(secMatch[2]) : null;
-            const secRaw = secMatch[3].trim();
-            sections.push(parseSingleSectionKey(secType, secRaw, secCount));
+            const secScore = secMatch[3] ? Number(secMatch[3]) : 1;
+            const secRaw = secMatch[4].trim();
+            sections.push(parseSingleSectionKey(secType, secRaw, secCount, secScore));
           }
         });
       }
 
       if (sections.length === 0) {
-        const singleMatch = rawField.match(/^(PG|BS|ISIAN|URAIAN)(?:\((\d+)\))?:(.*)$/i);
+        const singleMatch = rawField.match(/^(PG|BS|ISIAN|URAIAN)(?:\((\d+)\))?(?:@(\d+(?:\.\d+)?))?:(.*)$/i);
         const qType = singleMatch ? singleMatch[1].toUpperCase() : 'PG';
-        const rawKey = singleMatch ? singleMatch[3].trim() : rawField;
+        const secScore = singleMatch?.[3] ? Number(singleMatch[3]) : 1;
+        const rawKey = singleMatch ? singleMatch[4].trim() : rawField;
         const secCount = totalDeclared || (singleMatch?.[2] ? Number(singleMatch[2]) : null);
-        sections = [parseSingleSectionKey(qType, rawKey, secCount)];
+        sections = [parseSingleSectionKey(qType, rawKey, secCount, secScore)];
       }
 
       let cursor = 1;
@@ -1142,7 +1173,7 @@
           const keyVal = isNum
             ? String(sec.keyScores[i] ?? 0)
             : (sec.keyItems[i] || (sec.questionType === 'BS' ? 'B' : 'A'));
-          const maxScore = Number(sec.keyScores[i] ?? (isNum ? 0 : 1));
+          const maxScore = Number(sec.keyScores[i] ?? (isNum ? 0 : (sec.scorePerItem || 1)));
           items.push({
             globalIndex: items.length,
             number: cursor,
@@ -1160,6 +1191,8 @@
       const isMultiType = sections.length > 1;
       const primary = sections[0];
       const hasNumericSection = sections.some(s => isNumericQuestionType(s.questionType));
+      const hasWeightedObjective = sections.some(s => !isNumericQuestionType(s.questionType) && Number(s.scorePerItem || 1) !== 1);
+      const hasWeightedScore = hasNumericSection || hasWeightedObjective;
       const allNumeric = sections.every(s => isNumericQuestionType(s.questionType));
 
       return {
@@ -1169,13 +1202,15 @@
         questionType: primary.questionType,
         typeMeta: primary.typeMeta,
         hasNumericSection,
+        hasWeightedObjective,
+        hasWeightedScore,
         allNumeric,
         items,
         totalQuestions: items.length,
         rawKey: primary.rawKey,
         keyItems: items.map(it => it.keyVal),
         keyScores: items.map(it => it.maxScore),
-        maxTotalScore: sections.reduce((acc, s) => acc + s.maxTotalScore, 0),
+        maxTotalScore: Number(sections.reduce((acc, s) => acc + s.maxTotalScore, 0).toFixed(2)),
         displayKey: isMultiType
           ? sections.map(s => `${s.typeMeta.shortLabel}: ${s.displayKey}`).join(' | ')
           : primary.displayKey
@@ -1254,6 +1289,7 @@
       }
 
       const cleanStr = sanitizeAnswerInputValue(qType, rawSecAns);
+      const itemMax = normalizeItemScoreWeight(sec.scorePerItem);
       const itemResults = [];
       let correctCount = 0;
 
@@ -1271,12 +1307,15 @@
           sectionShort: sec.typeMeta.shortLabel,
           keyVal,
           studentVal: studentVal || '-',
-          earned: isCorrect ? 1 : 0,
-          max: 1,
+          earned: isCorrect ? itemMax : 0,
+          max: itemMax,
           isCorrect,
           isPartial: false
         });
       }
+
+      const earnedTotal = +(correctCount * itemMax).toFixed(2);
+      const maxTotal = +(numQ * itemMax).toFixed(2);
 
       return {
         questionType: qType,
@@ -1288,8 +1327,8 @@
         expectedCount: numQ,
         exceededItems: [],
         correctCount,
-        earnedTotal: correctCount,
-        maxTotal: numQ,
+        earnedTotal,
+        maxTotal,
         itemResults
       };
     }
@@ -2513,6 +2552,10 @@
         state.editingStudentId = null;
         state.editingTeacherId = null;
         state.editingExamId = null;
+        state.headerExamClassFilter = 'ALL';
+        state.examClassFilter = 'ALL';
+        state.examSubjectFilter = 'ALL';
+        state.examSearchQuery = '';
         state.supabaseAccessToken = null;
         clearSessionFromStorage();
 
@@ -2594,6 +2637,10 @@
       state.editingStudentId = null;
       state.editingTeacherId = null;
       state.editingExamId = null;
+      state.headerExamClassFilter = 'ALL';
+      state.examClassFilter = 'ALL';
+      state.examSubjectFilter = 'ALL';
+      state.examSearchQuery = '';
       saveSessionToStorage();
 
       await sleep(320);
@@ -2646,6 +2693,10 @@
       state.editingStudentId = null;
       state.editingTeacherId = null;
       state.editingExamId = null;
+      state.headerExamClassFilter = 'ALL';
+      state.examClassFilter = 'ALL';
+      state.examSubjectFilter = 'ALL';
+      state.examSearchQuery = '';
       saveSessionToStorage();
 
       await sleep(320);
@@ -2717,20 +2768,133 @@
       { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['admin', 'guru'] }
     ];
 
+    function sortClassNamesNatural(classList) {
+      const unique = Array.from(new Set(classList.map(c => String(c || '').trim()).filter(Boolean)));
+      return unique.sort((a, b) => {
+        const ia = GRADE_CLASS_OPTIONS.indexOf(a);
+        const ib = GRADE_CLASS_OPTIONS.indexOf(b);
+        if (ia !== -1 && ib !== -1) return ia - ib;
+        if (ia !== -1) return -1;
+        if (ib !== -1) return 1;
+        return a.localeCompare(b);
+      });
+    }
+
+    function sortExamsForDisplay(list) {
+      return (Array.isArray(list) ? list : [])
+        .map((ex, idx) => ({ ex, idx }))
+        .sort((a, b) => {
+          const dateCmp = String(b.ex?.exam_date || '').localeCompare(String(a.ex?.exam_date || ''));
+          if (dateCmp !== 0) return dateCmp;
+          return a.idx - b.idx;
+        })
+        .map(item => item.ex);
+    }
+
+    /** Kembalikan daftar paket ulangan sesuai hak akses user (Admin = semua; Guru = sesuai kelas & mapel ampuan atau miliknya). */
+    function getVisibleExams() {
+      const sorted = sortExamsForDisplay(state.exams || []);
+      const user = state.currentUser;
+      if (!user || user.role === 'admin') return sorted;
+
+      const userId = String(user.id || '').trim();
+      const teacherMeta = decodeTeacherMeta(user);
+      const teacherClasses = String(teacherMeta.classAssigned || '')
+        .split(',')
+        .map(c => c.trim().toLowerCase())
+        .filter(Boolean);
+      const isAllClassesTeacher = teacherClasses.length === 0 || teacherClasses.includes('semua kelas');
+      const teacherSubjectsLower = new Set(parseTeacherSubjects(user.subject).map(s => s.toLowerCase()));
+
+      return sorted.filter(ex => {
+        const examTeacherId = String(ex.teacher_id || '').trim();
+        if (examTeacherId && examTeacherId === userId) return true;
+        if (examTeacherId && examTeacherId !== userId) return false;
+
+        const examClassNorm = String(ex.class_name || '').trim().toLowerCase();
+        const examSubjNorm = String(ex.subject || '').trim().toLowerCase();
+        const classMatches = isAllClassesTeacher || teacherClasses.includes(examClassNorm);
+        const subjectMatches = teacherSubjectsLower.size > 0 && teacherSubjectsLower.has(examSubjNorm);
+        return classMatches && subjectMatches;
+      });
+    }
+
     function populateExamSelectors() {
       const desktopSelect = document.getElementById('global-exam-selector');
       const mobileSelect = document.getElementById('mobile-exam-selector');
-      if (!state.activeExamId && state.exams.length > 0) {
-        state.activeExamId = state.exams[0].id;
+      const desktopClassEl = document.getElementById('global-exam-class-filter');
+      const mobileClassEl = document.getElementById('mobile-exam-class-filter');
+
+      const visibleExams = getVisibleExams();
+      const availableClasses = sortClassNamesNatural(visibleExams.map(ex => ex.class_name));
+
+      if (state.headerExamClassFilter !== 'ALL' && !availableClasses.includes(state.headerExamClassFilter)) {
+        state.headerExamClassFilter = 'ALL';
       }
 
-      const optionsHtml = state.exams.length === 0
-        ? '<option value="">Belum ada ulangan</option>'
-        : state.exams.map(ex => `<option value="${ex.id}" ${ex.id === state.activeExamId ? 'selected' : ''}>${ex.title} (${ex.class_name})</option>`).join('');
+      const showClassFilter = availableClasses.length > 1;
+      const classOptionsHtml = '<option value="ALL">Semua Kelas</option>' +
+        availableClasses.map(cls =>
+          `<option value="${escapeHtml(cls)}" ${cls === state.headerExamClassFilter ? 'selected' : ''}>${escapeHtml(cls)}</option>`
+        ).join('');
+
+      [desktopClassEl, mobileClassEl].forEach(el => {
+        if (!el) return;
+        el.innerHTML = classOptionsHtml;
+        el.value = state.headerExamClassFilter;
+        el.classList.toggle('hidden', !showClassFilter);
+      });
+
+      const filteredExams = state.headerExamClassFilter === 'ALL'
+        ? visibleExams
+        : visibleExams.filter(ex => String(ex.class_name || '').trim() === state.headerExamClassFilter);
+
+      if (filteredExams.length > 0 && !filteredExams.some(ex => ex.id === state.activeExamId)) {
+        state.activeExamId = filteredExams[0].id;
+      } else if (visibleExams.length === 0) {
+        state.activeExamId = null;
+      } else if (!state.activeExamId && visibleExams.length > 0) {
+        state.activeExamId = visibleExams[0].id;
+      }
+
+      let optionsHtml = '';
+      if (filteredExams.length === 0) {
+        optionsHtml = '<option value="">Belum ada ulangan</option>';
+      } else {
+        const groupedClasses = sortClassNamesNatural(filteredExams.map(ex => ex.class_name));
+        if (state.headerExamClassFilter === 'ALL' && groupedClasses.length > 1) {
+          optionsHtml = groupedClasses.map(cls => {
+            const groupItems = filteredExams.filter(ex => String(ex.class_name || '').trim() === cls);
+            const opts = groupItems.map(ex => {
+              const label = ex.subject ? `${ex.subject} — ${ex.title}` : ex.title;
+              return `<option value="${ex.id}" ${ex.id === state.activeExamId ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+            }).join('');
+            return `<optgroup label="${escapeHtml(cls)}">${opts}</optgroup>`;
+          }).join('');
+        } else {
+          optionsHtml = filteredExams.map(ex => {
+            const label = ex.subject
+              ? `${ex.subject} — ${ex.title} (${ex.class_name})`
+              : `${ex.title} (${ex.class_name})`;
+            return `<option value="${ex.id}" ${ex.id === state.activeExamId ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+          }).join('');
+        }
+      }
 
       if (desktopSelect) desktopSelect.innerHTML = optionsHtml;
       if (mobileSelect) mobileSelect.innerHTML = optionsHtml;
     }
+
+    window.handleHeaderClassFilterChange = function (className) {
+      state.headerExamClassFilter = className || 'ALL';
+      state.pagination.inputResults = 1;
+      state.pagination.itemAnalysis = 1;
+      state.pagination.remedial = 1;
+      state.pagination.enrichment = 1;
+      populateExamSelectors();
+      saveSessionToStorage();
+      renderCurrentMenu();
+    };
 
     const PAGE_SIZE_DEFAULT = 10;
 
@@ -2826,6 +2990,10 @@
     };
 
     window.handleChangeActiveExam = function (examId) {
+      const targetExam = state.exams.find(e => e.id === examId);
+      if (targetExam && state.headerExamClassFilter !== 'ALL' && targetExam.class_name !== state.headerExamClassFilter) {
+        state.headerExamClassFilter = 'ALL';
+      }
       state.activeExamId = examId;
       state.pagination.inputResults = 1;
       state.pagination.itemAnalysis = 1;
@@ -2837,12 +3005,13 @@
       renderCurrentMenu();
       const activeExam = getActiveExam();
       if (activeExam) {
-        showToast(`Paket ulangan aktif: ${activeExam.title}`, 'info');
+        showToast(`Paket ulangan aktif: ${activeExam.subject} — ${activeExam.title} (${activeExam.class_name})`, 'info');
       }
     };
 
     function getActiveExam() {
-      return state.exams.find(e => e.id === state.activeExamId) || state.exams[0] || null;
+      const visible = getVisibleExams();
+      return visible.find(e => e.id === state.activeExamId) || visible[0] || null;
     }
 
     window.navigateMenu = function (menuId) {
@@ -3137,11 +3306,12 @@
 
     // ==================== 1. DASHBOARD ANALITIK (FLOWORA BENTO STYLE) ====================
     function renderDashboardView(exam, stats) {
-      const totalExams = state.exams.length;
+      const visibleExams = getVisibleExams();
+      const totalExams = visibleExams.length;
       const strokeDash = `${stats.classicalMastery}, 100`;
 
       // Calculate per-exam progress bars
-      const examSummaries = state.exams.map((ex, idx) => {
+      const examSummaries = visibleExams.map((ex, idx) => {
         const s = computeExamStatistics(ex);
         const colors = ['bg-indigo-600', 'bg-purple-600', 'bg-emerald-500', 'bg-amber-500'];
         return {
@@ -3321,8 +3491,8 @@
               ` : stats.results.slice(0, 6).map((r, i) => {
         const examMeta = stats.examMeta || decodeExamMeta(exam);
         const graded = scoreStudentResponse(exam, r.student_answers);
-        const subLabel = examMeta.hasNumericSection
-          ? `Skor ${graded.earnedTotal}/${graded.maxTotal} poin (${graded.correctCount}/${exam.total_questions} tuntas)`
+        const subLabel = examMeta.hasWeightedScore
+          ? `Skor ${graded.earnedTotal}/${graded.maxTotal} poin (${graded.correctCount}/${exam.total_questions} ${examMeta.allNumeric ? 'tuntas' : 'benar'})`
           : `Benar ${graded.correctCount}/${exam.total_questions} soal`;
         return `
                 <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50/80 border border-slate-100">
@@ -3460,9 +3630,13 @@
       };
     }
 
-    function getExamKeyCounterMeta(qType, targetLen, rawVal) {
+    function getExamKeyCounterMeta(qType, targetLen, rawVal, rawScorePerItem = 1) {
       const cleanVal = sanitizeAnswerInputValue(qType, rawVal);
       const len = Number.isFinite(Number(targetLen)) && Number(targetLen) >= 1 ? Math.floor(Number(targetLen)) : 0;
+      const weight = normalizeItemScoreWeight(rawScorePerItem);
+      const bobotSuffix = len > 0 && weight !== 1
+        ? ` • Bobot ${Number((len * weight).toFixed(2))}`
+        : '';
 
       if (len === 0) {
         return {
@@ -3476,7 +3650,7 @@
       const isMatch = cleanVal.length === len;
       return {
         cleanVal,
-        text: `${cleanVal.length} / ${len} Karakter`,
+        text: `${cleanVal.length} / ${len} Karakter${bobotSuffix}`,
         isMatch,
         colorClass: isMatch
           ? 'text-[11px] font-extrabold text-emerald-600 shrink-0'
@@ -3487,7 +3661,8 @@
     function renderManajemenUlanganView() {
       if (state.subjects.length === 0) mergeSubjectsState();
 
-      const editingExam = state.editingExamId ? state.exams.find(ex => ex.id === state.editingExamId) : null;
+      const visibleExams = getVisibleExams();
+      const editingExam = state.editingExamId ? visibleExams.find(ex => ex.id === state.editingExamId) : null;
       if (state.editingExamId && !editingExam) state.editingExamId = null;
 
       const editingMeta = editingExam ? decodeExamMeta(editingExam) : null;
@@ -3591,7 +3766,44 @@
         }
 
         const keyVal = isChecked ? String(sec.rawKey || '') : '';
-        const counterMeta = getExamKeyCounterMeta(qType, isChecked ? sec.count : 0, keyVal);
+        const scoreVal = isChecked ? String(sec.scorePerItem ?? 1) : '';
+        const counterMeta = getExamKeyCounterMeta(qType, isChecked ? sec.count : 0, keyVal, isChecked ? sec.scorePerItem : 1);
+
+        if (qType === 'PG') {
+          return `
+          <div id="exam-qtype-card-${qt.id}" data-qtype="${qt.id}"
+            class="${isChecked ? '' : 'hidden '}p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/90 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${qt.badgeClass}">${qt.label}</span>
+              <span id="key-length-counter-${qt.id}" class="${counterMeta.colorClass}">${counterMeta.text}</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+              <div class="sm:col-span-6">
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">Jumlah Soal</label>
+                <input type="number" id="exam-total-${qt.id}" ${isChecked ? '' : 'disabled'} required min="1" max="100" value="${escapeHtml(totalVal)}"
+                  oninput="window.syncAnswerKeyLength('${qt.id}')"
+                  placeholder="Contoh: 30"
+                  class="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div class="sm:col-span-6">
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">Skor per Soal <span class="font-medium text-slate-400">(Default: 1)</span></label>
+                <input type="number" id="exam-score-${qt.id}" ${isChecked ? '' : 'disabled'} min="0.01" step="any" value="${escapeHtml(scoreVal)}"
+                  oninput="window.syncAnswerKeyLength('${qt.id}')"
+                  placeholder="Default: 1 (misal: 2)"
+                  class="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div class="sm:col-span-12">
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">${qt.keyLabel}</label>
+                <input type="text" id="exam-answer-key-${qt.id}" ${isChecked ? '' : 'disabled'} required value="${escapeHtml(keyVal)}"
+                  oninput="window.syncAnswerKeyLength('${qt.id}')"
+                  placeholder="${qt.keyPlaceholder}"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-indigo-50/50 border border-indigo-200 font-mono text-xs font-extrabold tracking-widest uppercase text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
+            <p class="text-[11px] text-slate-500">${qt.keyHint} Kosongkan Skor per Soal untuk bobot standar 1 poin/soal.</p>
+          </div>
+        `;
+        }
 
         return `
           <div id="exam-qtype-card-${qt.id}" data-qtype="${qt.id}"
@@ -3721,29 +3933,96 @@
 
         <!-- Daftar Paket Ulangan -->
         <div class="lg:col-span-7 glass-surface rounded-3xl p-6 space-y-4">
-          <div class="flex items-center justify-between">
+          ${(() => {
+        const classChoices = sortClassNamesNatural(visibleExams.map(ex => ex.class_name));
+        if (state.examClassFilter !== 'ALL' && !classChoices.includes(state.examClassFilter)) {
+          state.examClassFilter = 'ALL';
+        }
+        const examsForSubjects = state.examClassFilter === 'ALL'
+          ? visibleExams
+          : visibleExams.filter(ex => ex.class_name === state.examClassFilter);
+        const subjectChoices = Array.from(new Set(examsForSubjects.map(ex => String(ex.subject || '').trim()).filter(Boolean)))
+          .sort((a, b) => a.localeCompare(b, 'id'));
+        if (state.examSubjectFilter !== 'ALL' && !subjectChoices.some(s => s.toLowerCase() === state.examSubjectFilter.toLowerCase())) {
+          state.examSubjectFilter = 'ALL';
+        }
+
+        const q = String(state.examSearchQuery || '').trim().toLowerCase();
+        const filteredExams = visibleExams.filter(ex => {
+          if (state.examClassFilter !== 'ALL' && ex.class_name !== state.examClassFilter) return false;
+          if (state.examSubjectFilter !== 'ALL' && String(ex.subject || '').toLowerCase() !== state.examSubjectFilter.toLowerCase()) return false;
+          if (q) {
+            const teacherObj = state.teachers.find(t => t.id === ex.teacher_id) || getSubjectTeacher(ex.subject);
+            const hay = `${ex.title || ''} ${ex.subject || ''} ${ex.class_name || ''} ${teacherObj?.full_name || ''} ${ex.exam_date || ''}`.toLowerCase();
+            if (!hay.includes(q)) return false;
+          }
+          return true;
+        });
+
+        const hasActiveFilters = state.examClassFilter !== 'ALL' || state.examSubjectFilter !== 'ALL' || q !== '';
+        const examsPage = paginateItems(filteredExams, 'exams');
+        const badgeCountText = hasActiveFilters
+          ? `${filteredExams.length} dari ${visibleExams.length} Paket`
+          : `${visibleExams.length} Paket`;
+
+        const classFilterOptionsHtml = `<option value="ALL" ${state.examClassFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
+          classChoices.map(cls => `<option value="${escapeHtml(cls)}" ${cls === state.examClassFilter ? 'selected' : ''}>${escapeHtml(cls)}</option>`).join('');
+        const subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>Semua Mapel</option>` +
+          subjectChoices.map(subj => `<option value="${escapeHtml(subj)}" ${subj.toLowerCase() === state.examSubjectFilter.toLowerCase() ? 'selected' : ''}>${escapeHtml(subj)}</option>`).join('');
+
+        return `
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h3 class="text-base font-extrabold text-slate-900">Daftar Paket Ulangan Tersimpan</h3>
-              <p class="text-xs text-slate-500">Klik "Pilih Analisis" untuk mengaktifkan paket ulangan</p>
+              <p class="text-xs text-slate-500">${state.currentUser?.role === 'guru' ? 'Menampilkan paket ulangan sesuai kelas & mapel yang Anda ampu' : 'Klik "Pilih Analisis" untuk mengaktifkan paket ulangan'}</p>
             </div>
-            <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">${state.exams.length} Paket</span>
+            <div class="flex items-center gap-2 shrink-0">
+              ${hasActiveFilters ? `
+                <button type="button" onclick="window.handleResetExamFilters()"
+                  class="px-2.5 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold transition">
+                  Reset Filter
+                </button>
+              ` : ''}
+              <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">${badgeCountText}</span>
+            </div>
           </div>
 
-          ${(() => {
-        const examsPage = paginateItems(state.exams, 'exams');
-        return `
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+            <select id="exam-filter-class" onchange="window.handleFilterExams()"
+              class="sm:col-span-3 px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              ${classFilterOptionsHtml}
+            </select>
+            <select id="exam-filter-subject" onchange="window.handleFilterExams()"
+              class="sm:col-span-4 px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              ${subjectFilterOptionsHtml}
+            </select>
+            <input type="text" id="exam-search-input" value="${escapeHtml(state.examSearchQuery || '')}" oninput="window.handleFilterExams(this)"
+              placeholder="Cari judul, mapel, atau guru..."
+              class="sm:col-span-5 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
           <div class="space-y-3">
             ${examsPage.totalItems === 0 ? `
-              <div class="py-10 text-center text-xs text-slate-400">Belum ada paket ulangan tersimpan.</div>
+              <div class="py-10 text-center text-xs text-slate-400">
+                ${hasActiveFilters
+              ? 'Tidak ada paket ulangan yang sesuai dengan filter.'
+              : (visibleExams.length === 0 && state.exams.length > 0
+                ? 'Belum ada paket ulangan yang sesuai dengan kelas/mapel ampuan Anda.'
+                : 'Belum ada paket ulangan tersimpan.')}
+              </div>
             ` : examsPage.items.map(ex => {
         const s = computeExamStatistics(ex);
         const exMeta = s.examMeta || decodeExamMeta(ex);
         const teacherObj = state.teachers.find(t => t.id === ex.teacher_id) || getSubjectTeacher(ex.subject);
         const isSelected = ex.id === state.activeExamId;
         const isEditingCard = Boolean(editingExam && ex.id === editingExam.id);
-        const typeBadgesHtml = exMeta.sections.map(sec =>
-          `<span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${sec.typeMeta.badgeClass}">${exMeta.isMultiType ? `${sec.typeMeta.shortLabel} (${sec.count})` : sec.typeMeta.label}</span>`
-        ).join(' ');
+        const typeBadgesHtml = exMeta.sections.map(sec => {
+          const weightSuffix = !isNumericQuestionType(sec.questionType) && sec.scorePerItem !== 1 ? ` • @${sec.scorePerItem}` : '';
+          const badgeLabel = exMeta.isMultiType
+            ? `${sec.typeMeta.shortLabel} (${sec.count}${weightSuffix})`
+            : `${sec.typeMeta.label}${weightSuffix}`;
+          return `<span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${sec.typeMeta.badgeClass}">${badgeLabel}</span>`;
+        }).join(' ');
 
         return `
                 <div class="p-4 rounded-2xl border transition ${isEditingCard ? 'bg-amber-50/40 border-amber-300 ring-2 ring-amber-200/70 shadow-sm' : (isSelected ? 'bg-indigo-50/70 border-indigo-300 shadow-sm' : 'bg-white border-slate-200/80 hover:border-slate-300')} flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -3760,7 +4039,7 @@
                     <div class="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
                       <span>KKM: <strong>${ex.kkm}</strong></span>
                       <span>Soal: <strong>${ex.total_questions} ${exMeta.isMultiType ? 'Soal Campuran' : exMeta.typeMeta.shortLabel}</strong></span>
-                      ${exMeta.hasNumericSection ? `<span>Bobot Total: <strong>${exMeta.maxTotalScore}</strong></span>` : ''}
+                      ${exMeta.hasWeightedScore ? `<span>Bobot Total: <strong>${exMeta.maxTotalScore}</strong></span>` : ''}
                       <span>Peserta: <strong>${s.totalStudents} Siswa</strong></span>
                       <span>Ketuntasan: <strong class="text-emerald-600">${s.classicalMastery}%</strong></span>
                     </div>
@@ -3768,13 +4047,13 @@
                       <div class="flex flex-wrap gap-1.5 pt-0.5">
                         ${exMeta.sections.map(sec => `
                           <div class="text-[11px] font-mono bg-slate-100 px-2.5 py-1 rounded-lg text-slate-700">
-                            <span class="font-bold text-indigo-700">${sec.typeMeta.shortLabel}:</span> <strong>${escapeHtml(sec.displayKey)}</strong>
+                            <span class="font-bold text-indigo-700">${sec.typeMeta.shortLabel}${!isNumericQuestionType(sec.questionType) && sec.scorePerItem !== 1 ? ` (@${sec.scorePerItem})` : ''}:</span> <strong>${escapeHtml(sec.displayKey)}</strong>
                           </div>
                         `).join('')}
                       </div>
                     ` : `
                       <div class="text-[11px] font-mono bg-slate-100 px-2.5 py-1 rounded-lg inline-block text-slate-700">
-                        ${exMeta.hasNumericSection ? 'Nilai/No' : 'Kunci'}: <strong>${escapeHtml(exMeta.displayKey)}</strong>
+                        ${exMeta.hasNumericSection ? 'Nilai/No' : `Kunci${exMeta.hasWeightedObjective ? ` (@${exMeta.sections[0]?.scorePerItem || 1}/soal)` : ''}`}: <strong>${escapeHtml(exMeta.displayKey)}</strong>
                       </div>
                     `}
                   </div>
@@ -3900,10 +4179,12 @@
         }
         const card = document.getElementById(`exam-qtype-card-${qt}`);
         const totalEl = document.getElementById(`exam-total-${qt}`);
+        const scoreEl = document.getElementById(`exam-score-${qt}`);
         const keyEl = document.getElementById(`exam-answer-key-${qt}`);
         const uniformEl = document.getElementById(`exam-uniform-score-${qt}`);
         if (card) card.classList.toggle('hidden', !cb.checked);
         if (totalEl) totalEl.disabled = !cb.checked;
+        if (scoreEl) scoreEl.disabled = !cb.checked;
         if (keyEl) keyEl.disabled = !cb.checked;
         if (uniformEl) uniformEl.disabled = !cb.checked;
         getNumericScoreInputs(qt).forEach(inp => {
@@ -3940,12 +4221,41 @@
       const keyInput = document.getElementById(`exam-answer-key-${targetType}`);
       if (!keyInput) return;
 
-      const meta = getExamKeyCounterMeta(targetType, totalInput.value, keyInput.value);
+      const scorePerItemRaw = document.getElementById(`exam-score-${targetType}`)?.value;
+      const meta = getExamKeyCounterMeta(targetType, totalInput.value, keyInput.value, scorePerItemRaw);
       if (meta.cleanVal !== keyInput.value) keyInput.value = meta.cleanVal;
       counter.textContent = meta.text;
       counter.className = meta.colorClass;
 
       updateExamSummaryBadge();
+    };
+
+    window.handleFilterExams = function (searchInputEl = null) {
+      const classEl = document.getElementById('exam-filter-class');
+      const subjectEl = document.getElementById('exam-filter-subject');
+      const searchEl = searchInputEl || document.getElementById('exam-search-input');
+      const hadFocus = document.activeElement === searchEl;
+      const selStart = searchEl?.selectionStart ?? null;
+      if (classEl) state.examClassFilter = classEl.value || 'ALL';
+      if (subjectEl) state.examSubjectFilter = subjectEl.value || 'ALL';
+      if (searchEl) state.examSearchQuery = searchEl.value || '';
+      state.pagination.exams = 1;
+      renderCurrentMenu();
+      if (hadFocus) {
+        const nextSearch = document.getElementById('exam-search-input');
+        if (nextSearch) {
+          nextSearch.focus();
+          if (selStart !== null) nextSearch.setSelectionRange(selStart, selStart);
+        }
+      }
+    };
+
+    window.handleResetExamFilters = function () {
+      state.examClassFilter = 'ALL';
+      state.examSubjectFilter = 'ALL';
+      state.examSearchQuery = '';
+      state.pagination.exams = 1;
+      renderCurrentMenu();
     };
 
     window.handleEditExam = function (examId) {
@@ -4021,6 +4331,7 @@
         }
 
         let rawKey = '';
+        let scorePerItem = 1;
         if (isNumericQuestionType(qType)) {
           const itemInputs = getNumericScoreInputs(qType);
           const scores = [];
@@ -4053,13 +4364,25 @@
             showToast(`Panjang Kunci Jawaban ${qtMeta.label} (${cleanKey.length}) harus sama dengan Jumlah Soal (${secTotal})!`, 'warning');
             return;
           }
+          const scoreInput = document.getElementById(`exam-score-${qType}`);
+          const rawScoreStr = scoreInput ? scoreInput.value.trim() : '';
+          if (rawScoreStr !== '') {
+            const parsedScore = Number(rawScoreStr);
+            if (!Number.isFinite(parsedScore) || parsedScore <= 0) {
+              if (scoreInput) scoreInput.focus();
+              showToast(`Skor per soal ${qtMeta.label} harus lebih dari 0.`, 'warning');
+              return;
+            }
+            scorePerItem = normalizeItemScoreWeight(parsedScore);
+          }
           rawKey = cleanKey;
         }
 
         sections.push({
           questionType: qType,
           count: secTotal,
-          rawKey
+          rawKey,
+          scorePerItem
         });
       }
 
@@ -4081,6 +4404,10 @@
       const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
       const prevActiveId = state.activeExamId;
       const prevEditingId = state.editingExamId;
+      const prevHeaderClassFilter = state.headerExamClassFilter;
+      const prevExamClassFilter = state.examClassFilter;
+      const prevExamSubjectFilter = state.examSubjectFilter;
+      const prevExamPage = state.pagination.exams;
       const prevExamCopy = existingExam ? { ...existingExam } : null;
       const shouldRecalcResults = Boolean(
         existingExam && (
@@ -4104,6 +4431,15 @@
           ? 'Perubahan paket ulangan berhasil disimpan dan tersinkron!'
           : 'Paket ulangan baru berhasil disimpan dan tersinkron!',
         onLocalApply: () => {
+          if (state.headerExamClassFilter !== 'ALL' && examRecord.class_name !== state.headerExamClassFilter) {
+            state.headerExamClassFilter = 'ALL';
+          }
+          if (state.examClassFilter !== 'ALL' && examRecord.class_name !== state.examClassFilter) {
+            state.examClassFilter = 'ALL';
+          }
+          if (state.examSubjectFilter !== 'ALL' && examRecord.subject.toLowerCase() !== state.examSubjectFilter.toLowerCase()) {
+            state.examSubjectFilter = 'ALL';
+          }
           if (existingExam) {
             const idx = state.exams.findIndex(ex => ex.id === existingExam.id);
             if (idx !== -1) state.exams[idx] = examRecord;
@@ -4131,6 +4467,7 @@
           } else {
             state.exams.unshift(examRecord);
             state.activeExamId = examRecord.id;
+            state.pagination.exams = 1;
           }
         },
         onRollback: () => {
@@ -4148,6 +4485,10 @@
           } else {
             state.exams = state.exams.filter(ex => ex.id !== examRecord.id);
           }
+          state.headerExamClassFilter = prevHeaderClassFilter;
+          state.examClassFilter = prevExamClassFilter;
+          state.examSubjectFilter = prevExamSubjectFilter;
+          state.pagination.exams = prevExamPage;
           state.activeExamId = prevActiveId;
         }
       });
@@ -4245,10 +4586,12 @@
 
       const examMeta = decodeExamMeta(exam);
       const isNumType = isNumericQuestionType(examMeta.questionType);
-      const showNumericScoreCol = examMeta.hasNumericSection;
-      const headerBadgesHtml = examMeta.sections.map(sec =>
-        `<span class="px-2.5 py-1 rounded-full border text-[10px] font-extrabold ${sec.typeMeta.badgeClass}">${examMeta.isMultiType ? `${sec.typeMeta.shortLabel} (${sec.count})` : sec.typeMeta.label}</span>`
-      ).join(' ');
+      const showNumericScoreCol = examMeta.hasWeightedScore;
+      const headerBadgesHtml = examMeta.sections.map(sec => {
+        const w = !isNumericQuestionType(sec.questionType) && sec.scorePerItem !== 1 ? ` • @${sec.scorePerItem}` : '';
+        const label = examMeta.isMultiType ? `${sec.typeMeta.shortLabel} (${sec.count}${w})` : `${sec.typeMeta.label}${w}`;
+        return `<span class="px-2.5 py-1 rounded-full border text-[10px] font-extrabold ${sec.typeMeta.badgeClass}">${label}</span>`;
+      }).join(' ');
 
       const keySummaryHtml = examMeta.isMultiType
         ? `
@@ -4261,7 +4604,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200/70">
                   <span class="inline-flex items-center gap-1.5 font-semibold text-slate-700">
                     <span class="px-2 py-0.5 rounded-full border text-[10px] font-extrabold ${sec.typeMeta.badgeClass}">${sec.typeMeta.shortLabel}</span>
-                    <span>No. ${sec.startNumber}–${sec.endNumber} (${sec.count} Soal${isNumericQuestionType(sec.questionType) ? ` • ${sec.maxTotalScore} Poin` : ''})</span>
+                    <span>No. ${sec.startNumber}–${sec.endNumber} (${sec.count} Soal${isNumericQuestionType(sec.questionType) || sec.scorePerItem !== 1 ? ` • ${sec.maxTotalScore} Poin` : ''}${!isNumericQuestionType(sec.questionType) && sec.scorePerItem !== 1 ? ` @${sec.scorePerItem}` : ''})</span>
                   </span>
                   <span class="font-mono font-extrabold tracking-wider text-indigo-700">${escapeHtml(sec.displayKey)}</span>
                 </div>
@@ -4272,7 +4615,9 @@
         : `
           <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
             <span class="font-semibold text-slate-600">
-              ${isNumType ? `Nilai Maks per No (${exam.total_questions} Soal • Total ${examMeta.maxTotalScore})` : `Kunci Jawaban ${examMeta.typeMeta.shortLabel} (${exam.total_questions} Soal)`}:
+              ${isNumType
+          ? `Nilai Maks per No (${exam.total_questions} Soal • Total ${examMeta.maxTotalScore})`
+          : `Kunci Jawaban ${examMeta.typeMeta.shortLabel} (${exam.total_questions} Soal${examMeta.hasWeightedObjective ? ` • @${examMeta.sections[0]?.scorePerItem || 1}, Total ${examMeta.maxTotalScore} Poin` : ''})`}:
             </span>
             <span class="font-mono font-extrabold tracking-wider text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg">${escapeHtml(examMeta.displayKey)}</span>
           </div>
@@ -4557,6 +4902,8 @@
         detailEl.innerHTML = `Skor <strong>${graded.earnedTotal}</strong>/<strong>${graded.maxTotal}</strong> (${breakdown}) • <strong class="${passed ? 'text-emerald-600' : 'text-amber-600'}">${passed ? 'TUNTAS KKM' : 'PERLU REMEDIAL'}</strong>`;
       } else if (isNumericQuestionType(graded.questionType)) {
         detailEl.innerHTML = `Total Skor <strong>${graded.earnedTotal}</strong> / <strong>${graded.maxTotal}</strong> (${graded.itemCount}/${graded.expectedCount} nomor) • Status: <strong class="${passed ? 'text-emerald-600' : 'text-amber-600'}">${passed ? 'TUNTAS KKM' : 'PERLU REMEDIAL'}</strong>`;
+      } else if (examMeta.hasWeightedObjective) {
+        detailEl.innerHTML = `Benar <strong>${graded.correctCount}</strong>/${graded.expectedCount} soal (Skor <strong>${graded.earnedTotal}</strong>/<strong>${graded.maxTotal}</strong> poin) • Status: <strong class="${passed ? 'text-emerald-600' : 'text-amber-600'}">${passed ? 'TUNTAS KKM' : 'PERLU REMEDIAL'}</strong>`;
       } else {
         detailEl.innerHTML = `Benar <strong>${graded.correctCount}</strong> dari <strong>${graded.expectedCount}</strong> soal • Status: <strong class="${passed ? 'text-emerald-600' : 'text-amber-600'}">${passed ? 'TUNTAS KKM' : 'PERLU REMEDIAL'}</strong>`;
       }
@@ -4975,8 +5322,11 @@
       if (!exam) return;
       const stats = computeExamStatistics(exam);
       const examMeta = stats.examMeta || decodeExamMeta(exam);
-      const showPointsCol = examMeta.hasNumericSection || examMeta.isMultiType;
-      const qTypeSummary = examMeta.sections.map(s => examMeta.isMultiType ? `${s.typeMeta.shortLabel} (${s.count})` : s.typeMeta.label).join(' + ');
+      const showPointsCol = examMeta.hasWeightedScore || examMeta.isMultiType;
+      const qTypeSummary = examMeta.sections.map(s => {
+        const w = !isNumericQuestionType(s.questionType) && s.scorePerItem !== 1 ? ` @${s.scorePerItem}` : '';
+        return examMeta.isMultiType ? `${s.typeMeta.shortLabel} (${s.count}${w})` : `${s.typeMeta.label}${w}`;
+      }).join(' + ');
 
       let csv = `Laporan Analisis Hasil Ulangan - ${exam.title} (${exam.class_name})\n`;
       csv += `Mata Pelajaran,"${exam.subject}",Jenis Soal,"${qTypeSummary}",KKM,${exam.kkm},Tanggal,${exam.exam_date}\n\n`;
