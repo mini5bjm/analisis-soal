@@ -1136,6 +1136,8 @@
       },
       rekapSelectedClass: '',
       rekapSearchQuery: '',
+      rekapActiveTab: 'rapor',
+      rekapActiveExamId: null,
       editingSubjectId: null,
       editingStudentId: null,
       editingTeacherId: null,
@@ -8989,6 +8991,13 @@
         ? Math.round((totalPassedExamCount / countAllTakenScores) * 100)
         : 0;
 
+      const activeTab = state.rekapActiveTab || 'rapor';
+      const defaultExamId = classExams[0]?.id || null;
+      const activeExamId = state.rekapActiveExamId && classExams.some(e => e.id === state.rekapActiveExamId)
+        ? state.rekapActiveExamId
+        : defaultExamId;
+      const selectedExam = classExams.find(e => e.id === activeExamId) || null;
+
       return `
       <div class="glass-surface rounded-3xl p-6 md:p-8 space-y-6">
         <!-- Header -->
@@ -9073,161 +9082,103 @@
           </div>
         </div>
 
-        <!-- Student Table -->
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <h4 class="text-sm font-extrabold text-slate-900">Daftar Siswa &amp; Cetak Rapor</h4>
-              <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-extrabold">${filteredStudents.length} Siswa</span>
-            </div>
-            <span class="text-xs text-slate-500">Klik tombol aksi untuk mencetak rapor PDF atau mengunduh Excel</span>
-          </div>
-
-          <div class="overflow-x-auto custom-scroll rounded-2xl border border-slate-200/80">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500">
-                  <th class="py-3 px-3.5 w-12 text-center">No</th>
-                  <th class="py-3 px-3.5 text-center">NIS / NISN</th>
-                  <th class="py-3 px-3.5">Nama Lengkap Siswa</th>
-                  <th class="py-3 px-3.5 text-center">L/P</th>
-                  <th class="py-3 px-3.5 text-center">Ulangan Diikuti</th>
-                  <th class="py-3 px-3.5 text-center">Rata-Rata</th>
-                  <th class="py-3 px-3.5 text-center">Status Ketuntasan</th>
-                  <th class="py-3 px-3.5 text-center w-60">Aksi Cetak &amp; Ekspor</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100 text-xs">
-                ${rekapPage.totalItems === 0 ? `
-                  <tr>
-                    <td colspan="8" class="py-12 text-center text-slate-400">
-                      ${searchQ ? 'Tidak ada siswa yang sesuai dengan kata kunci pencarian.' : `Belum ada data siswa di kelas ${escapeHtml(selectedClass)}.`}
-                    </td>
-                  </tr>
-                ` : rekapPage.items.map((stu, idx) => {
-                  const stats = getStudentRecapStats(stu, classExams);
-                  return `
-                  <tr class="hover:bg-indigo-50/20 transition">
-                    <td class="py-3 px-3.5 font-bold text-slate-400 text-center">${rekapPage.startIndex + idx + 1}</td>
-                    <td class="py-3 px-3.5 font-mono font-bold text-indigo-700 text-center">${escapeHtml(stu.nis || '-')}</td>
-                    <td class="py-3 px-3.5 font-bold text-slate-900">${escapeHtml(stu.full_name)}</td>
-                    <td class="py-3 px-3.5 text-center">
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${stu.gender === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-sky-100 text-sky-700'}">
-                        ${stu.gender === 'P' ? 'P' : 'L'}
-                      </span>
-                    </td>
-                    <td class="py-3 px-3.5 text-center">
-                      <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px]">
-                        ${stats.totalTaken} / ${stats.totalExams} Paket
-                      </span>
-                    </td>
-                    <td class="py-3 px-3.5 text-center">
-                      <span class="px-2.5 py-0.5 rounded-full font-black text-xs ${stats.avgScore >= 75 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : (stats.avgScore > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-400')}">
-                        ${stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '-'}
-                      </span>
-                    </td>
-                    <td class="py-3 px-3.5 text-center">
-                      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${stats.statusBadgeClass}">
-                        ${escapeHtml(stats.overallStatus)}
-                      </span>
-                    </td>
-                    <td class="py-3 px-3.5 text-center whitespace-nowrap">
-                      <div class="inline-flex items-center justify-center gap-1.5">
-                        <button type="button" onclick="window.handlePrintStudentReport('${stu.id}')"
-                          class="px-2.5 py-1.5 rounded-full flowora-btn-primary text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition hover:scale-105"
-                          title="Cetak Lembar Rekap / Rapor PDF">
-                          <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak PDF
-                        </button>
-                        <button type="button" onclick="window.handleExportStudentXlsx('${stu.id}')"
-                          class="px-2.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition hover:scale-105"
-                          title="Ekspor Rapor Siswa ke Excel (.xlsx)">
-                          <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Excel
-                        </button>
-                        <button type="button" onclick="window.handleViewStudentDetail('${stu.id}')"
-                          class="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-indigo-600 transition"
-                          title="Lihat Rincian Jawaban, Nilai &amp; Remedial">
-                          <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-          ${renderPaginationBar(rekapPage)}
+        <!-- Navigation Tabs Bar -->
+        <div class="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-2 custom-scroll">
+          <button type="button" onclick="window.handleRekapSwitchTab('rapor')"
+            class="px-4 py-2.5 rounded-2xl text-xs font-extrabold flex items-center gap-2 whitespace-nowrap transition ${activeTab === 'rapor' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/70'}">
+            <i data-lucide="file-text" class="w-4 h-4"></i> Rapor &amp; Rekap Siswa (${filteredStudents.length})
+          </button>
+          <button type="button" onclick="window.handleRekapSwitchTab('jawaban')"
+            class="px-4 py-2.5 rounded-2xl text-xs font-extrabold flex items-center gap-2 whitespace-nowrap transition ${activeTab === 'jawaban' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/70'}">
+            <i data-lucide="check-square" class="w-4 h-4"></i> Rekap Input Jawaban Siswa
+          </button>
+          <button type="button" onclick="window.handleRekapSwitchTab('analisis')"
+            class="px-4 py-2.5 rounded-2xl text-xs font-extrabold flex items-center gap-2 whitespace-nowrap transition ${activeTab === 'analisis' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/70'}">
+            <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Analisis Butir Soal
+          </button>
+          <button type="button" onclick="window.handleRekapSwitchTab('remedial')"
+            class="px-4 py-2.5 rounded-2xl text-xs font-extrabold flex items-center gap-2 whitespace-nowrap transition ${activeTab === 'remedial' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/70'}">
+            <i data-lucide="award" class="w-4 h-4"></i> Remedial &amp; Pengayaan (${studentsNeedingRemedial})
+          </button>
         </div>
 
-        <!-- Monitoring Section: Paket Ulangan & Analisis Butir Kelas -->
-        <div class="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-            <div class="flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
-                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+        ${activeTab === 'rapor' ? `
+          <!-- Tab 1: Student Table & Report Actions -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <h4 class="text-sm font-extrabold text-slate-900">Daftar Siswa &amp; Cetak Rapor</h4>
+                <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-extrabold">${filteredStudents.length} Siswa</span>
               </div>
-              <div>
-                <h4 class="text-sm font-extrabold text-slate-900">Pantauan Hasil Ulangan &amp; Analisis Butir Soal (${classExams.length} Paket)</h4>
-                <p class="text-[11px] text-slate-500">Tinjau mutu soal, capaian ketuntasan, dan cetak analisis butir per paket ulangan</p>
-              </div>
+              <span class="text-xs text-slate-500">Klik Cetak PDF untuk mencetak rapor 4 bagian lengkap atau Excel untuk mengunduh rekap</span>
             </div>
-            <span class="text-xs text-slate-400 font-medium">Periode: ${escapeHtml(activeYear)} • ${escapeHtml(activeSem)}</span>
-          </div>
 
-          ${classExams.length === 0 ? `
-            <div class="py-8 text-center text-slate-400 text-xs">
-              Belum ada paket ulangan yang dibuat untuk kelas ${escapeHtml(selectedClass)} pada ${escapeHtml(activeYear)} (${escapeHtml(activeSem)}).
-            </div>
-          ` : `
-            <div class="overflow-x-auto custom-scroll">
-              <table class="w-full text-left border-collapse text-xs">
+            <div class="overflow-x-auto custom-scroll rounded-2xl border border-slate-200/80">
+              <table class="w-full text-left border-collapse">
                 <thead>
-                  <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400 text-center">
-                    <th class="py-2.5 px-3 text-center">No</th>
-                    <th class="py-2.5 px-3 text-left">Mata Pelajaran &amp; Judul Ulangan</th>
-                    <th class="py-2.5 px-3 text-left">Guru Pengampu</th>
-                    <th class="py-2.5 px-3 text-center">KKM</th>
-                    <th class="py-2.5 px-3 text-center">Peserta</th>
-                    <th class="py-2.5 px-3 text-center">Rata-Rata</th>
-                    <th class="py-2.5 px-3 text-center">Ketuntasan</th>
-                    <th class="py-2.5 px-3 text-center">Analisis Butir</th>
-                    <th class="py-2.5 px-3 text-center">Aksi Laporan</th>
+                  <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500">
+                    <th class="py-3 px-3.5 w-12 text-center">No</th>
+                    <th class="py-3 px-3.5 text-center">NIS / NISN</th>
+                    <th class="py-3 px-3.5">Nama Lengkap Siswa</th>
+                    <th class="py-3 px-3.5 text-center">L/P</th>
+                    <th class="py-3 px-3.5 text-center">Ulangan Diikuti</th>
+                    <th class="py-3 px-3.5 text-center">Rata-Rata</th>
+                    <th class="py-3 px-3.5 text-center">Status Ketuntasan</th>
+                    <th class="py-3 px-3.5 text-center w-60">Aksi Cetak &amp; Ekspor</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
-                  ${classExams.map((ex, idx) => {
-                    const stats = computeExamStatistics(ex);
-                    const teacher = getExamTeacher(ex);
-                    const { masteredCount, reinforceCount, reteachCount } = summarizeItemMastery(stats.itemAnalysis);
-                    return `
-                    <tr class="hover:bg-slate-50/80 transition">
-                      <td class="py-2.5 px-3 text-center font-bold text-slate-400">${idx + 1}</td>
-                      <td class="py-2.5 px-3">
-                        <div class="font-bold text-slate-900">${escapeHtml(ex.subject)}</div>
-                        <div class="text-[11px] text-slate-500">${escapeHtml(ex.title)}</div>
+                <tbody class="divide-y divide-slate-100 text-xs">
+                  ${rekapPage.totalItems === 0 ? `
+                    <tr>
+                      <td colspan="8" class="py-12 text-center text-slate-400">
+                        ${searchQ ? 'Tidak ada siswa yang sesuai dengan kata kunci pencarian.' : `Belum ada data siswa di kelas ${escapeHtml(selectedClass)}.`}
                       </td>
-                      <td class="py-2.5 px-3 text-slate-700">${escapeHtml(teacher?.full_name || '-')}</td>
-                      <td class="py-2.5 px-3 text-center font-bold text-slate-900">${ex.kkm}</td>
-                      <td class="py-2.5 px-3 text-center font-bold text-slate-700">${stats.totalStudents} Siswa</td>
-                      <td class="py-2.5 px-3 text-center font-black ${stats.avgScore >= ex.kkm ? 'text-emerald-700' : 'text-amber-700'}">${stats.avgScore}</td>
-                      <td class="py-2.5 px-3 text-center">
-                        <span class="px-2 py-0.5 rounded-full font-bold text-[10px] ${stats.classicalMastery >= 75 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
-                          ${stats.classicalMastery}%
+                    </tr>
+                  ` : rekapPage.items.map((stu, idx) => {
+                    const stats = getStudentRecapStats(stu, classExams);
+                    return `
+                    <tr class="hover:bg-indigo-50/20 transition">
+                      <td class="py-3 px-3.5 font-bold text-slate-400 text-center">${rekapPage.startIndex + idx + 1}</td>
+                      <td class="py-3 px-3.5 font-mono font-bold text-indigo-700 text-center">${escapeHtml(stu.nis || '-')}</td>
+                      <td class="py-3 px-3.5 font-bold text-slate-900">${escapeHtml(stu.full_name)}</td>
+                      <td class="py-3 px-3.5 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${stu.gender === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-sky-100 text-sky-700'}">
+                          ${stu.gender === 'P' ? 'P' : 'L'}
                         </span>
                       </td>
-                      <td class="py-2.5 px-3 text-center">
-                        <div class="inline-flex items-center gap-1 text-[10px] font-bold">
-                          <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700" title="Dikuasai">${masteredCount}</span>
-                          <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="Perlu Penguatan">${reinforceCount}</span>
-                          <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700" title="Perlu Remedial">${reteachCount}</span>
-                        </div>
+                      <td class="py-3 px-3.5 text-center">
+                        <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px]">
+                          ${stats.totalTaken} / ${stats.totalExams} Paket
+                        </span>
                       </td>
-                      <td class="py-2.5 px-3 text-center">
-                        <button type="button" onclick="window.handlePrintExamCombinedReportFromRekap('${ex.id}')"
-                          class="px-2.5 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold flex items-center gap-1 mx-auto transition"
-                          title="Cetak Laporan Lengkap Landscape (Analisis Butir + Remedial)">
-                          <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak Analisis
-                        </button>
+                      <td class="py-3 px-3.5 text-center">
+                        <span class="px-2.5 py-0.5 rounded-full font-black text-xs ${stats.avgScore >= 75 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : (stats.avgScore > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-400')}">
+                          ${stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '-'}
+                        </span>
+                      </td>
+                      <td class="py-3 px-3.5 text-center">
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${stats.statusBadgeClass}">
+                          ${escapeHtml(stats.overallStatus)}
+                        </span>
+                      </td>
+                      <td class="py-3 px-3.5 text-center whitespace-nowrap">
+                        <div class="inline-flex items-center justify-center gap-1.5">
+                          <button type="button" onclick="window.handlePrintStudentReport('${stu.id}')"
+                            class="px-2.5 py-1.5 rounded-full flowora-btn-primary text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition hover:scale-105"
+                            title="Cetak Lembar Rekap Lengkap (4 Bagian) PDF">
+                            <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak PDF
+                          </button>
+                          <button type="button" onclick="window.handleExportStudentXlsx('${stu.id}')"
+                            class="px-2.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition hover:scale-105"
+                            title="Ekspor Rapor Siswa ke Excel (.xlsx)">
+                            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Excel
+                          </button>
+                          <button type="button" onclick="window.handleViewStudentDetail('${stu.id}')"
+                            class="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-indigo-600 transition"
+                            title="Lihat Rincian Jawaban, Nilai &amp; Remedial">
+                            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     `;
@@ -9235,77 +9186,462 @@
                 </tbody>
               </table>
             </div>
-          `}
-        </div>
+            ${renderPaginationBar(rekapPage)}
+          </div>
+        ` : ''}
 
-        <!-- Monitoring Section: Program Remedial Kelas -->
-        <div class="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-4">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div class="flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
-                <i data-lucide="award" class="w-4 h-4"></i>
+        ${activeTab === 'jawaban' ? `
+          <!-- Tab 2: Rekap Input Jawaban Siswa per Butir Soal -->
+          <div class="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                  <i data-lucide="check-square" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h4 class="text-sm font-extrabold text-slate-900">Rekap Input Jawaban Siswa per Butir Soal</h4>
+                  <p class="text-[11px] text-slate-500">Matriks lembar jawaban siswa lengkap dengan kunci dan status koreksi</p>
+                </div>
               </div>
-              <div>
-                <h4 class="text-sm font-extrabold text-slate-900">Pantauan Program Remedial Siswa (${studentsNeedingRemedial} Siswa Perlu Bimbingan)</h4>
-                <p class="text-[11px] text-slate-500">Daftar siswa dengan nilai di bawah KKM beserta tindak lanjut remedial dari guru</p>
+              ${classExams.length > 0 && selectedExam ? `
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="window.handlePrintExamCombinedReportFromRekap('${selectedExam.id}')"
+                    class="px-3.5 py-2 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition hover:scale-105">
+                    <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak Rekap Jawaban (PDF)
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+
+            ${classExams.length === 0 ? `
+              <div class="py-12 text-center text-slate-400 text-xs">
+                Belum ada paket ulangan yang dibuat untuk kelas ${escapeHtml(selectedClass)} pada ${escapeHtml(activeYear)} (${escapeHtml(activeSem)}).
+              </div>
+            ` : `
+              <!-- Exam Switcher Selector -->
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-2 flex-1">
+                  <label for="rekap-exam-select-jawaban" class="text-xs font-bold text-slate-600 whitespace-nowrap">Pilih Paket Ulangan:</label>
+                  <select id="rekap-exam-select-jawaban" onchange="window.handleRekapSwitchExam(this.value)"
+                    class="flex-1 max-w-md px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                    ${classExams.map(ex => `
+                      <option value="${ex.id}" ${selectedExam && selectedExam.id === ex.id ? 'selected' : ''}>
+                        ${escapeHtml(ex.subject)} — ${escapeHtml(ex.title)} (KKM: ${ex.kkm})
+                      </option>
+                    `).join('')}
+                  </select>
+                </div>
+                ${selectedExam ? `
+                  <div class="text-[11px] text-slate-500 font-semibold flex items-center gap-2">
+                    <span>Guru: <strong class="text-slate-800">${escapeHtml(getExamTeacher(selectedExam)?.full_name || '-')}</strong></span>
+                    <span>•</span>
+                    <span>KKM: <strong class="text-slate-800">${selectedExam.kkm}</strong></span>
+                    <span>•</span>
+                    <span>Total: <strong class="text-slate-800">${selectedExam.total_questions} Soal</strong></span>
+                  </div>
+                ` : ''}
+              </div>
+
+              ${selectedExam ? (() => {
+                const examMeta = decodeExamMeta(selectedExam);
+                const isNumType = isNumericQuestionType(examMeta.questionType);
+                const isMulti = examMeta.isMultiType;
+                const showWeightedCol = examMeta.hasWeightedScore;
+
+                const keyStripHtml = isMulti
+                  ? examMeta.sections.map(sec =>
+                      `<span class="mr-3"><strong>${escapeHtml(sec.typeMeta.shortLabel)}</strong> (No. ${sec.startNumber}–${sec.endNumber}): <code class="font-mono font-bold text-indigo-900">${escapeHtml(sec.displayKey)}</code></span>`
+                    ).join(' ')
+                  : `<strong>${isNumType ? 'Bobot Maksimal per Butir' : `Kunci Jawaban Resmi (${examMeta.typeMeta.shortLabel})`}:</strong> <code class="font-mono font-bold text-indigo-900">${escapeHtml(examMeta.displayKey)}</code>`;
+
+                const examResults = (state.examResults || []).filter(r => r.exam_id === selectedExam.id);
+
+                return `
+                  <!-- Official Key Banner -->
+                  <div class="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 text-xs text-indigo-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="px-2 py-0.5 rounded-full bg-indigo-200 text-indigo-800 text-[10px] font-black uppercase">Kunci Jawaban</span>
+                      <span class="text-xs">${keyStripHtml}</span>
+                    </div>
+                    <div class="text-[11px] text-indigo-700 font-bold whitespace-nowrap">
+                      ${examResults.length} Siswa Sudah Dinilai
+                    </div>
+                  </div>
+
+                  <!-- Student Answers Matrix Table -->
+                  <div class="overflow-x-auto custom-scroll rounded-2xl border border-slate-200/80">
+                    <table class="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500">
+                          <th class="py-3 px-3 w-10 text-center">No</th>
+                          <th class="py-3 px-3.5 w-48">Nama Siswa &amp; NIS</th>
+                          <th class="py-3 px-3.5">Lembar Jawaban Siswa per Butir</th>
+                          <th class="py-3 px-3 text-center w-20">${showWeightedCol ? 'Poin' : 'Benar'}</th>
+                          <th class="py-3 px-3 text-center w-16">Nilai</th>
+                          <th class="py-3 px-3 text-center w-24">Status</th>
+                          <th class="py-3 px-3.5 text-left w-48">Catatan Guru</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-100">
+                        ${examResults.length === 0 ? `
+                          <tr>
+                            <td colspan="7" class="py-12 text-center text-slate-400">
+                              Belum ada data jawaban siswa yang diinput pada paket ulangan ini.
+                            </td>
+                          </tr>
+                        ` : examResults.map((r, idx) => {
+                          const graded = scoreStudentResponse(selectedExam, r.student_answers);
+                          const isTuntas = Number(r.score) >= Number(selectedExam.kkm);
+                          return `
+                            <tr class="hover:bg-slate-50/80 transition">
+                              <td class="py-3 px-3 text-center font-bold text-slate-400">${idx + 1}</td>
+                              <td class="py-3 px-3.5">
+                                <div class="font-bold text-slate-900">${escapeHtml(r.student_name)}</div>
+                                <div class="font-mono text-[11px] text-indigo-700">${escapeHtml(r.student_nis || '-')}</div>
+                              </td>
+                              <td class="py-3 px-3.5">
+                                ${renderStudentAnswerChips(graded)}
+                              </td>
+                              <td class="py-3 px-3 text-center font-bold text-slate-700 whitespace-nowrap">
+                                ${showWeightedCol ? `${graded.earnedTotal}/${graded.maxTotal}` : `${graded.correctCount}/${selectedExam.total_questions}`}
+                              </td>
+                              <td class="py-3 px-3 text-center font-black text-sm ${isTuntas ? 'text-emerald-700' : 'text-amber-700'}">
+                                ${r.score}
+                              </td>
+                              <td class="py-3 px-3 text-center">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${isTuntas ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                                  ${isTuntas ? 'TUNTAS' : 'REMEDIAL'}
+                                </span>
+                              </td>
+                              <td class="py-3 px-3.5 text-[11px] text-slate-600">
+                                ${escapeHtml(r.notes || '-')}
+                              </td>
+                            </tr>
+                          `;
+                        }).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                `;
+              })() : ''}
+            `}
+          </div>
+        ` : ''}
+
+        ${activeTab === 'analisis' ? `
+          <!-- Tab 3: Analisis Butir Soal (Item Analysis) -->
+          <div class="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                  <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h4 class="text-sm font-extrabold text-slate-900">Analisis Butir Soal (Item Analysis)</h4>
+                  <p class="text-[11px] text-slate-500">Tingkat kesukaran, daya serap butir soal, dan sebaran jawaban siswa</p>
+                </div>
+              </div>
+              ${classExams.length > 0 && selectedExam ? `
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="window.handlePrintExamCombinedReportFromRekap('${selectedExam.id}')"
+                    class="px-3.5 py-2 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition hover:scale-105">
+                    <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak Analisis Butir (PDF)
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+
+            ${classExams.length === 0 ? `
+              <div class="py-12 text-center text-slate-400 text-xs">
+                Belum ada paket ulangan yang dibuat untuk kelas ${escapeHtml(selectedClass)} pada ${escapeHtml(activeYear)} (${escapeHtml(activeSem)}).
+              </div>
+            ` : `
+              <!-- Exam Switcher Selector -->
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-2 flex-1">
+                  <label for="rekap-exam-select-analisis" class="text-xs font-bold text-slate-600 whitespace-nowrap">Pilih Paket Ulangan:</label>
+                  <select id="rekap-exam-select-analisis" onchange="window.handleRekapSwitchExam(this.value)"
+                    class="flex-1 max-w-md px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                    ${classExams.map(ex => `
+                      <option value="${ex.id}" ${selectedExam && selectedExam.id === ex.id ? 'selected' : ''}>
+                        ${escapeHtml(ex.subject)} — ${escapeHtml(ex.title)} (KKM: ${ex.kkm})
+                      </option>
+                    `).join('')}
+                  </select>
+                </div>
+                ${selectedExam ? `
+                  <div class="text-[11px] text-slate-500 font-semibold flex items-center gap-2">
+                    <span>Guru: <strong class="text-slate-800">${escapeHtml(getExamTeacher(selectedExam)?.full_name || '-')}</strong></span>
+                    <span>•</span>
+                    <span>KKM: <strong class="text-slate-800">${selectedExam.kkm}</strong></span>
+                  </div>
+                ` : ''}
+              </div>
+
+              ${selectedExam ? (() => {
+                const stats = computeExamStatistics(selectedExam);
+                const { masteredCount, reinforceCount, reteachCount } = summarizeItemMastery(stats.itemAnalysis);
+                const examMeta = stats.examMeta || decodeExamMeta(selectedExam);
+                const qType = examMeta.questionType;
+                const isNumType = isNumericQuestionType(qType);
+                const isMulti = examMeta.isMultiType;
+
+                return `
+                  <!-- Item Mastery KPI Summary -->
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                      <div class="text-[10px] font-bold uppercase text-emerald-700">Butir Dikuasai</div>
+                      <div class="text-2xl font-black text-emerald-950 mt-0.5">${masteredCount} <span class="text-xs font-bold text-emerald-600">Butir</span></div>
+                      <div class="text-[11px] text-emerald-700 mt-0.5">Daya serap tinggi (&ge;75%)</div>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
+                      <div class="text-[10px] font-bold uppercase text-amber-700">Perlu Penguatan</div>
+                      <div class="text-2xl font-black text-amber-950 mt-0.5">${reinforceCount} <span class="text-xs font-bold text-amber-600">Butir</span></div>
+                      <div class="text-[11px] text-amber-700 mt-0.5">Daya serap sedang (50-74%)</div>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
+                      <div class="text-[10px] font-bold uppercase text-rose-700">Perlu Remedial</div>
+                      <div class="text-2xl font-black text-rose-950 mt-0.5">${reteachCount} <span class="text-xs font-bold text-rose-600">Butir</span></div>
+                      <div class="text-[11px] text-rose-700 mt-0.5">Daya serap rendah (&lt;50%)</div>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200">
+                      <div class="text-[10px] font-bold uppercase text-indigo-700">Ketuntasan Klasikal</div>
+                      <div class="text-2xl font-black text-indigo-950 mt-0.5">${stats.classicalMastery}%</div>
+                      <div class="text-[11px] text-indigo-700 mt-0.5">Rata-rata kelas: ${stats.avgScore}</div>
+                    </div>
+                  </div>
+
+                  <!-- Full Item Analysis Table -->
+                  <div class="overflow-x-auto custom-scroll rounded-2xl border border-slate-200/80">
+                    <table class="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500">
+                          <th class="py-3 px-3 text-center w-16">No Butir</th>
+                          <th class="py-3 px-3 text-center w-16">Kunci</th>
+                          <th class="py-3 px-3.5 w-44">Tingkat Ketercapaian</th>
+                          <th class="py-3 px-3 text-center w-28">Tingkat Kesukaran</th>
+                          <th class="py-3 px-3 text-center w-28">Kategori Capaian</th>
+                          <th class="py-3 px-3 text-center w-40">Sebaran Pilihan Siswa</th>
+                          <th class="py-3 px-3.5 text-center w-36">Rekomendasi Tindak Lanjut</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-100">
+                        ${stats.itemAnalysis.length === 0 ? `
+                          <tr>
+                            <td colspan="7" class="py-12 text-center text-slate-400">
+                              Belum ada data jawaban siswa untuk dianalisis pada paket ulangan ini.
+                            </td>
+                          </tr>
+                        ` : stats.itemAnalysis.map(item => {
+                          const itemType = item.questionType || qType;
+                          const itemIsNum = isNumericQuestionType(itemType);
+                          let distText = '';
+                          if (itemIsNum) {
+                            distText = `Rata ${item.meanScore} / Maks ${item.maxScore}`;
+                          } else if (itemType === 'BS') {
+                            distText = `B: ${item.optionCounts.B} • S: ${item.optionCounts.S}`;
+                          } else {
+                            distText = `A:${item.optionCounts.A} • B:${item.optionCounts.B} • C:${item.optionCounts.C} • D:${item.optionCounts.D} • E:${item.optionCounts.E}`;
+                          }
+
+                          const diffCls = item.difficultyLabel === 'Mudah'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : (item.difficultyLabel === 'Sedang' ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800');
+
+                          const tierCls = item.masteryTier === 'high'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : (item.masteryTier === 'mid' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800');
+
+                          return `
+                            <tr class="hover:bg-slate-50/80 transition">
+                              <td class="py-3 px-3 text-center font-bold text-slate-900">
+                                #${item.number}
+                                ${isMulti ? `<div class="text-[9px] text-indigo-600 font-bold">${escapeHtml(item.sectionShort)}</div>` : ''}
+                              </td>
+                              <td class="py-3 px-3 text-center">
+                                <span class="px-2 py-0.5 rounded font-mono font-black text-indigo-700 bg-indigo-50 border border-indigo-200">
+                                  ${escapeHtml(String(item.key))}
+                                </span>
+                              </td>
+                              <td class="py-3 px-3.5">
+                                <div class="flex items-center justify-between text-[11px] font-bold mb-1">
+                                  <span class="text-slate-600">${item.correctCount}/${stats.totalStudents} Siswa</span>
+                                  <span class="text-indigo-700">${item.correctPercent}%</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                  <div class="h-full bg-indigo-600 rounded-full" style="width: ${item.correctPercent}%;"></div>
+                                </div>
+                              </td>
+                              <td class="py-3 px-3 text-center">
+                                <div class="font-bold text-slate-800 text-xs">${item.pIndex}</div>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${diffCls}">${escapeHtml(item.difficultyLabel)}</span>
+                              </td>
+                              <td class="py-3 px-3 text-center">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${tierCls}">${escapeHtml(item.masteryLabel)}</span>
+                              </td>
+                              <td class="py-3 px-3 text-center font-mono text-[10px] text-slate-600">
+                                ${escapeHtml(distText)}
+                              </td>
+                              <td class="py-3 px-3.5 text-center">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${tierCls}">${escapeHtml(item.statusAction)}</span>
+                              </td>
+                            </tr>
+                          `;
+                        }).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                `;
+              })() : ''}
+            `}
+          </div>
+        ` : ''}
+
+        ${activeTab === 'remedial' ? `
+          <!-- Tab 4: Program Remedial & Pengayaan -->
+          <div class="space-y-6">
+            <!-- Pantauan Program Remedial Siswa -->
+            <div class="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                    <i data-lucide="award" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-sm font-extrabold text-slate-900">Pantauan Program Remedial Siswa (${studentsNeedingRemedial} Siswa Perlu Bimbingan)</h4>
+                    <p class="text-[11px] text-slate-500">Daftar siswa dengan nilai di bawah KKM beserta diagnosis butir yang salah dan tindak lanjut guru</p>
+                  </div>
+                </div>
+              </div>
+
+              ${studentsNeedingRemedial === 0 ? `
+                <div class="py-8 text-center text-emerald-600 font-bold text-xs bg-emerald-50/50 rounded-2xl border border-emerald-100">
+                  ✓ Luar biasa! Seluruh siswa yang mengikuti ulangan di kelas ${escapeHtml(selectedClass)} telah TUNTAS mencapai KKM.
+                </div>
+              ` : `
+                <div class="overflow-x-auto custom-scroll rounded-2xl border border-slate-200/80">
+                  <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500">
+                        <th class="py-3 px-3 w-10 text-center">No</th>
+                        <th class="py-3 px-3.5 w-44">Nama Siswa &amp; NIS</th>
+                        <th class="py-3 px-3.5 w-44">Mata Pelajaran &amp; Ulangan</th>
+                        <th class="py-3 px-3 text-center w-28">Nilai / KKM</th>
+                        <th class="py-3 px-3.5">Diagnosis Butir Soal Belum Tuntas</th>
+                        <th class="py-3 px-3.5 w-64">Catatan &amp; Bentuk Tindak Lanjut Guru</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                      ${(() => {
+                        let rowNum = 0;
+                        const rows = [];
+                        classStudents.forEach(stu => {
+                          const stats = getStudentRecapStats(stu, classExams);
+                          stats.examSummaries.filter(e => e.result !== null && !e.isPassed).forEach(e => {
+                            rowNum++;
+                            const examMeta = decodeExamMeta(e.exam);
+                            const weakLabel = formatWeakQuestionsLabel(e.exam, examMeta, e.result.student_answers);
+                            rows.push(`
+                              <tr class="hover:bg-amber-50/30 transition">
+                                <td class="py-3 px-3 text-center font-bold text-slate-400">${rowNum}</td>
+                                <td class="py-3 px-3.5">
+                                  <div class="font-bold text-slate-900">${escapeHtml(stu.full_name)}</div>
+                                  <div class="font-mono text-[11px] text-indigo-700">${escapeHtml(stu.nis || '-')}</div>
+                                </td>
+                                <td class="py-3 px-3.5">
+                                  <div class="font-bold text-indigo-700">${escapeHtml(e.exam.subject)}</div>
+                                  <div class="text-[11px] text-slate-500">${escapeHtml(e.exam.title)}</div>
+                                </td>
+                                <td class="py-3 px-3 text-center">
+                                  <span class="px-2 py-0.5 rounded-full font-black text-xs bg-amber-100 text-amber-800">
+                                    ${e.score} <span class="text-[10px] font-normal text-amber-700">/ KKM ${e.kkm}</span>
+                                  </span>
+                                </td>
+                                <td class="py-3 px-3.5 font-mono text-[11px] font-bold text-rose-700">
+                                  ${escapeHtml(weakLabel)}
+                                </td>
+                                <td class="py-3 px-3.5 text-slate-700">
+                                  ${escapeHtml(e.notes || 'Bimbingan tutor sebaya dan latihan butir soal.')}
+                                </td>
+                              </tr>
+                            `);
+                          });
+                        });
+                        return rows.join('');
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              `}
+            </div>
+
+            <!-- Pantauan Program Pengayaan Siswa -->
+            <div class="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <i data-lucide="award" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-sm font-extrabold text-slate-900">Pantauan Program Pengayaan Siswa (Nilai &ge; KKM)</h4>
+                    <p class="text-[11px] text-slate-500">Daftar siswa yang telah tuntas beserta rencana kegiatan pendalaman materi dan tantangan HOTS</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="overflow-x-auto custom-scroll rounded-2xl border border-slate-200/80">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500">
+                      <th class="py-3 px-3 w-10 text-center">No</th>
+                      <th class="py-3 px-3.5 w-44">Nama Siswa &amp; NIS</th>
+                      <th class="py-3 px-3.5 w-44">Mata Pelajaran &amp; Ulangan</th>
+                      <th class="py-3 px-3 text-center w-28">Nilai / KKM</th>
+                      <th class="py-3 px-3.5">Bentuk Program Pengayaan</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    ${(() => {
+                      let rowNum = 0;
+                      const rows = [];
+                      classStudents.forEach(stu => {
+                        const stats = getStudentRecapStats(stu, classExams);
+                        stats.examSummaries.filter(e => e.result !== null && e.isPassed).forEach(e => {
+                          rowNum++;
+                          rows.push(`
+                            <tr class="hover:bg-emerald-50/20 transition">
+                              <td class="py-3 px-3 text-center font-bold text-slate-400">${rowNum}</td>
+                              <td class="py-3 px-3.5">
+                                <div class="font-bold text-slate-900">${escapeHtml(stu.full_name)}</div>
+                                <div class="font-mono text-[11px] text-indigo-700">${escapeHtml(stu.nis || '-')}</div>
+                              </td>
+                              <td class="py-3 px-3.5">
+                                <div class="font-bold text-indigo-700">${escapeHtml(e.exam.subject)}</div>
+                                <div class="text-[11px] text-slate-500">${escapeHtml(e.exam.title)}</div>
+                              </td>
+                              <td class="py-3 px-3 text-center">
+                                <span class="px-2 py-0.5 rounded-full font-black text-xs bg-emerald-100 text-emerald-800">
+                                  ${e.score} <span class="text-[10px] font-normal text-emerald-700">/ KKM ${e.kkm}</span>
+                                </span>
+                              </td>
+                              <td class="py-3 px-3.5 text-emerald-800 font-semibold">
+                                ${e.score >= 90 ? 'Tutor Sebaya & Pemecahan Soal Tantangan HOTS / Kompetisi Sains' : 'Pendalaman Materi Lanjutan & Latihan Tambahan Mandiri'}
+                              </td>
+                            </tr>
+                          `);
+                        });
+                      });
+                      if (rows.length === 0) {
+                        return `<tr><td colspan="5" class="py-8 text-center text-slate-400">Belum ada siswa yang tuntas pada periode ini.</td></tr>`;
+                      }
+                      return rows.join('');
+                    })()}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
-
-          ${studentsNeedingRemedial === 0 ? `
-            <div class="py-8 text-center text-emerald-600 font-bold text-xs bg-emerald-50/50 rounded-2xl border border-emerald-100">
-              ✓ Luar biasa! Seluruh siswa yang mengikuti ulangan di kelas ${escapeHtml(selectedClass)} telah TUNTAS mencapai KKM.
-            </div>
-          ` : `
-            <div class="overflow-x-auto custom-scroll">
-              <table class="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
-                    <th class="py-2.5 px-3 w-10 text-center">No</th>
-                    <th class="py-2.5 px-3">Nama Siswa &amp; NIS</th>
-                    <th class="py-2.5 px-3">Mata Pelajaran &amp; Ulangan</th>
-                    <th class="py-2.5 px-3 text-center">Nilai / KKM</th>
-                    <th class="py-2.5 px-3">Catatan &amp; Bentuk Tindak Lanjut Guru</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                  ${(() => {
-                    let rowNum = 0;
-                    const rows = [];
-                    classStudents.forEach(stu => {
-                      const stats = getStudentRecapStats(stu, classExams);
-                      stats.examSummaries.filter(e => e.result !== null && !e.isPassed).forEach(e => {
-                        rowNum++;
-                        rows.push(`
-                          <tr class="hover:bg-amber-50/30 transition">
-                            <td class="py-2.5 px-3 text-center font-bold text-slate-400">${rowNum}</td>
-                            <td class="py-2.5 px-3">
-                              <div class="font-bold text-slate-900">${escapeHtml(stu.full_name)}</div>
-                              <div class="font-mono text-[11px] text-slate-500">${escapeHtml(stu.nis || '-')}</div>
-                            </td>
-                            <td class="py-2.5 px-3">
-                              <div class="font-bold text-indigo-700">${escapeHtml(e.exam.subject)}</div>
-                              <div class="text-[11px] text-slate-500">${escapeHtml(e.exam.title)}</div>
-                            </td>
-                            <td class="py-2.5 px-3 text-center">
-                              <span class="px-2 py-0.5 rounded-full font-black text-xs bg-amber-100 text-amber-800">
-                                ${e.score} <span class="text-[10px] font-normal text-amber-700">/ KKM ${e.kkm}</span>
-                              </span>
-                            </td>
-                            <td class="py-2.5 px-3 text-slate-700">
-                              ${escapeHtml(e.notes || 'Perlu pendampingan tutor sebaya dan latihan butir soal.')}
-                            </td>
-                          </tr>
-                        `);
-                      });
-                    });
-                    return rows.join('');
-                  })()}
-                </tbody>
-              </table>
-            </div>
-          `}
-        </div>
+        ` : ''}
       </div>
       `;
     }
@@ -9314,6 +9650,7 @@
       state.rekapSelectedClass = className || '';
       state.pagination.rekap = 1;
       state.rekapSearchQuery = '';
+      state.rekapActiveExamId = null;
       renderCurrentMenu();
     };
 
@@ -9323,12 +9660,23 @@
       renderCurrentMenu();
     };
 
+    window.handleRekapSwitchTab = function (tabName) {
+      state.rekapActiveTab = tabName || 'rapor';
+      renderCurrentMenu();
+    };
+
+    window.handleRekapSwitchExam = function (examId) {
+      state.rekapActiveExamId = examId || null;
+      renderCurrentMenu();
+    };
+
     function buildStudentReportSheetHtml(student, stats, classExams) {
       const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
       const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
       const printDateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
       const homeroom = getHomeroomTeacherForClass(student.class_name);
 
+      // Bagian I: Baris Rekapitulasi Nilai Asesmen
       let examRowsHtml = '';
       if (stats.examSummaries.length === 0) {
         examRowsHtml = `<tr><td colspan="8" style="text-align:center; padding:16px; color:#64748b;">Belum ada paket ulangan pada periode ini.</td></tr>`;
@@ -9359,6 +9707,253 @@
         }).join('');
       }
 
+      // Filter ulangan yang sudah diikuti siswa untuk Bagian II, III, dan IV
+      const takenExams = stats.examSummaries.filter(e => e.result !== null);
+
+      // Bagian II: Lembar Jawaban Siswa per Butir Soal (Chips Jawaban)
+      let bagian2Html = '';
+      if (takenExams.length === 0) {
+        bagian2Html = `
+          <div style="padding:12px; text-align:center; color:#64748b; font-size:9.5px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:6px;">
+            Belum ada lembar jawaban ulangan yang diinput untuk siswa ini.
+          </div>
+        `;
+      } else {
+        bagian2Html = takenExams.map(e => {
+          const examMeta = decodeExamMeta(e.exam);
+          const graded = scoreStudentResponse(e.exam, e.result.student_answers);
+          const isMulti = examMeta.isMultiType;
+          const isNumType = isNumericQuestionType(examMeta.questionType);
+          const teacher = getExamTeacher(e.exam);
+
+          const keyStripHtml = isMulti
+            ? examMeta.sections.map(sec =>
+                `<span style="margin-right:10px;"><strong>${escapeHtml(sec.typeMeta.shortLabel)}</strong> (No. ${sec.startNumber}–${sec.endNumber}): <code style="font-family:monospace; font-weight:800; color:#312e81;">${escapeHtml(sec.displayKey)}</code></span>`
+              ).join(' ')
+            : `<strong>${isNumType ? 'Bobot Maksimal per Butir' : `Kunci Jawaban Resmi (${examMeta.typeMeta.shortLabel})`}:</strong> <code style="font-family:monospace; font-weight:800; color:#312e81;">${escapeHtml(examMeta.displayKey)}</code>`;
+
+          return `
+            <div style="margin-bottom:10px; border:1px solid #cbd5e1; border-radius:8px; padding:9px 12px; background:#ffffff; page-break-inside:avoid; break-inside:avoid;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; padding-bottom:4px; border-bottom:1px solid #e2e8f0;">
+                <div>
+                  <span style="font-weight:800; font-size:11px; color:#1e1b4b;">${escapeHtml(e.exam.subject)} — ${escapeHtml(e.exam.title)}</span>
+                  <span style="font-size:9px; color:#64748b; margin-left:8px;">Guru: <strong>${escapeHtml(teacher?.full_name || '-')}</strong></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:9px; font-weight:700; color:#475569;">KKM: ${e.kkm}</span>
+                  <span style="font-size:11px; font-weight:800; color:${e.isPassed ? '#047857' : '#b45309'};">Nilai: ${e.score}</span>
+                  <span class="pr-pill ${e.isPassed ? 'pr-pill-emerald' : 'pr-pill-amber'}">${e.isPassed ? 'TUNTAS' : 'REMEDIAL'}</span>
+                </div>
+              </div>
+
+              <div class="pr-key-strip" style="margin-bottom:6px; font-size:9px;">
+                ${keyStripHtml}
+              </div>
+
+              <div style="margin-bottom:6px;">
+                <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:3px;">
+                  Lembar Jawaban Siswa per Butir (Warna Hijau = Benar/Tuntas, Warna Merah = Salah/Perlu Remedial):
+                </div>
+                ${renderPrintAnswerChipsHtml(graded)}
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:9px; padding-top:4px; border-top:1px dashed #e2e8f0; color:#334155;">
+                <span>Total Soal: <strong>${e.exam.total_questions}</strong> Butir</span>
+                <span style="color:#047857;">Jawaban Benar: <strong>${graded.correctCount}</strong> Butir</span>
+                <span style="color:#b91c1c;">Salah / Belum Tuntas: <strong>${graded.incorrectCount}</strong> Butir</span>
+                <span>Skor: <strong>${graded.earnedTotal} / ${graded.maxTotal}</strong></span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Bagian III: Analisis Butir Soal & Capaian Kompetensi Siswa
+      let bagian3Html = '';
+      if (takenExams.length === 0) {
+        bagian3Html = `
+          <div style="padding:12px; text-align:center; color:#64748b; font-size:9.5px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:6px;">
+            Belum ada data capaian kompetensi butir soal untuk dianalisis.
+          </div>
+        `;
+      } else {
+        bagian3Html = takenExams.map(e => {
+          const examMeta = decodeExamMeta(e.exam);
+          const graded = scoreStudentResponse(e.exam, e.result.student_answers);
+          const correctItems = graded.itemResults.filter(i => i.isCorrect);
+          const missedItems = graded.itemResults.filter(i => !i.isCorrect);
+          const pct = Math.round((graded.correctCount / Math.max(1, graded.itemResults.length)) * 100);
+
+          const correctListStr = correctItems.length > 0
+            ? correctItems.map(i => `No. ${i.number}${examMeta.isMultiType ? ` (${i.sectionShort})` : ''}`).join(', ')
+            : 'Tidak ada';
+
+          const missedListHtml = missedItems.length === 0
+            ? `<div style="padding:6px 10px; background:#dcfce7; border:1px solid #bbf7d0; border-radius:6px; font-size:9.5px; color:#15803d; font-weight:700;">✓ Luar biasa! Seluruh butir soal berhasil dikuasai dengan benar (100% Tuntas).</div>`
+            : `
+              <table class="pr-table" style="margin-top:4px;">
+                <thead>
+                  <tr style="background:#fef2f2;">
+                    <th style="width:32px; text-align:center; color:#991b1b;">No</th>
+                    <th style="width:85px; text-align:center; color:#991b1b;">Butir Soal</th>
+                    <th style="width:75px; text-align:center; color:#991b1b;">Kunci</th>
+                    <th style="width:75px; text-align:center; color:#991b1b;">Jawaban</th>
+                    <th style="text-align:left; color:#991b1b;">Diagnosis Analisis Kesalahan &amp; Rekomendasi Guru</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${missedItems.map((m, mIdx) => `
+                    <tr>
+                      <td style="text-align:center; font-weight:bold;">${mIdx + 1}</td>
+                      <td style="text-align:center; font-weight:bold; color:#be123c;">
+                        Butir #${m.number} ${examMeta.isMultiType ? `(${m.sectionShort})` : ''}
+                      </td>
+                      <td style="text-align:center; font-family:monospace; font-weight:800; color:#312e81;">
+                        ${escapeHtml(String(m.keyVal))}
+                      </td>
+                      <td style="text-align:center; font-family:monospace; font-weight:800; color:#be123c; background:#fff1f2;">
+                        ${escapeHtml(String(m.studentVal || '-'))}
+                      </td>
+                      <td style="font-size:9px; color:#475569;">
+                        Siswa belum menguasai indikator soal ini. Direkomendasikan pembimbingan ulang materi terkait &amp; pemberian latihan soal sejenis.
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            `;
+
+          return `
+            <div style="margin-bottom:10px; border:1px solid #cbd5e1; border-radius:8px; padding:9px 12px; background:#ffffff; page-break-inside:avoid; break-inside:avoid;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; padding-bottom:4px; border-bottom:1px solid #e2e8f0;">
+                <div style="font-weight:800; font-size:11px; color:#1e1b4b;">
+                  Analisis Butir: ${escapeHtml(e.exam.subject)} — ${escapeHtml(e.exam.title)}
+                </div>
+                <div style="font-size:9.5px; font-weight:700;">
+                  Daya Serap / Capaian: <span style="color:${pct >= 75 ? '#047857' : '#b45309'}; font-size:11px;">${pct}%</span> (${graded.correctCount}/${graded.itemResults.length} Butir)
+                </div>
+              </div>
+
+              <div style="margin-bottom:6px; font-size:9.5px;">
+                <span style="font-weight:700; color:#047857;">✓ Butir Soal yang Sudah Dikuasai (${correctItems.length} Butir):</span>
+                <div style="color:#334155; margin-top:2px; line-height:1.4;">${correctListStr}</div>
+              </div>
+
+              <div>
+                <span style="font-weight:700; color:#b91c1c;">⚠ Butir Soal yang Belum Dikuasai / Perlu Remedial (${missedItems.length} Butir):</span>
+                ${missedListHtml}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Bagian IV: Program Tindak Lanjut: Remedial & Pengayaan
+      const remedialExams = takenExams.filter(e => !e.isPassed);
+      const passedExams = takenExams.filter(e => e.isPassed);
+
+      let remedialTableHtml = '';
+      if (remedialExams.length === 0) {
+        remedialTableHtml = `
+          <div style="padding:8px 12px; background:#dcfce7; border:1px solid #bbf7d0; border-radius:6px; font-size:9.5px; color:#15803d; font-weight:700; margin-bottom:8px;">
+            ✓ Selamat! Seluruh mata pelajaran telah TUNTAS mencapai KKM. Siswa tidak memerlukan program remedial.
+          </div>
+        `;
+      } else {
+        remedialTableHtml = `
+          <table class="pr-table" style="margin-bottom:10px;">
+            <thead>
+              <tr style="background:#fffbeb;">
+                <th style="width:30px; text-align:center;">No</th>
+                <th style="width:130px; text-align:left;">Mata Pelajaran &amp; Ulangan</th>
+                <th style="width:48px; text-align:center;">Nilai Awal</th>
+                <th style="width:40px; text-align:center;">KKM</th>
+                <th style="text-align:left;">Diagnosis Butir Soal Belum Tuntas</th>
+                <th style="width:150px; text-align:left;">Bentuk Kegiatan Remedial</th>
+                <th style="width:75px; text-align:center;">Nilai Remedial</th>
+                <th style="width:65px; text-align:center;">Paraf Guru</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${remedialExams.map((e, idx) => {
+                const examMeta = decodeExamMeta(e.exam);
+                const weakItemsStr = formatWeakQuestionsLabel(e.exam, examMeta, e.result.student_answers);
+                return `
+                  <tr>
+                    <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+                    <td>
+                      <div style="font-weight:bold;">${escapeHtml(e.exam.subject)}</div>
+                      <div style="font-size:9px; color:#64748b;">${escapeHtml(e.exam.title)}</div>
+                    </td>
+                    <td style="text-align:center; font-weight:bold; color:#be123c;">${e.score}</td>
+                    <td style="text-align:center; font-weight:bold;">${e.kkm}</td>
+                    <td style="font-family:monospace; font-size:9px; font-weight:700; color:#b91c1c;">
+                      ${weakItemsStr}
+                    </td>
+                    <td style="font-size:9px; color:#334155;">
+                      ${escapeHtml(e.notes || 'Bimbingan tutor sebaya dan latihan pengerjaan butir soal terkait.')}
+                    </td>
+                    <td style="text-align:center; font-family:monospace; font-weight:bold; font-size:10.5px;">
+                      ...... / 100
+                    </td>
+                    <td style="text-align:center; font-size:9px; color:#64748b; vertical-align:bottom; height:32px;">
+                      ( ........... )
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      let enrichmentTableHtml = '';
+      if (passedExams.length === 0) {
+        enrichmentTableHtml = `
+          <div style="padding:8px 12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; font-size:9.5px; color:#64748b; font-style:italic;">
+            Siswa difokuskan untuk menyelesaikan bimbingan program remedial terlebih dahulu.
+          </div>
+        `;
+      } else {
+        enrichmentTableHtml = `
+          <table class="pr-table">
+            <thead>
+              <tr style="background:#f0fdf4;">
+                <th style="width:30px; text-align:center;">No</th>
+                <th style="width:140px; text-align:left;">Mata Pelajaran &amp; Ulangan</th>
+                <th style="width:50px; text-align:center;">Nilai</th>
+                <th style="width:40px; text-align:center;">KKM</th>
+                <th style="text-align:left;">Bentuk Kegiatan Program Pengayaan</th>
+                <th style="width:80px; text-align:center;">Status</th>
+                <th style="width:70px; text-align:center;">Paraf Guru</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${passedExams.map((e, idx) => `
+                <tr>
+                  <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+                  <td>
+                    <div style="font-weight:bold;">${escapeHtml(e.exam.subject)}</div>
+                    <div style="font-size:9px; color:#64748b;">${escapeHtml(e.exam.title)}</div>
+                  </td>
+                  <td style="text-align:center; font-weight:bold; color:#047857;">${e.score}</td>
+                  <td style="text-align:center; font-weight:bold;">${e.kkm}</td>
+                  <td style="font-size:9px; color:#15803d; font-weight:600;">
+                    ${e.score >= 90 ? 'Tutor Sebaya & Pemecahan Soal Tantangan HOTS / Kompetisi' : 'Pendalaman Materi Lanjutan & Penugasan Eksploratif'}
+                  </td>
+                  <td style="text-align:center;">
+                    <span class="pr-pill pr-pill-emerald">PENGAYAAN</span>
+                  </td>
+                  <td style="text-align:center; font-size:9px; color:#64748b; vertical-align:bottom; height:30px;">
+                    ( ........... )
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
       return `
         <div class="pr-kop">
           <div>
@@ -9374,16 +9969,16 @@
           </div>
         </div>
 
-        <div style="text-align:center; margin:12px 0 16px;">
-          <div style="font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#0f172a;">
-            LEMBAR REKAPITULASI HASIL ULANGAN &amp; TINDAK LANJUT SISWA
+        <div style="text-align:center; margin:10px 0 14px;">
+          <div style="font-size:13.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#0f172a;">
+            LEMBAR REKAPITULASI HASIL ULANGAN, ANALISIS BUTIR &amp; TINDAK LANJUT SISWA
           </div>
-          <div style="font-size:10.5px; color:#475569; margin-top:2px;">
-            Laporan Rekapitulasi Nilai Asesmen, Analisis Capaian Kompetensi, dan Program Remedial
+          <div style="font-size:10px; color:#475569; margin-top:2px;">
+            Laporan Rekapitulasi Nilai Asesmen, Lembar Jawaban Siswa, Analisis Butir Soal, Serta Program Remedial dan Pengayaan
           </div>
         </div>
 
-        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:14px; padding:10px 14px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px;">
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:12px; padding:9px 12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px;">
           <div>
             <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase;">Nama Lengkap Siswa</div>
             <div style="font-size:12px; font-weight:800; color:#0f172a; margin-top:2px;">${escapeHtml(student.full_name)}</div>
@@ -9402,23 +9997,28 @@
           </div>
         </div>
 
-        <table class="pr-table">
+        <!-- BAGIAN I: REKAPITULASI NILAI & STATUS KETUNTASAN -->
+        <div class="pr-block-title">
+          <span>BAGIAN I: REKAPITULASI NILAI ASESMEN &amp; STATUS KETUNTASAN</span>
+          <span style="font-size:9px; font-weight:normal; color:#64748b;">${stats.totalTaken} dari ${stats.totalExams} Ulangan Diikuti</span>
+        </div>
+        <table class="pr-table" style="margin-bottom:12px;">
           <thead>
             <tr>
-              <th style="width:36px; text-align:center;">No</th>
-              <th style="width:140px; text-align:left;">Mata Pelajaran</th>
+              <th style="width:32px; text-align:center;">No</th>
+              <th style="width:130px; text-align:left;">Mata Pelajaran</th>
               <th style="text-align:left;">Judul Ulangan / Asesmen</th>
-              <th style="width:130px; text-align:left;">Guru Pengampu</th>
-              <th style="width:48px; text-align:center;">KKM</th>
-              <th style="width:58px; text-align:center;">Nilai</th>
-              <th style="width:85px; text-align:center;">Ketuntasan</th>
-              <th style="width:200px; text-align:left;">Catatan / Tindak Lanjut</th>
+              <th style="width:120px; text-align:left;">Guru Pengampu</th>
+              <th style="width:44px; text-align:center;">KKM</th>
+              <th style="width:50px; text-align:center;">Nilai</th>
+              <th style="width:80px; text-align:center;">Ketuntasan</th>
+              <th style="width:180px; text-align:left;">Catatan / Tindak Lanjut</th>
             </tr>
           </thead>
           <tbody>
             ${examRowsHtml}
             <tr style="background:#f1f5f9; font-weight:800;">
-              <td colspan="5" style="text-align:right; padding:6px 10px;">RATA-RATA NILAI &amp; STATUS KETUNTASAN:</td>
+              <td colspan="5" style="text-align:right; padding:5px 8px;">RATA-RATA NILAI &amp; STATUS KETUNTASAN:</td>
               <td style="text-align:center; font-size:11px; color:${stats.avgScore >= 75 ? '#047857' : '#b45309'};">
                 ${stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '-'}
               </td>
@@ -9427,25 +10027,55 @@
                   ${escapeHtml(stats.overallStatus)}
                 </span>
               </td>
-              <td style="font-size:9.5px; color:#475569;">
+              <td style="font-size:9px; color:#475569;">
                 ${stats.totalTaken} dari ${stats.totalExams} ulangan diikuti (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)
               </td>
             </tr>
           </tbody>
         </table>
 
-        <div style="margin-top:28px; display:flex; justify-content:space-between; page-break-inside:avoid; break-inside:avoid; font-size:11px;">
+        <!-- BAGIAN II: REKAP HASIL INPUT JAWABAN SISWA -->
+        <div class="pr-block-title" style="margin-top:14px;">
+          <span>BAGIAN II: REKAP HASIL INPUT JAWABAN SISWA (LEMBAR JAWABAN PER BUTIR)</span>
+          <span style="font-size:9px; font-weight:normal; color:#64748b;">Rincian Kunci &amp; Jawaban Siswa per Nomor Soal</span>
+        </div>
+        ${bagian2Html}
+
+        <!-- BAGIAN III: ANALISIS BUTIR SOAL & CAPAIAN KOMPETENSI SISWA -->
+        <div class="pr-block-title" style="margin-top:14px;">
+          <span>BAGIAN III: ANALISIS BUTIR SOAL &amp; CAPAIAN KOMPETENSI SISWA</span>
+          <span style="font-size:9px; font-weight:normal; color:#64748b;">Capaian Butir Soal Dikuasai vs Perlu Remedial</span>
+        </div>
+        ${bagian3Html}
+
+        <!-- BAGIAN IV: PROGRAM TINDAK LANJUT: REMEDIAL & PENGAYAAN -->
+        <div class="pr-block-title" style="margin-top:14px;">
+          <span>BAGIAN IV: PROGRAM TINDAK LANJUT: REMEDIAL &amp; PENGAYAAN</span>
+          <span style="font-size:9px; font-weight:normal; color:#64748b;">Diagnosis Butir Belum Tuntas &amp; Rekomendasi Guru</span>
+        </div>
+        
+        <div style="font-size:9.5px; font-weight:800; color:#b45309; margin:6px 0 3px;">
+          A. Program Remedial (Siswa dengan Nilai di Bawah KKM):
+        </div>
+        ${remedialTableHtml}
+
+        <div style="font-size:9.5px; font-weight:800; color:#047857; margin:8px 0 3px;">
+          B. Program Pengayaan (Siswa dengan Nilai Memenuhi KKM):
+        </div>
+        ${enrichmentTableHtml}
+
+        <div style="margin-top:24px; display:flex; justify-content:space-between; page-break-inside:avoid; break-inside:avoid; font-size:11px;">
           <div style="text-align:center; width:220px;">
             <div>Mengetahui,</div>
             <div style="font-weight:700;">Kepala Madrasah</div>
-            <div style="height:55px;"></div>
+            <div style="height:50px;"></div>
             <div style="font-weight:800; text-decoration:underline;">H. Ahmad Syauqi, S.Pd.I, M.Pd.</div>
             <div style="font-size:10px; color:#475569;">NIP. 197808152005011004</div>
           </div>
           <div style="text-align:center; width:220px;">
             <div>Banjarmasin, ${printDateStr}</div>
             <div style="font-weight:700;">Wali Kelas / Guru Kelas</div>
-            <div style="height:55px;"></div>
+            <div style="height:50px;"></div>
             <div style="font-weight:800; text-decoration:underline;">${escapeHtml(homeroom.name)}</div>
             <div style="font-size:10px; color:#475569;">NIP/NUPTK: ${escapeHtml(homeroom.nip)}</div>
           </div>
@@ -9489,7 +10119,8 @@
       const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
       const dateStr = new Date().toISOString().slice(0, 10);
 
-      const aoa = [
+      // Sheet 1: Rekap Nilai Siswa
+      const aoaSheet1 = [
         ['LEMBAR REKAPITULASI HASIL ULANGAN & TINDAK LANJUT SISWA'],
         ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
         ['Tahun Ajaran:', activeYear, 'Semester:', activeSem, 'Tanggal Ekspor:', dateStr],
@@ -9502,7 +10133,7 @@
 
       stats.examSummaries.forEach((e, idx) => {
         const teacherName = getExamTeacher(e.exam)?.full_name || '-';
-        aoa.push([
+        aoaSheet1.push([
           idx + 1,
           e.exam.subject || '-',
           e.exam.title || '-',
@@ -9514,25 +10145,96 @@
         ]);
       });
 
-      aoa.push([]);
-      aoa.push([
+      aoaSheet1.push([]);
+      aoaSheet1.push([
         '', 'RATA-RATA NILAI', '', '', '',
         stats.avgScore > 0 ? stats.avgScore : '-',
         stats.overallStatus,
-        `${stats.totalTaken} dari ${stats.totalExams} ulangan diikuti`
+        `${stats.totalTaken} dari ${stats.totalExams} ulangan diikuti (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)`
       ]);
+
+      // Sheet 2: Rekap Lembar Jawaban Siswa per Butir
+      const aoaSheet2 = [
+        ['REKAP HASIL INPUT JAWABAN SISWA PER BUTIR SOAL'],
+        ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
+        ['Nama Siswa:', stu.full_name, 'NIS:', stu.nis || '-', 'Kelas:', stu.class_name],
+        ['Tahun Ajaran:', activeYear, 'Semester:', activeSem, 'Tanggal Ekspor:', dateStr],
+        [],
+        ['Mata Pelajaran', 'Judul Ulangan', 'No Butir', 'Kunci Jawaban', 'Jawaban Siswa', 'Koreksi', 'Skor Poin']
+      ];
+
+      const takenExams = stats.examSummaries.filter(e => e.result !== null);
+      if (takenExams.length === 0) {
+        aoaSheet2.push(['Belum ada data ulangan yang diikuti oleh siswa ini.']);
+      } else {
+        takenExams.forEach(e => {
+          const graded = scoreStudentResponse(e.exam, e.result.student_answers);
+          graded.itemResults.forEach(item => {
+            aoaSheet2.push([
+              e.exam.subject,
+              e.exam.title,
+              `#${item.number}`,
+              String(item.keyVal),
+              String(item.studentVal || '-'),
+              item.isCorrect ? 'BENAR' : 'SALAH',
+              `${item.earned} / ${item.max}`
+            ]);
+          });
+          aoaSheet2.push([]);
+        });
+      }
+
+      // Sheet 3: Analisis Butir & Program Remedial
+      const aoaSheet3 = [
+        ['ANALISIS BUTIR SOAL & PROGRAM TINDAK LANJUT REMEDIAL'],
+        ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
+        ['Nama Siswa:', stu.full_name, 'NIS:', stu.nis || '-', 'Kelas:', stu.class_name],
+        [],
+        ['No', 'Mata Pelajaran', 'Judul Ulangan', 'KKM', 'Nilai Siswa', 'Status', 'Diagnosis Butir Belum Tuntas', 'Rekomendasi Tindak Lanjut Guru']
+      ];
+
+      if (takenExams.length === 0) {
+        aoaSheet3.push(['Belum ada data tindak lanjut untuk siswa ini.']);
+      } else {
+        takenExams.forEach((e, idx) => {
+          const examMeta = decodeExamMeta(e.exam);
+          const weakLabel = formatWeakQuestionsLabel(e.exam, examMeta, e.result.student_answers);
+          aoaSheet3.push([
+            idx + 1,
+            e.exam.subject,
+            e.exam.title,
+            e.kkm,
+            e.score,
+            e.status,
+            weakLabel,
+            e.isPassed ? 'Pengayaan Materi Lanjutan & Latihan HOTS' : (e.notes || 'Bimbingan tutor sebaya & penugasan remedial')
+          ]);
+        });
+      }
 
       const cleanName = (stu.full_name || 'Siswa').replace(/[^a-zA-Z0-9_-]/g, '_');
       const cleanClass = (stu.class_name || className).replace(/[^a-zA-Z0-9_-]/g, '_');
       (window.downloadXlsxWorkbook || downloadXlsxWorkbook)(`Rapor_Siswa_${cleanName}_${cleanClass}_${dateStr}.xlsx`, [
         {
           name: 'Rekap Nilai Siswa',
-          aoa,
+          aoa: aoaSheet1,
           colWidths: [6, 22, 28, 22, 10, 14, 18, 35],
           textCols: [0, 1, 2, 3, 6, 7]
+        },
+        {
+          name: 'Lembar Jawaban Siswa',
+          aoa: aoaSheet2,
+          colWidths: [20, 26, 12, 15, 15, 14, 14],
+          textCols: [0, 1, 2, 3, 4, 5]
+        },
+        {
+          name: 'Analisis & Remedial',
+          aoa: aoaSheet3,
+          colWidths: [6, 20, 26, 10, 12, 14, 28, 35],
+          textCols: [0, 1, 2, 5, 6, 7]
         }
       ]);
-      showToast(`Berhasil mengekspor rapor ${stu.full_name} ke Excel!`, 'success');
+      showToast(`Berhasil mengekspor rapor lengkap ${stu.full_name} ke Excel!`, 'success');
     };
 
     function buildClassRecapReportSheetHtml(className, students, classExams) {
@@ -9811,8 +10513,33 @@
             ` : stats.examSummaries.map((e, idx) => {
               const teacher = getExamTeacher(e.exam);
               const hasResult = e.result !== null;
+              let answerSectionHtml = '';
+              if (hasResult) {
+                const examMeta = decodeExamMeta(e.exam);
+                const graded = scoreStudentResponse(e.exam, e.result.student_answers);
+                const weakLabel = formatWeakQuestionsLabel(e.exam, examMeta, e.result.student_answers);
+                answerSectionHtml = `
+                  <div class="mt-3 pt-3 border-t border-slate-200/60 space-y-2">
+                    <div class="flex items-center justify-between text-[11px] font-bold">
+                      <span class="text-slate-600">Lembar Jawaban Siswa per Butir:</span>
+                      <span class="${e.isPassed ? 'text-emerald-700' : 'text-amber-700'}">
+                        ${graded.correctCount}/${graded.itemResults.length} Benar (${graded.earnedTotal}/${graded.maxTotal} Poin)
+                      </span>
+                    </div>
+                    <div>
+                      ${renderStudentAnswerChips(graded)}
+                    </div>
+                    <div class="text-[11px] text-slate-600 flex items-center gap-1.5 flex-wrap">
+                      <span class="font-bold text-slate-700">Diagnosis Butir Salah:</span>
+                      <span class="font-mono font-bold ${weakLabel === '-' ? 'text-emerald-700' : 'text-rose-700'}">
+                        ${weakLabel === '-' ? '✓ Tidak ada (100% Tuntas)' : escapeHtml(weakLabel)}
+                      </span>
+                    </div>
+                  </div>
+                `;
+              }
               return `
-                <div class="p-3.5 rounded-2xl border transition ${hasResult ? (e.isPassed ? 'bg-emerald-50/40 border-emerald-200/70' : 'bg-amber-50/40 border-amber-200/70') : 'bg-slate-50 border-slate-200/60'}">
+                <div class="p-4 rounded-2xl border transition ${hasResult ? (e.isPassed ? 'bg-emerald-50/40 border-emerald-200/70' : 'bg-amber-50/40 border-amber-200/70') : 'bg-slate-50 border-slate-200/60'}">
                   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <div class="flex items-center gap-2 flex-wrap">
@@ -9832,6 +10559,7 @@
                       <div class="text-[10px] font-bold text-slate-400">Nilai Siswa</div>
                     </div>
                   </div>
+                  ${answerSectionHtml}
                   ${hasResult && e.notes ? `
                     <div class="mt-2.5 pt-2.5 border-t border-slate-200/60 text-xs text-slate-700">
                       <strong class="text-slate-900">Catatan Tindak Lanjut Guru:</strong> ${escapeHtml(e.notes)}
