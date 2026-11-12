@@ -4593,7 +4593,7 @@
         let classFilterOptionsHtml = '';
         if (isWaliLockedClass) {
           state.examClassFilter = tRole.assignedGrade;
-          classFilterOptionsHtml = `<option value="${escapeHtml(tRole.assignedGrade)}" selected>${escapeHtml(tRole.assignedGrade)} (Kelas Anda)</option>`;
+          classFilterOptionsHtml = `<option value="${escapeHtml(tRole.assignedGrade)}" selected>${escapeHtml(tRole.assignedGrade)}</option>`;
         } else {
           const classChoices = sortClassNamesNatural(visibleExams.map(ex => ex.class_name));
           if (state.examClassFilter !== 'ALL' && !classChoices.includes(state.examClassFilter)) {
@@ -4607,12 +4607,12 @@
         let subjectFilterOptionsHtml = '';
         if (isSingleSubject) {
           state.examSubjectFilter = subjectList[0];
-          subjectFilterOptionsHtml = `<option value="${escapeHtml(subjectList[0])}" selected>${escapeHtml(subjectList[0])} (Mapel Anda)</option>`;
+          subjectFilterOptionsHtml = `<option value="${escapeHtml(subjectList[0])}" selected>${escapeHtml(subjectList[0])}</option>`;
         } else if (subjectList.length > 1 && !isAdmin) {
           if (state.examSubjectFilter !== 'ALL' && !subjectList.some(s => s.toLowerCase() === state.examSubjectFilter.toLowerCase())) {
             state.examSubjectFilter = 'ALL';
           }
-          subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>Semua Mapel (${subjectList.length} Mapel Ampuan)</option>` +
+          subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>-- Pilih Mapel --</option>` +
             subjectList.map(subj => `<option value="${escapeHtml(subj)}" ${subj.toLowerCase() === state.examSubjectFilter.toLowerCase() ? 'selected' : ''}>${escapeHtml(subj)}</option>`).join('');
         } else {
           const examsForSubjects = state.examClassFilter === 'ALL'
@@ -4623,7 +4623,7 @@
           if (state.examSubjectFilter !== 'ALL' && !subjectChoices.some(s => s.toLowerCase() === state.examSubjectFilter.toLowerCase())) {
             state.examSubjectFilter = 'ALL';
           }
-          subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>Semua Mapel</option>` +
+          subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>-- Pilih Mapel --</option>` +
             subjectChoices.map(subj => `<option value="${escapeHtml(subj)}" ${subj.toLowerCase() === state.examSubjectFilter.toLowerCase() ? 'selected' : ''}>${escapeHtml(subj)}</option>`).join('');
         }
 
@@ -7148,7 +7148,7 @@
 
       const stuPage = paginateItems(filteredStudents, 'students');
       const filterOptionsHtml = isWaliLocked
-        ? `<option value="${escapeHtml(tRole.assignedGrade)}" selected>${escapeHtml(tRole.assignedGrade)} (Kelas Anda)</option>`
+        ? `<option value="${escapeHtml(tRole.assignedGrade)}" selected>${escapeHtml(tRole.assignedGrade)}</option>`
         : `<option value="ALL" ${classFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
           GRADE_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}" ${classFilter === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
 
