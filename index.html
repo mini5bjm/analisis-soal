@@ -752,7 +752,7 @@
           </div>
 
           <!-- Navigation Menu List -->
-          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 mb-2">Menu Analitik</div>
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-400 px-3 mb-2">Menu Analitik</div>
           <nav id="desktop-nav-list" class="space-y-1.5">
             <!-- Populated dynamically by JS -->
           </nav>
@@ -803,13 +803,6 @@
 
           <!-- Global Exam Filter & Quick Actions -->
           <div class="flex items-center gap-2.5 md:gap-3">
-            <button type="button" id="header-period-badge" onclick="if (window.__isAdminActive && window.__isAdminActive()) window.navigateMenu('pengaturan_sistem')"
-              class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-[11px] font-bold transition shrink-0"
-              title="Tahun Ajaran & Semester Aktif">
-              <i data-lucide="calendar" class="w-3.5 h-3.5 shrink-0"></i>
-              <span id="header-period-text">2026/2027 • Ganjil</span>
-            </button>
-
             <button type="button" id="sync-status-badge" onclick="window.manualSyncSupabase()"
               title="Klik untuk sinkronisasi manual ke Supabase"
               class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-bold transition hover:bg-emerald-100/80 shrink-0">
@@ -1473,23 +1466,13 @@
       const label = `${year} • ${sem}`;
 
       const sidebarText = document.getElementById('sidebar-period-text');
-      const headerText = document.getElementById('header-period-text');
       const sidebarEditBtn = document.getElementById('btn-sidebar-period-edit');
-      const headerBadge = document.getElementById('header-period-badge');
 
       if (sidebarText) sidebarText.textContent = label;
-      if (headerText) headerText.textContent = label;
 
       const isAdmin = isAdminUser();
       if (sidebarEditBtn) {
         sidebarEditBtn.classList.toggle('hidden', !isAdmin);
-      }
-      if (headerBadge) {
-        headerBadge.classList.toggle('cursor-pointer', isAdmin);
-        headerBadge.classList.toggle('hover:bg-indigo-100', isAdmin);
-        headerBadge.title = isAdmin
-          ? 'Klik untuk mengatur Tahun Ajaran & Semester'
-          : `Tahun Ajaran ${year} • Semester ${sem}`;
       }
     }
 
@@ -3351,10 +3334,10 @@
       { id: 'manajemen_siswa', label: 'Data Siswa', shortLabel: 'Siswa', icon: 'graduation-cap', subtitle: 'Kelola data siswa per kelas, NIS/NISN, serta template, import & ekspor Excel', roles: ['admin', 'guru'] },
       { id: 'manajemen_guru', label: 'Data Guru', shortLabel: 'Guru', icon: 'users-round', subtitle: 'Manajemen akun guru, jenis ID, jabatan, kelas ampuan, serta template & ekspor Excel', roles: ['admin'] },
       { id: 'manajemen_mapel', label: 'Mapel & Kelas', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Kelola daftar mata pelajaran dan pembagian kelas untuk setiap mapel', roles: ['admin'] },
-      { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, jenis soal, KKM, jumlah butir, dan kunci jawaban', roles: ['admin', 'guru'] },
-      { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban PG, Benar Salah, Isian, dan Uraian', roles: ['admin', 'guru'] },
-      { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Tingkat kesukaran (P), capaian penguasaan siswa, dan tindak lanjut pembelajaran', roles: ['admin', 'guru'] },
-      { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['admin', 'guru'] },
+      { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, jenis soal, KKM, jumlah butir, dan kunci jawaban', roles: ['guru'] },
+      { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban PG, Benar Salah, Isian, dan Uraian', roles: ['guru'] },
+      { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Tingkat kesukaran (P), capaian penguasaan siswa, dan tindak lanjut pembelajaran', roles: ['guru'] },
+      { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['guru'] },
       { id: 'pengaturan_sistem', label: 'Pengaturan & Backup', shortLabel: 'Pengaturan', icon: 'settings', subtitle: 'Atur Tahun Ajaran & Semester aktif serta Backup & Restore data aplikasi', roles: ['admin'] }
     ];
 
@@ -3619,7 +3602,7 @@
       const target = MENU_CONFIG.find(m => m.id === menuId);
       if (!target) return;
       if (!target.roles.includes(state.currentUser?.role)) {
-        showToast('Menu ini khusus untuk Administrator.', 'warning');
+        showToast(state.currentUser?.role === 'admin' ? 'Menu ini khusus untuk akun Guru.' : 'Menu ini khusus untuk Administrator.', 'warning');
         return;
       }
       closeFormModal({ resetEditState: false });
@@ -3645,11 +3628,11 @@
         const isActive = state.activeMenu === m.id;
         return `
         <button type="button" onclick="window.navigateMenu('${m.id}')"
-          class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${isActive
+          class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isActive
             ? 'flowora-btn-primary text-white shadow-md'
             : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
           }">
-          <i data-lucide="${m.icon}" class="w-4 h-4 shrink-0"></i>
+          <i data-lucide="${m.icon}" class="w-[18px] h-[18px] shrink-0"></i>
           <span class="truncate">${m.label}</span>
         </button>
       `;
@@ -3666,7 +3649,7 @@
           <div class="${isActive ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}">
             <i data-lucide="${m.icon}" class="w-4 h-4"></i>
           </div>
-          <span class="text-[10px] mt-0.5 truncate max-w-[64px]">${m.shortLabel}</span>
+          <span class="text-[11px] mt-0.5 truncate max-w-[70px]">${m.shortLabel}</span>
         </button>
       `;
       }).join('');
@@ -3928,6 +3911,7 @@
 
     // ==================== 1. DASHBOARD ANALITIK (FLOWORA BENTO STYLE) ====================
     function renderDashboardView(exam, stats) {
+      const isAdmin = isAdminUser();
       const visibleExams = getVisibleExams();
       const totalExams = visibleExams.length;
       const strokeDash = `${stats.classicalMastery}, 100`;
@@ -3965,12 +3949,21 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-3 relative z-10">
-          <button type="button" onclick="window.navigateMenu('analisis_butir')" class="px-5 py-3 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-2">
-            <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Lihat Analisis Butir Soal
-          </button>
-          <button type="button" onclick="window.navigateMenu('remedial_pengayaan')" class="px-5 py-3 rounded-full bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-bold flex items-center gap-2 shadow-sm transition">
-            <i data-lucide="printer" class="w-4 h-4 text-indigo-600"></i> Laporan Remedial
-          </button>
+          ${isAdmin ? `
+            <button type="button" onclick="window.navigateMenu('manajemen_siswa')" class="px-5 py-3 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-2">
+              <i data-lucide="graduation-cap" class="w-4 h-4"></i> Kelola Data Siswa
+            </button>
+            <button type="button" onclick="window.navigateMenu('pengaturan_sistem')" class="px-5 py-3 rounded-full bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-bold flex items-center gap-2 shadow-sm transition">
+              <i data-lucide="settings" class="w-4 h-4 text-indigo-600"></i> Pengaturan &amp; Backup
+            </button>
+          ` : `
+            <button type="button" onclick="window.navigateMenu('analisis_butir')" class="px-5 py-3 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-2">
+              <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Lihat Analisis Butir Soal
+            </button>
+            <button type="button" onclick="window.navigateMenu('remedial_pengayaan')" class="px-5 py-3 rounded-full bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-bold flex items-center gap-2 shadow-sm transition">
+              <i data-lucide="printer" class="w-4 h-4 text-indigo-600"></i> Laporan Remedial
+            </button>
+          `}
         </div>
       </div>
 
@@ -4088,10 +4081,12 @@
             </div>
           </div>
 
-          <button type="button" onclick="window.navigateMenu('manajemen_ulangan')" class="mt-5 w-full py-2.5 px-4 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
-            <span>Kelola Semua Paket Ulangan</span>
-            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-          </button>
+          ${!isAdmin ? `
+            <button type="button" onclick="window.navigateMenu('manajemen_ulangan')" class="mt-5 w-full py-2.5 px-4 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <span>Kelola Semua Paket Ulangan</span>
+              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+            </button>
+          ` : ''}
         </div>
 
         <!-- Middle Column (4 cols): Peringkat & Status Siswa Terbaru -->
@@ -4139,10 +4134,12 @@
             </div>
           </div>
 
-          <button type="button" onclick="window.navigateMenu('input_nilai')" class="mt-5 w-full py-2.5 px-4 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
-            <span>Input / Edit Nilai Siswa</span>
-            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-          </button>
+          ${!isAdmin ? `
+            <button type="button" onclick="window.navigateMenu('input_nilai')" class="mt-5 w-full py-2.5 px-4 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <span>Input / Edit Nilai Siswa</span>
+              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+            </button>
+          ` : ''}
         </div>
 
         <!-- Right Column (3 cols): Flowora Performance Donut Chart Card -->
