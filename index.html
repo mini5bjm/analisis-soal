@@ -1131,8 +1131,11 @@
         inputResults: 1,
         itemAnalysis: 1,
         remedial: 1,
-        enrichment: 1
+        enrichment: 1,
+        rekap: 1
       },
+      rekapSelectedClass: '',
+      rekapSearchQuery: '',
       editingSubjectId: null,
       editingStudentId: null,
       editingTeacherId: null,
@@ -2208,6 +2211,7 @@
       });
       XLSX.writeFile(wb, filename);
     }
+    window.downloadXlsxWorkbook = downloadXlsxWorkbook;
 
     async function readXlsxFirstSheetRows(file) {
       if (!ensureXlsxLoaded()) return null;
@@ -3338,6 +3342,7 @@
       { id: 'manajemen_siswa', label: 'Data Siswa', shortLabel: 'Siswa', icon: 'graduation-cap', subtitle: 'Kelola data siswa per kelas, NIS/NISN, serta template, import & ekspor Excel', roles: ['admin', 'guru'] },
       { id: 'manajemen_guru', label: 'Data Guru', shortLabel: 'Guru', icon: 'users-round', subtitle: 'Manajemen akun guru, jenis ID, jabatan, kelas ampuan, serta template & ekspor Excel', roles: ['admin'] },
       { id: 'manajemen_mapel', label: 'Mapel & Kelas', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Kelola daftar mata pelajaran dan pembagian kelas untuk setiap mapel', roles: ['admin'] },
+      { id: 'rekap_laporan', label: 'Rekap & Laporan', shortLabel: 'Rekap', icon: 'clipboard-check', subtitle: 'Pantau hasil ulangan, analisis butir, remedial, dan cetak rapor siswa per kelas', roles: ['admin'] },
       { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, jenis soal, KKM, jumlah butir, dan kunci jawaban', roles: ['guru'] },
       { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban PG, Benar Salah, Isian, dan Uraian', roles: ['guru'] },
       { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Tingkat kesukaran (P), capaian penguasaan siswa, dan tindak lanjut pembelajaran', roles: ['guru'] },
@@ -3904,6 +3909,9 @@
           break;
         case 'manajemen_guru':
           container.innerHTML = renderManajemenGuruView();
+          break;
+        case 'rekap_laporan':
+          container.innerHTML = renderRekapLaporanView();
           break;
         case 'pengaturan_sistem':
           container.innerHTML = renderPengaturanSistemView();
@@ -8707,6 +8715,1190 @@
         console.error('Restore Parse Error:', err);
         showToast('Gagal membaca file backup JSON. Pastikan format file valid.', 'danger');
       }
+    };
+
+    // ==================== 10. REKAPITULASI & CETAK RAPOR SISWA (KHUSUS ADMIN) ====================
+    function formatClassOptionLabel(className) {
+      const match = String(className || '').match(/Kelas\s*(\d+)/i);
+      if (match) {
+        const roman = ['I', 'II', 'III', 'IV', 'V', 'VI'][Number(match[1]) - 1] || match[1];
+        return `Tingkat ${roman} (${className})`;
+      }
+      return className;
+    }
+
+    function getClassExamsForRekap(className) {
+      const norm = String(className || '').trim().toLowerCase();
+      const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      return (state.exams || []).filter(ex => {
+        const p = decodeExamPeriod(ex);
+        return p.academicYear === activeYear &&
+          p.semester === activeSem &&
+          String(ex.class_name || '').trim().toLowerCase() === norm;
+      }).sort((a, b) => (a.subject || '').localeCompare(b.subject || '') || (a.title || '').localeCompare(b.title || ''));
+    }
+
+    function getRekapStudentsForClass(className) {
+      const norm = String(className || '').trim().toLowerCase();
+      const studentMap = new Map();
+
+      // 1. Dari master data siswa
+      (state.students || [])
+        .filter(s => String(s.class_name || '').trim().toLowerCase() === norm)
+        .forEach(s => {
+          const key = String(s.id || s.nis || s.full_name).trim();
+          studentMap.set(key, {
+            id: s.id,
+            nis: s.nis || '-',
+            full_name: s.full_name,
+            gender: s.gender || 'L',
+            class_name: s.class_name || className,
+            isFromMaster: true
+          });
+        });
+
+      // 2. Dari hasil ujian yang sudah tersimpan untuk kelas ini
+      const classExams = getClassExamsForRekap(className);
+      const examIds = new Set(classExams.map(e => e.id));
+
+      (state.examResults || [])
+        .filter(r => examIds.has(r.exam_id))
+        .forEach(r => {
+          const existing = Array.from(studentMap.values()).find(s =>
+            (r.student_nis && s.nis && s.nis !== '-' && String(s.nis).trim() === String(r.student_nis).trim()) ||
+            (String(s.full_name || '').trim().toLowerCase() === String(r.student_name || '').trim().toLowerCase())
+          );
+          if (!existing && r.student_name) {
+            const sid = r.student_nis || r.id;
+            studentMap.set(sid, {
+              id: sid,
+              nis: r.student_nis || '-',
+              full_name: r.student_name,
+              gender: 'L',
+              class_name: className,
+              isFromMaster: false
+            });
+          }
+        });
+
+      return Array.from(studentMap.values()).sort((a, b) =>
+        (a.full_name || '').localeCompare(b.full_name || '', 'id', { numeric: true })
+      );
+    }
+
+    function getStudentRecapStats(student, classExams) {
+      const normNis = String(student.nis || '').trim();
+      const normName = String(student.full_name || '').trim().toLowerCase();
+
+      const examSummaries = classExams.map(ex => {
+        const r = (state.examResults || []).find(res =>
+          res.exam_id === ex.id && (
+            (normNis && normNis !== '-' && String(res.student_nis || '').trim() === normNis) ||
+            (String(res.student_name || '').trim().toLowerCase() === normName)
+          )
+        );
+        if (!r) {
+          return {
+            exam: ex,
+            result: null,
+            score: null,
+            kkm: Number(ex.kkm || 75),
+            isPassed: null,
+            notes: '',
+            status: 'Belum Mengikuti'
+          };
+        }
+        const score = Number(r.score);
+        const kkm = Number(ex.kkm || 75);
+        const isPassed = typeof r.is_passed === 'boolean' ? r.is_passed : (score >= kkm);
+        return {
+          exam: ex,
+          result: r,
+          score,
+          kkm,
+          isPassed,
+          notes: r.notes || '',
+          status: isPassed ? 'TUNTAS' : 'REMEDIAL'
+        };
+      });
+
+      const takenExams = examSummaries.filter(e => e.result !== null);
+      const totalTaken = takenExams.length;
+      const avgScore = totalTaken > 0
+        ? Math.round((takenExams.reduce((sum, e) => sum + e.score, 0) / totalTaken) * 10) / 10
+        : 0;
+      const passedCount = takenExams.filter(e => e.isPassed).length;
+      const remedialCount = totalTaken - passedCount;
+
+      let overallStatus = 'Belum Ada Nilai';
+      let statusBadgeClass = 'bg-slate-100 text-slate-600 border-slate-200';
+      if (totalTaken > 0) {
+        if (remedialCount === 0) {
+          overallStatus = 'TUNTAS SEMUA';
+          statusBadgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+        } else {
+          overallStatus = `${remedialCount} Mapel Remedial`;
+          statusBadgeClass = 'bg-amber-100 text-amber-800 border-amber-300';
+        }
+      }
+
+      return {
+        examSummaries,
+        takenExams,
+        totalTaken,
+        totalExams: classExams.length,
+        avgScore,
+        passedCount,
+        remedialCount,
+        overallStatus,
+        statusBadgeClass
+      };
+    }
+
+    function findRekapStudentById(studentId) {
+      const fromMaster = (state.students || []).find(s => s.id === studentId || s.nis === studentId);
+      if (fromMaster) return fromMaster;
+      const fromResult = (state.examResults || []).find(r => r.id === studentId || r.student_nis === studentId);
+      if (fromResult) {
+        const ex = (state.exams || []).find(e => e.id === fromResult.exam_id);
+        return {
+          id: fromResult.student_nis || fromResult.id,
+          nis: fromResult.student_nis || '-',
+          full_name: fromResult.student_name,
+          gender: 'L',
+          class_name: ex?.class_name || state.rekapSelectedClass || 'Kelas'
+        };
+      }
+      return null;
+    }
+
+    function getHomeroomTeacherForClass(className) {
+      const norm = String(className || '').trim().toLowerCase();
+      const teacher = (state.teachers || []).find(t => {
+        const meta = decodeTeacherMeta(t);
+        return meta.isWaliKelas && String(meta.classAssigned || '').trim().toLowerCase() === norm;
+      });
+      if (teacher) {
+        const meta = decodeTeacherMeta(teacher);
+        return {
+          name: teacher.full_name || 'Guru Kelas',
+          nip: meta.idNumber || '-'
+        };
+      }
+      return {
+        name: 'Guru Kelas / Wali Kelas',
+        nip: '-'
+      };
+    }
+
+    function renderRekapLaporanView() {
+      if (!isAdminUser()) {
+        return `<div class="glass-surface rounded-3xl p-8 text-center text-sm font-bold text-rose-600">Akses ditolak. Menu Rekap &amp; Laporan khusus untuk Administrator.</div>`;
+      }
+
+      const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+
+      const allAvailableClasses = sortClassNamesNatural([
+        ...GRADE_CLASS_OPTIONS,
+        ...(state.classes || []).map(c => c.name || c),
+        ...(state.students || []).map(s => s.class_name),
+        ...(state.exams || []).map(e => e.class_name)
+      ]);
+
+      const selectedClass = state.rekapSelectedClass || '';
+      const searchQ = (state.rekapSearchQuery || '').trim().toLowerCase();
+
+      // JIKA KELAS BELUM DIPILIH: TAMPILKAN PANDUAN SESUAI DESAIN USER
+      if (!selectedClass) {
+        return `
+        <div class="glass-surface rounded-3xl p-6 md:p-8 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+            <div>
+              <div class="flex items-center gap-2.5 flex-wrap">
+                <h3 class="text-lg md:text-xl font-extrabold text-slate-900">Cetak Rapor &amp; Rekapitulasi Siswa</h3>
+                <span class="px-3 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold">Khusus Administrator</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">Pantau &amp; rekap hasil input jawaban siswa, analisis butir soal, status remedial &amp; pengayaan, serta cetak rapor per kelas</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="px-3.5 py-1.5 rounded-2xl bg-indigo-50 text-indigo-700 border border-indigo-200/60 text-xs font-bold">
+                Tahun Ajaran: ${escapeHtml(activeYear)} • ${escapeHtml(activeSem)}
+              </span>
+            </div>
+          </div>
+
+          <!-- Tingkat / Kelas Selector Bar -->
+          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+            <div class="flex items-center justify-between">
+              <label for="rekap-filter-class" class="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <i data-lucide="layers" class="w-4 h-4 text-indigo-600"></i> Tingkat / Kelas
+              </label>
+              <span class="text-[11px] text-slate-500 font-medium">Pilih kelas untuk memunculkan daftar siswa</span>
+            </div>
+            <div class="max-w-md">
+              <select id="rekap-filter-class" onchange="window.handleRekapSelectClass(this.value)"
+                class="w-full px-4 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition">
+                <option value="">-- Pilih Kelas --</option>
+                ${allAvailableClasses.map(c => `
+                  <option value="${escapeHtml(c)}">${escapeHtml(formatClassOptionLabel(c))}</option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+
+          <!-- Guidance / Empty State Card -->
+          <div class="py-14 px-6 text-center rounded-3xl bg-white/70 border border-dashed border-slate-200 space-y-4">
+            <div class="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center shadow-inner">
+              <i data-lucide="graduation-cap" class="w-8 h-8"></i>
+            </div>
+            <div class="max-w-md mx-auto space-y-1.5">
+              <h4 class="text-base font-extrabold text-slate-900">Silakan Pilih Kelas Terlebih Dahulu</h4>
+              <p class="text-xs text-slate-500 leading-relaxed">
+                Pilih salah satu kelas di atas atau klik pintasan kelas di bawah ini untuk menampilkan daftar siswa, rekapitulasi nilai ulangan, analisis butir soal, remedial, serta tombol cetak laporan (PDF) dan ekspor Excel.
+              </p>
+            </div>
+            <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+              ${GRADE_CLASS_OPTIONS.map(c => `
+                <button type="button" onclick="window.handleRekapSelectClass('${c}')"
+                  class="px-4 py-2 rounded-2xl bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 text-xs font-bold transition shadow-sm hover:scale-105 flex items-center gap-1.5">
+                  <i data-lucide="folder" class="w-3.5 h-3.5 text-indigo-600"></i> ${escapeHtml(c)}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+        `;
+      }
+
+      // KETIKA KELAS SUDAH DIPILIH: TAMPILKAN DAFTAR SISWA & REKAP KELAS
+      const classStudents = getRekapStudentsForClass(selectedClass);
+      const classExams = getClassExamsForRekap(selectedClass);
+
+      const filteredStudents = classStudents.filter(s =>
+        !searchQ ||
+        (s.full_name || '').toLowerCase().includes(searchQ) ||
+        (s.nis || '').toLowerCase().includes(searchQ)
+      );
+
+      const rekapPage = paginateItems(filteredStudents, 'rekap');
+
+      // Hitung metrik keseluruhan kelas
+      let totalAllTakenScores = 0;
+      let countAllTakenScores = 0;
+      let totalPassedExamCount = 0;
+      let studentsNeedingRemedial = 0;
+
+      classStudents.forEach(stu => {
+        const stats = getStudentRecapStats(stu, classExams);
+        if (stats.remedialCount > 0) studentsNeedingRemedial++;
+        stats.takenExams.forEach(te => {
+          totalAllTakenScores += te.score;
+          countAllTakenScores++;
+          if (te.isPassed) totalPassedExamCount++;
+        });
+      });
+
+      const classAvgScore = countAllTakenScores > 0
+        ? Math.round((totalAllTakenScores / countAllTakenScores) * 10) / 10
+        : 0;
+      const classicalMastery = countAllTakenScores > 0
+        ? Math.round((totalPassedExamCount / countAllTakenScores) * 100)
+        : 0;
+
+      return `
+      <div class="glass-surface rounded-3xl p-6 md:p-8 space-y-6">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+          <div>
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h3 class="text-lg md:text-xl font-extrabold text-slate-900">Cetak Rapor &amp; Rekapitulasi Siswa</h3>
+              <span class="px-3 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold">${escapeHtml(selectedClass)}</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">Pantau &amp; rekap hasil input jawaban siswa, analisis butir soal, status remedial &amp; pengayaan, serta cetak rapor per kelas</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="px-3.5 py-1.5 rounded-2xl bg-indigo-50 text-indigo-700 border border-indigo-200/60 text-xs font-bold">
+              Tahun Ajaran: ${escapeHtml(activeYear)} • ${escapeHtml(activeSem)}
+            </span>
+          </div>
+        </div>
+
+        <!-- Filter & Action Bar -->
+        <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-4">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
+              <div class="w-full sm:w-64">
+                <label for="rekap-filter-class" class="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Pilih Tingkat / Kelas
+                </label>
+                <select id="rekap-filter-class" onchange="window.handleRekapSelectClass(this.value)"
+                  class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition">
+                  <option value="">-- Pilih Kelas --</option>
+                  ${allAvailableClasses.map(c => `
+                    <option value="${escapeHtml(c)}" ${selectedClass === c ? 'selected' : ''}>
+                      ${escapeHtml(formatClassOptionLabel(c))}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <div class="flex-1">
+                <label for="rekap-search-input" class="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Cari Siswa
+                </label>
+                <div class="relative">
+                  <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                  <input type="text" id="rekap-search-input" value="${escapeHtml(state.rekapSearchQuery || '')}"
+                    oninput="window.handleRekapSearch(this)" placeholder="Cari nama siswa atau NIS/NISN di ${escapeHtml(selectedClass)}..."
+                    class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition" />
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-end gap-2 pt-1 lg:pt-0">
+              <button type="button" onclick="window.handlePrintClassRecap('${escapeHtml(selectedClass)}')"
+                class="px-4 py-2.5 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition hover:scale-105"
+                title="Cetak format cetak seluruh rekap nilai kelas ${escapeHtml(selectedClass)} ke PDF">
+                <i data-lucide="printer" class="w-4 h-4"></i> Cetak Rekap Kelas (PDF)
+              </button>
+              <button type="button" onclick="window.handleExportClassRecapXlsx('${escapeHtml(selectedClass)}')"
+                class="px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition hover:scale-105"
+                title="Ekspor rekapitulasi nilai seluruh siswa ${escapeHtml(selectedClass)} ke Excel (.xlsx)">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Ekspor Rekap Kelas (.xlsx)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+          <div class="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/70">
+            <div class="text-[10px] font-extrabold uppercase text-indigo-700 tracking-wider">Total Siswa di Kelas</div>
+            <div class="text-2xl font-black text-indigo-950 mt-1">${classStudents.length} <span class="text-xs font-bold text-indigo-600">Siswa</span></div>
+            <div class="text-[11px] text-indigo-600/80 mt-0.5">Terdaftar di ${escapeHtml(selectedClass)}</div>
+          </div>
+          <div class="p-4 rounded-2xl bg-purple-50/70 border border-purple-200/70">
+            <div class="text-[10px] font-extrabold uppercase text-purple-700 tracking-wider">Paket Ulangan</div>
+            <div class="text-2xl font-black text-purple-950 mt-1">${classExams.length} <span class="text-xs font-bold text-purple-600">Paket</span></div>
+            <div class="text-[11px] text-purple-600/80 mt-0.5">${activeSem} ${activeYear}</div>
+          </div>
+          <div class="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/70">
+            <div class="text-[10px] font-extrabold uppercase text-emerald-700 tracking-wider">Rata-Rata Nilai Kelas</div>
+            <div class="text-2xl font-black text-emerald-950 mt-1">${classAvgScore > 0 ? classAvgScore.toFixed(1) : '-'}</div>
+            <div class="text-[11px] text-emerald-600/80 mt-0.5">${countAllTakenScores} penilaian tersimpan</div>
+          </div>
+          <div class="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/70">
+            <div class="text-[10px] font-extrabold uppercase text-amber-700 tracking-wider">Ketuntasan Klasikal</div>
+            <div class="text-2xl font-black text-amber-950 mt-1">${classicalMastery}%</div>
+            <div class="text-[11px] text-amber-700 mt-0.5">${studentsNeedingRemedial} siswa perlu remedial</div>
+          </div>
+        </div>
+
+        <!-- Student Table -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <h4 class="text-sm font-extrabold text-slate-900">Daftar Siswa &amp; Cetak Rapor</h4>
+              <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-extrabold">${filteredStudents.length} Siswa</span>
+            </div>
+            <span class="text-xs text-slate-500">Klik tombol aksi untuk mencetak rapor PDF atau mengunduh Excel</span>
+          </div>
+
+          <div class="overflow-x-auto custom-scroll rounded-2xl border border-slate-200/80">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500">
+                  <th class="py-3 px-3.5 w-12 text-center">No</th>
+                  <th class="py-3 px-3.5 text-center">NIS / NISN</th>
+                  <th class="py-3 px-3.5">Nama Lengkap Siswa</th>
+                  <th class="py-3 px-3.5 text-center">L/P</th>
+                  <th class="py-3 px-3.5 text-center">Ulangan Diikuti</th>
+                  <th class="py-3 px-3.5 text-center">Rata-Rata</th>
+                  <th class="py-3 px-3.5 text-center">Status Ketuntasan</th>
+                  <th class="py-3 px-3.5 text-center w-60">Aksi Cetak &amp; Ekspor</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-xs">
+                ${rekapPage.totalItems === 0 ? `
+                  <tr>
+                    <td colspan="8" class="py-12 text-center text-slate-400">
+                      ${searchQ ? 'Tidak ada siswa yang sesuai dengan kata kunci pencarian.' : `Belum ada data siswa di kelas ${escapeHtml(selectedClass)}.`}
+                    </td>
+                  </tr>
+                ` : rekapPage.items.map((stu, idx) => {
+                  const stats = getStudentRecapStats(stu, classExams);
+                  return `
+                  <tr class="hover:bg-indigo-50/20 transition">
+                    <td class="py-3 px-3.5 font-bold text-slate-400 text-center">${rekapPage.startIndex + idx + 1}</td>
+                    <td class="py-3 px-3.5 font-mono font-bold text-indigo-700 text-center">${escapeHtml(stu.nis || '-')}</td>
+                    <td class="py-3 px-3.5 font-bold text-slate-900">${escapeHtml(stu.full_name)}</td>
+                    <td class="py-3 px-3.5 text-center">
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${stu.gender === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-sky-100 text-sky-700'}">
+                        ${stu.gender === 'P' ? 'P' : 'L'}
+                      </span>
+                    </td>
+                    <td class="py-3 px-3.5 text-center">
+                      <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px]">
+                        ${stats.totalTaken} / ${stats.totalExams} Paket
+                      </span>
+                    </td>
+                    <td class="py-3 px-3.5 text-center">
+                      <span class="px-2.5 py-0.5 rounded-full font-black text-xs ${stats.avgScore >= 75 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : (stats.avgScore > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-400')}">
+                        ${stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '-'}
+                      </span>
+                    </td>
+                    <td class="py-3 px-3.5 text-center">
+                      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${stats.statusBadgeClass}">
+                        ${escapeHtml(stats.overallStatus)}
+                      </span>
+                    </td>
+                    <td class="py-3 px-3.5 text-center whitespace-nowrap">
+                      <div class="inline-flex items-center justify-center gap-1.5">
+                        <button type="button" onclick="window.handlePrintStudentReport('${stu.id}')"
+                          class="px-2.5 py-1.5 rounded-full flowora-btn-primary text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition hover:scale-105"
+                          title="Cetak Lembar Rekap / Rapor PDF">
+                          <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak PDF
+                        </button>
+                        <button type="button" onclick="window.handleExportStudentXlsx('${stu.id}')"
+                          class="px-2.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition hover:scale-105"
+                          title="Ekspor Rapor Siswa ke Excel (.xlsx)">
+                          <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Excel
+                        </button>
+                        <button type="button" onclick="window.handleViewStudentDetail('${stu.id}')"
+                          class="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-indigo-600 transition"
+                          title="Lihat Rincian Jawaban, Nilai &amp; Remedial">
+                          <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+          ${renderPaginationBar(rekapPage)}
+        </div>
+
+        <!-- Monitoring Section: Paket Ulangan & Analisis Butir Kelas -->
+        <div class="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h4 class="text-sm font-extrabold text-slate-900">Pantauan Hasil Ulangan &amp; Analisis Butir Soal (${classExams.length} Paket)</h4>
+                <p class="text-[11px] text-slate-500">Tinjau mutu soal, capaian ketuntasan, dan cetak analisis butir per paket ulangan</p>
+              </div>
+            </div>
+            <span class="text-xs text-slate-400 font-medium">Periode: ${escapeHtml(activeYear)} • ${escapeHtml(activeSem)}</span>
+          </div>
+
+          ${classExams.length === 0 ? `
+            <div class="py-8 text-center text-slate-400 text-xs">
+              Belum ada paket ulangan yang dibuat untuk kelas ${escapeHtml(selectedClass)} pada ${escapeHtml(activeYear)} (${escapeHtml(activeSem)}).
+            </div>
+          ` : `
+            <div class="overflow-x-auto custom-scroll">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400 text-center">
+                    <th class="py-2.5 px-3 text-center">No</th>
+                    <th class="py-2.5 px-3 text-left">Mata Pelajaran &amp; Judul Ulangan</th>
+                    <th class="py-2.5 px-3 text-left">Guru Pengampu</th>
+                    <th class="py-2.5 px-3 text-center">KKM</th>
+                    <th class="py-2.5 px-3 text-center">Peserta</th>
+                    <th class="py-2.5 px-3 text-center">Rata-Rata</th>
+                    <th class="py-2.5 px-3 text-center">Ketuntasan</th>
+                    <th class="py-2.5 px-3 text-center">Analisis Butir</th>
+                    <th class="py-2.5 px-3 text-center">Aksi Laporan</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${classExams.map((ex, idx) => {
+                    const stats = computeExamStatistics(ex);
+                    const teacher = getExamTeacher(ex);
+                    const { masteredCount, reinforceCount, reteachCount } = summarizeItemMastery(stats.itemAnalysis);
+                    return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                      <td class="py-2.5 px-3 text-center font-bold text-slate-400">${idx + 1}</td>
+                      <td class="py-2.5 px-3">
+                        <div class="font-bold text-slate-900">${escapeHtml(ex.subject)}</div>
+                        <div class="text-[11px] text-slate-500">${escapeHtml(ex.title)}</div>
+                      </td>
+                      <td class="py-2.5 px-3 text-slate-700">${escapeHtml(teacher?.full_name || '-')}</td>
+                      <td class="py-2.5 px-3 text-center font-bold text-slate-900">${ex.kkm}</td>
+                      <td class="py-2.5 px-3 text-center font-bold text-slate-700">${stats.totalStudents} Siswa</td>
+                      <td class="py-2.5 px-3 text-center font-black ${stats.avgScore >= ex.kkm ? 'text-emerald-700' : 'text-amber-700'}">${stats.avgScore}</td>
+                      <td class="py-2.5 px-3 text-center">
+                        <span class="px-2 py-0.5 rounded-full font-bold text-[10px] ${stats.classicalMastery >= 75 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                          ${stats.classicalMastery}%
+                        </span>
+                      </td>
+                      <td class="py-2.5 px-3 text-center">
+                        <div class="inline-flex items-center gap-1 text-[10px] font-bold">
+                          <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700" title="Dikuasai">${masteredCount}</span>
+                          <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700" title="Perlu Penguatan">${reinforceCount}</span>
+                          <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700" title="Perlu Remedial">${reteachCount}</span>
+                        </div>
+                      </td>
+                      <td class="py-2.5 px-3 text-center">
+                        <button type="button" onclick="window.handlePrintExamCombinedReportFromRekap('${ex.id}')"
+                          class="px-2.5 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold flex items-center gap-1 mx-auto transition"
+                          title="Cetak Laporan Lengkap Landscape (Analisis Butir + Remedial)">
+                          <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak Analisis
+                        </button>
+                      </td>
+                    </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>
+
+        <!-- Monitoring Section: Program Remedial Kelas -->
+        <div class="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                <i data-lucide="award" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h4 class="text-sm font-extrabold text-slate-900">Pantauan Program Remedial Siswa (${studentsNeedingRemedial} Siswa Perlu Bimbingan)</h4>
+                <p class="text-[11px] text-slate-500">Daftar siswa dengan nilai di bawah KKM beserta tindak lanjut remedial dari guru</p>
+              </div>
+            </div>
+          </div>
+
+          ${studentsNeedingRemedial === 0 ? `
+            <div class="py-8 text-center text-emerald-600 font-bold text-xs bg-emerald-50/50 rounded-2xl border border-emerald-100">
+              ✓ Luar biasa! Seluruh siswa yang mengikuti ulangan di kelas ${escapeHtml(selectedClass)} telah TUNTAS mencapai KKM.
+            </div>
+          ` : `
+            <div class="overflow-x-auto custom-scroll">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400">
+                    <th class="py-2.5 px-3 w-10 text-center">No</th>
+                    <th class="py-2.5 px-3">Nama Siswa &amp; NIS</th>
+                    <th class="py-2.5 px-3">Mata Pelajaran &amp; Ulangan</th>
+                    <th class="py-2.5 px-3 text-center">Nilai / KKM</th>
+                    <th class="py-2.5 px-3">Catatan &amp; Bentuk Tindak Lanjut Guru</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${(() => {
+                    let rowNum = 0;
+                    const rows = [];
+                    classStudents.forEach(stu => {
+                      const stats = getStudentRecapStats(stu, classExams);
+                      stats.examSummaries.filter(e => e.result !== null && !e.isPassed).forEach(e => {
+                        rowNum++;
+                        rows.push(`
+                          <tr class="hover:bg-amber-50/30 transition">
+                            <td class="py-2.5 px-3 text-center font-bold text-slate-400">${rowNum}</td>
+                            <td class="py-2.5 px-3">
+                              <div class="font-bold text-slate-900">${escapeHtml(stu.full_name)}</div>
+                              <div class="font-mono text-[11px] text-slate-500">${escapeHtml(stu.nis || '-')}</div>
+                            </td>
+                            <td class="py-2.5 px-3">
+                              <div class="font-bold text-indigo-700">${escapeHtml(e.exam.subject)}</div>
+                              <div class="text-[11px] text-slate-500">${escapeHtml(e.exam.title)}</div>
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                              <span class="px-2 py-0.5 rounded-full font-black text-xs bg-amber-100 text-amber-800">
+                                ${e.score} <span class="text-[10px] font-normal text-amber-700">/ KKM ${e.kkm}</span>
+                              </span>
+                            </td>
+                            <td class="py-2.5 px-3 text-slate-700">
+                              ${escapeHtml(e.notes || 'Perlu pendampingan tutor sebaya dan latihan butir soal.')}
+                            </td>
+                          </tr>
+                        `);
+                      });
+                    });
+                    return rows.join('');
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>
+      </div>
+      `;
+    }
+
+    window.handleRekapSelectClass = function (className) {
+      state.rekapSelectedClass = className || '';
+      state.pagination.rekap = 1;
+      state.rekapSearchQuery = '';
+      renderCurrentMenu();
+    };
+
+    window.handleRekapSearch = function (inputEl) {
+      state.rekapSearchQuery = inputEl?.value || '';
+      state.pagination.rekap = 1;
+      renderCurrentMenu();
+    };
+
+    function buildStudentReportSheetHtml(student, stats, classExams) {
+      const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      const printDateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+      const homeroom = getHomeroomTeacherForClass(student.class_name);
+
+      let examRowsHtml = '';
+      if (stats.examSummaries.length === 0) {
+        examRowsHtml = `<tr><td colspan="8" style="text-align:center; padding:16px; color:#64748b;">Belum ada paket ulangan pada periode ini.</td></tr>`;
+      } else {
+        examRowsHtml = stats.examSummaries.map((e, idx) => {
+          const teacher = getExamTeacher(e.exam);
+          const hasResult = e.result !== null;
+          return `
+            <tr>
+              <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+              <td style="font-weight:bold;">${escapeHtml(e.exam.subject || '-')}</td>
+              <td>${escapeHtml(e.exam.title || '-')}</td>
+              <td>${escapeHtml(teacher?.full_name || '-')}</td>
+              <td style="text-align:center; font-weight:bold;">${e.kkm}</td>
+              <td style="text-align:center; font-weight:bold; font-size:11px; color:${hasResult ? (e.isPassed ? '#047857' : '#b45309') : '#64748b'};">
+                ${hasResult ? e.score : '-'}
+              </td>
+              <td style="text-align:center;">
+                <span class="pr-pill ${hasResult ? (e.isPassed ? 'pr-pill-emerald' : 'pr-pill-amber') : 'pr-pill-slate'}">
+                  ${hasResult ? (e.isPassed ? 'TUNTAS' : 'REMEDIAL') : 'BELUM ADA'}
+                </span>
+              </td>
+              <td style="font-size:9.5px; color:#334155;">
+                ${escapeHtml(e.notes || (hasResult && !e.isPassed ? 'Perlu bimbingan remedial' : '-'))}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      return `
+        <div class="pr-kop">
+          <div>
+            <div class="pr-kop-school">KEMENTERIAN AGAMA REPUBLIK INDONESIA</div>
+            <div class="pr-kop-title">MIS. NURUL ISLAM KM. 5 BANJARMASIN</div>
+            <div style="font-size:10px; color:#475569; margin-top:2px;">NSM: 111263710005 • NPSN: 60723456 • Terakreditasi B</div>
+            <div style="font-size:9.5px; color:#64748b;">Jl. Ahmad Yani Km. 5 No. 45, Kec. Banjarmasin Timur, Kota Banjarmasin</div>
+          </div>
+          <div class="pr-kop-date">
+            <div><strong>Tahun Ajaran:</strong> ${escapeHtml(activeYear)}</div>
+            <div><strong>Semester:</strong> ${escapeHtml(activeSem)}</div>
+            <div style="font-size:9px; color:#64748b; margin-top:4px;">Dicetak: ${printDateStr}</div>
+          </div>
+        </div>
+
+        <div style="text-align:center; margin:12px 0 16px;">
+          <div style="font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#0f172a;">
+            LEMBAR REKAPITULASI HASIL ULANGAN &amp; TINDAK LANJUT SISWA
+          </div>
+          <div style="font-size:10.5px; color:#475569; margin-top:2px;">
+            Laporan Rekapitulasi Nilai Asesmen, Analisis Capaian Kompetensi, dan Program Remedial
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:14px; padding:10px 14px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px;">
+          <div>
+            <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase;">Nama Lengkap Siswa</div>
+            <div style="font-size:12px; font-weight:800; color:#0f172a; margin-top:2px;">${escapeHtml(student.full_name)}</div>
+          </div>
+          <div>
+            <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase;">NIS / NISN</div>
+            <div style="font-size:12px; font-weight:800; font-family:monospace; color:#4338ca; margin-top:2px;">${escapeHtml(student.nis || '-')}</div>
+          </div>
+          <div>
+            <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase;">Kelas / Tingkat</div>
+            <div style="font-size:12px; font-weight:800; color:#0f172a; margin-top:2px;">${escapeHtml(student.class_name)}</div>
+          </div>
+          <div>
+            <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase;">Jenis Kelamin</div>
+            <div style="font-size:12px; font-weight:800; color:#0f172a; margin-top:2px;">${student.gender === 'P' ? 'Perempuan (P)' : 'Laki-laki (L)'}</div>
+          </div>
+        </div>
+
+        <table class="pr-table">
+          <thead>
+            <tr>
+              <th style="width:36px; text-align:center;">No</th>
+              <th style="width:140px; text-align:left;">Mata Pelajaran</th>
+              <th style="text-align:left;">Judul Ulangan / Asesmen</th>
+              <th style="width:130px; text-align:left;">Guru Pengampu</th>
+              <th style="width:48px; text-align:center;">KKM</th>
+              <th style="width:58px; text-align:center;">Nilai</th>
+              <th style="width:85px; text-align:center;">Ketuntasan</th>
+              <th style="width:200px; text-align:left;">Catatan / Tindak Lanjut</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${examRowsHtml}
+            <tr style="background:#f1f5f9; font-weight:800;">
+              <td colspan="5" style="text-align:right; padding:6px 10px;">RATA-RATA NILAI &amp; STATUS KETUNTASAN:</td>
+              <td style="text-align:center; font-size:11px; color:${stats.avgScore >= 75 ? '#047857' : '#b45309'};">
+                ${stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '-'}
+              </td>
+              <td style="text-align:center;">
+                <span class="pr-pill ${stats.remedialCount === 0 && stats.totalTaken > 0 ? 'pr-pill-emerald' : (stats.remedialCount > 0 ? 'pr-pill-amber' : 'pr-pill-slate')}">
+                  ${escapeHtml(stats.overallStatus)}
+                </span>
+              </td>
+              <td style="font-size:9.5px; color:#475569;">
+                ${stats.totalTaken} dari ${stats.totalExams} ulangan diikuti (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top:28px; display:flex; justify-content:space-between; page-break-inside:avoid; break-inside:avoid; font-size:11px;">
+          <div style="text-align:center; width:220px;">
+            <div>Mengetahui,</div>
+            <div style="font-weight:700;">Kepala Madrasah</div>
+            <div style="height:55px;"></div>
+            <div style="font-weight:800; text-decoration:underline;">H. Ahmad Syauqi, S.Pd.I, M.Pd.</div>
+            <div style="font-size:10px; color:#475569;">NIP. 197808152005011004</div>
+          </div>
+          <div style="text-align:center; width:220px;">
+            <div>Banjarmasin, ${printDateStr}</div>
+            <div style="font-weight:700;">Wali Kelas / Guru Kelas</div>
+            <div style="height:55px;"></div>
+            <div style="font-weight:800; text-decoration:underline;">${escapeHtml(homeroom.name)}</div>
+            <div style="font-size:10px; color:#475569;">NIP/NUPTK: ${escapeHtml(homeroom.nip)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    window.handlePrintStudentReport = function (studentId) {
+      const stu = findRekapStudentById(studentId);
+      if (!stu) {
+        showToast('Data siswa tidak ditemukan.', 'danger');
+        return;
+      }
+      const className = stu.class_name || state.rekapSelectedClass;
+      const classExams = getClassExamsForRekap(className);
+      const stats = getStudentRecapStats(stu, classExams);
+
+      const sheet = document.getElementById('print-report-sheet');
+      if (!sheet) {
+        window.print();
+        return;
+      }
+      sheet.innerHTML = buildStudentReportSheetHtml(stu, stats, classExams);
+      document.body.classList.add('printing-combined-report');
+      void sheet.offsetHeight;
+      window.print();
+    };
+
+    window.handleExportStudentXlsx = function (studentId) {
+      if (!ensureXlsxLoaded()) return;
+      const stu = findRekapStudentById(studentId);
+      if (!stu) {
+        showToast('Data siswa tidak ditemukan.', 'danger');
+        return;
+      }
+      const className = stu.class_name || state.rekapSelectedClass;
+      const classExams = getClassExamsForRekap(className);
+      const stats = getStudentRecapStats(stu, classExams);
+
+      const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      const dateStr = new Date().toISOString().slice(0, 10);
+
+      const aoa = [
+        ['LEMBAR REKAPITULASI HASIL ULANGAN & TINDAK LANJUT SISWA'],
+        ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
+        ['Tahun Ajaran:', activeYear, 'Semester:', activeSem, 'Tanggal Ekspor:', dateStr],
+        [],
+        ['Nama Siswa:', stu.full_name, 'NIS/NISN:', stu.nis || '-'],
+        ['Kelas:', stu.class_name, 'Jenis Kelamin:', stu.gender === 'P' ? 'Perempuan' : 'Laki-laki'],
+        [],
+        ['No', 'Mata Pelajaran', 'Judul Ulangan', 'Guru Pengampu', 'KKM', 'Nilai Siswa', 'Status Ketuntasan', 'Catatan Guru / Remedial']
+      ];
+
+      stats.examSummaries.forEach((e, idx) => {
+        const teacherName = getExamTeacher(e.exam)?.full_name || '-';
+        aoa.push([
+          idx + 1,
+          e.exam.subject || '-',
+          e.exam.title || '-',
+          teacherName,
+          e.kkm,
+          e.score !== null ? e.score : 'Belum Ada',
+          e.status,
+          e.notes || '-'
+        ]);
+      });
+
+      aoa.push([]);
+      aoa.push([
+        '', 'RATA-RATA NILAI', '', '', '',
+        stats.avgScore > 0 ? stats.avgScore : '-',
+        stats.overallStatus,
+        `${stats.totalTaken} dari ${stats.totalExams} ulangan diikuti`
+      ]);
+
+      const cleanName = (stu.full_name || 'Siswa').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const cleanClass = (stu.class_name || className).replace(/[^a-zA-Z0-9_-]/g, '_');
+      (window.downloadXlsxWorkbook || downloadXlsxWorkbook)(`Rapor_Siswa_${cleanName}_${cleanClass}_${dateStr}.xlsx`, [
+        {
+          name: 'Rekap Nilai Siswa',
+          aoa,
+          colWidths: [6, 22, 28, 22, 10, 14, 18, 35],
+          textCols: [0, 1, 2, 3, 6, 7]
+        }
+      ]);
+      showToast(`Berhasil mengekspor rapor ${stu.full_name} ke Excel!`, 'success');
+    };
+
+    function buildClassRecapReportSheetHtml(className, students, classExams) {
+      const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      const printDateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+      const homeroom = getHomeroomTeacherForClass(className);
+
+      let totalAllTakenScores = 0;
+      let countAllTakenScores = 0;
+      let totalPassedExamCount = 0;
+
+      students.forEach(stu => {
+        const stats = getStudentRecapStats(stu, classExams);
+        stats.takenExams.forEach(te => {
+          totalAllTakenScores += te.score;
+          countAllTakenScores++;
+          if (te.isPassed) totalPassedExamCount++;
+        });
+      });
+
+      const classAvgScore = countAllTakenScores > 0
+        ? (totalAllTakenScores / countAllTakenScores).toFixed(1)
+        : '-';
+      const classicalMastery = countAllTakenScores > 0
+        ? Math.round((totalPassedExamCount / countAllTakenScores) * 100)
+        : 0;
+
+      return `
+        <div class="pr-kop">
+          <div>
+            <div class="pr-kop-school">KEMENTERIAN AGAMA REPUBLIK INDONESIA</div>
+            <div class="pr-kop-title">MIS. NURUL ISLAM KM. 5 BANJARMASIN</div>
+            <div style="font-size:10px; color:#475569; margin-top:2px;">NSM: 111263710005 • NPSN: 60723456 • Terakreditasi B</div>
+            <div style="font-size:9.5px; color:#64748b;">Jl. Ahmad Yani Km. 5 No. 45, Kec. Banjarmasin Timur, Kota Banjarmasin</div>
+          </div>
+          <div class="pr-kop-date">
+            <div><strong>Tahun Ajaran:</strong> ${escapeHtml(activeYear)}</div>
+            <div><strong>Semester:</strong> ${escapeHtml(activeSem)}</div>
+            <div style="font-size:9px; color:#64748b; margin-top:4px;">Dicetak: ${printDateStr}</div>
+          </div>
+        </div>
+
+        <div style="text-align:center; margin:12px 0 16px;">
+          <div style="font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#0f172a;">
+            REKAPITULASI HASIL ULANGAN &amp; KETUNTASAN SISWA — ${escapeHtml(className.toUpperCase())}
+          </div>
+          <div style="font-size:10.5px; color:#475569; margin-top:2px;">
+            Rekapitulasi Nilai Seluruh Mata Pelajaran dan Ketuntasan Klasikal
+          </div>
+        </div>
+
+        <table class="pr-table">
+          <thead>
+            <tr>
+              <th style="width:32px; text-align:center;">No</th>
+              <th style="width:75px; text-align:center;">NIS</th>
+              <th style="text-align:left;">Nama Siswa</th>
+              <th style="width:36px; text-align:center;">L/P</th>
+              ${classExams.map(e => `
+                <th style="text-align:center;">
+                  ${escapeHtml(e.subject)}<br>
+                  <span style="font-size:8px; font-weight:normal; color:#64748b;">KKM: ${e.kkm}</span>
+                </th>
+              `).join('')}
+              <th style="width:58px; text-align:center;">Rata-rata</th>
+              <th style="width:85px; text-align:center;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${students.length === 0 ? `
+              <tr><td colspan="${6 + classExams.length}" style="text-align:center; padding:16px; color:#64748b;">Belum ada siswa di kelas ini.</td></tr>
+            ` : students.map((stu, idx) => {
+              const stats = getStudentRecapStats(stu, classExams);
+              return `
+                <tr>
+                  <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+                  <td style="text-align:center; font-family:monospace; font-weight:bold; color:#4338ca;">${escapeHtml(stu.nis || '-')}</td>
+                  <td style="font-weight:bold;">${escapeHtml(stu.full_name)}</td>
+                  <td style="text-align:center;">${stu.gender === 'P' ? 'P' : 'L'}</td>
+                  ${stats.examSummaries.map(e => `
+                    <td style="text-align:center; font-weight:bold; color:${e.score !== null ? (e.isPassed ? '#047857' : '#b45309') : '#94a3b8'};">
+                      ${e.score !== null ? e.score : '-'}
+                    </td>
+                  `).join('')}
+                  <td style="text-align:center; font-weight:bold; font-size:10.5px;">${stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '-'}</td>
+                  <td style="text-align:center;">
+                    <span class="pr-pill ${stats.remedialCount === 0 && stats.totalTaken > 0 ? 'pr-pill-emerald' : (stats.remedialCount > 0 ? 'pr-pill-amber' : 'pr-pill-slate')}">
+                      ${escapeHtml(stats.overallStatus)}
+                    </span>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+            <tr style="background:#f1f5f9; font-weight:800;">
+              <td colspan="4" style="text-align:right; padding:6px 10px;">RATA-RATA KELAS:</td>
+              ${classExams.map(e => {
+                const examResults = (state.examResults || []).filter(r => r.exam_id === e.id);
+                const avg = examResults.length > 0 ? (examResults.reduce((s, r) => s + Number(r.score), 0) / examResults.length).toFixed(1) : '-';
+                return `<td style="text-align:center; font-size:9.5px;">${avg}</td>`;
+              }).join('')}
+              <td style="text-align:center; font-size:10.5px; color:#4338ca;">${classAvgScore}</td>
+              <td style="text-align:center;">${classicalMastery}% Tuntas</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top:28px; display:flex; justify-content:space-between; page-break-inside:avoid; break-inside:avoid; font-size:11px;">
+          <div style="text-align:center; width:220px;">
+            <div>Mengetahui,</div>
+            <div style="font-weight:700;">Kepala Madrasah</div>
+            <div style="height:55px;"></div>
+            <div style="font-weight:800; text-decoration:underline;">H. Ahmad Syauqi, S.Pd.I, M.Pd.</div>
+            <div style="font-size:10px; color:#475569;">NIP. 197808152005011004</div>
+          </div>
+          <div style="text-align:center; width:220px;">
+            <div>Banjarmasin, ${printDateStr}</div>
+            <div style="font-weight:700;">Wali Kelas / Guru Kelas</div>
+            <div style="height:55px;"></div>
+            <div style="font-weight:800; text-decoration:underline;">${escapeHtml(homeroom.name)}</div>
+            <div style="font-size:10px; color:#475569;">NIP/NUPTK: ${escapeHtml(homeroom.nip)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    window.handlePrintClassRecap = function (className) {
+      const targetClass = className || state.rekapSelectedClass;
+      if (!targetClass) {
+        showToast('Pilih kelas terlebih dahulu.', 'warning');
+        return;
+      }
+      const classStudents = getRekapStudentsForClass(targetClass);
+      const classExams = getClassExamsForRekap(targetClass);
+
+      const sheet = document.getElementById('print-report-sheet');
+      if (!sheet) {
+        window.print();
+        return;
+      }
+      sheet.innerHTML = buildClassRecapReportSheetHtml(targetClass, classStudents, classExams);
+      document.body.classList.add('printing-combined-report');
+      void sheet.offsetHeight;
+      window.print();
+    };
+
+    window.handleExportClassRecapXlsx = function (className) {
+      if (!ensureXlsxLoaded()) return;
+      const targetClass = className || state.rekapSelectedClass;
+      if (!targetClass) {
+        showToast('Pilih kelas terlebih dahulu.', 'warning');
+        return;
+      }
+      const classStudents = getRekapStudentsForClass(targetClass);
+      const classExams = getClassExamsForRekap(targetClass);
+      const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      const dateStr = new Date().toISOString().slice(0, 10);
+
+      const headers = ['No', 'NIS / NISN', 'Nama Lengkap Siswa', 'L/P'];
+      classExams.forEach(e => {
+        headers.push(`${e.subject} - ${e.title} (KKM: ${e.kkm})`);
+      });
+      headers.push('Rata-rata', 'Tuntas', 'Remedial', 'Status Akhir');
+
+      const aoa = [
+        [`REKAPITULASI HASIL ULANGAN & KETUNTASAN KELAS ${targetClass.toUpperCase()}`],
+        ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
+        ['Tahun Ajaran:', activeYear, 'Semester:', activeSem, 'Tanggal Ekspor:', dateStr],
+        [],
+        headers
+      ];
+
+      classStudents.forEach((stu, idx) => {
+        const stats = getStudentRecapStats(stu, classExams);
+        const row = [
+          idx + 1,
+          stu.nis || '-',
+          stu.full_name,
+          stu.gender || 'L'
+        ];
+        stats.examSummaries.forEach(e => {
+          row.push(e.score !== null ? e.score : '-');
+        });
+        row.push(
+          stats.avgScore > 0 ? stats.avgScore : '-',
+          stats.passedCount,
+          stats.remedialCount,
+          stats.overallStatus
+        );
+        aoa.push(row);
+      });
+
+      const cleanClass = targetClass.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const cleanYear = activeYear.replace(/[^a-zA-Z0-9_-]/g, '-');
+      const colWidths = [6, 16, 28, 8, ...classExams.map(() => 24), 12, 10, 10, 18];
+      const textCols = [0, 1, 2, 3];
+
+      (window.downloadXlsxWorkbook || downloadXlsxWorkbook)(`Rekap_Nilai_${cleanClass}_${cleanYear}_${activeSem}.xlsx`, [
+        {
+          name: `Rekap ${cleanClass}`,
+          aoa,
+          colWidths,
+          textCols
+        }
+      ]);
+      showToast(`Berhasil mengekspor rekap kelas ${targetClass} ke Excel!`, 'success');
+    };
+
+    window.handleViewStudentDetail = function (studentId) {
+      const stu = findRekapStudentById(studentId);
+      if (!stu) {
+        showToast('Data siswa tidak ditemukan.', 'danger');
+        return;
+      }
+      const className = stu.class_name || state.rekapSelectedClass;
+      const classExams = getClassExamsForRekap(className);
+      const stats = getStudentRecapStats(stu, classExams);
+
+      const bodyHtml = `
+        <div class="space-y-4">
+          <!-- Student Profile Card -->
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-2xl ${stu.gender === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-indigo-100 text-indigo-700'} flex items-center justify-center font-extrabold text-lg">
+                ${stu.gender === 'P' ? 'P' : 'L'}
+              </div>
+              <div>
+                <h4 class="text-base font-extrabold text-slate-900">${escapeHtml(stu.full_name)}</h4>
+                <div class="flex items-center gap-2 text-xs text-slate-500 font-semibold mt-0.5">
+                  <span>NIS: <strong class="font-mono text-indigo-700">${escapeHtml(stu.nis || '-')}</strong></span>
+                  <span>•</span>
+                  <span class="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold">${escapeHtml(stu.class_name)}</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="window.handlePrintStudentReport('${stu.id}')"
+                class="px-3.5 py-2 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak PDF
+              </button>
+              <button type="button" onclick="window.handleExportStudentXlsx('${stu.id}')"
+                class="px-3.5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Excel
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Stats Strip -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
+              <div class="text-[10px] font-bold text-slate-500 uppercase">Ulangan Diikuti</div>
+              <div class="text-base font-extrabold text-slate-900 mt-0.5">${stats.totalTaken} / ${stats.totalExams}</div>
+            </div>
+            <div class="p-3 rounded-2xl bg-indigo-50 border border-indigo-200/80 text-center">
+              <div class="text-[10px] font-bold text-indigo-600 uppercase">Rata-rata Nilai</div>
+              <div class="text-base font-extrabold text-indigo-900 mt-0.5">${stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '-'}</div>
+            </div>
+            <div class="p-3 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-center">
+              <div class="text-[10px] font-bold text-emerald-600 uppercase">Ulangan Tuntas</div>
+              <div class="text-base font-extrabold text-emerald-900 mt-0.5">${stats.passedCount} Paket</div>
+            </div>
+            <div class="p-3 rounded-2xl ${stats.remedialCount > 0 ? 'bg-amber-50 border-amber-200/80' : 'bg-slate-50 border-slate-200/80'} text-center">
+              <div class="text-[10px] font-bold ${stats.remedialCount > 0 ? 'text-amber-700' : 'text-slate-500'} uppercase">Perlu Remedial</div>
+              <div class="text-base font-extrabold ${stats.remedialCount > 0 ? 'text-amber-800' : 'text-slate-700'} mt-0.5">${stats.remedialCount} Paket</div>
+            </div>
+          </div>
+
+          <!-- Exam List Breakdown -->
+          <div class="space-y-2.5">
+            <h5 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Rincian Hasil Ulangan &amp; Tindak Lanjut</h5>
+            ${stats.examSummaries.length === 0 ? `
+              <div class="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-slate-200/60">
+                Belum ada paket ulangan pada kelas ${escapeHtml(className)} di periode aktif ini.
+              </div>
+            ` : stats.examSummaries.map((e, idx) => {
+              const teacher = getExamTeacher(e.exam);
+              const hasResult = e.result !== null;
+              return `
+                <div class="p-3.5 rounded-2xl border transition ${hasResult ? (e.isPassed ? 'bg-emerald-50/40 border-emerald-200/70' : 'bg-amber-50/40 border-amber-200/70') : 'bg-slate-50 border-slate-200/60'}">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-extrabold text-slate-900 text-xs">${idx + 1}. ${escapeHtml(e.exam.subject)} — ${escapeHtml(e.exam.title)}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${hasResult ? (e.isPassed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800') : 'bg-slate-100 text-slate-600'}">
+                          ${hasResult ? (e.isPassed ? '✓ TUNTAS' : '⚠ REMEDIAL') : 'BELUM MENGIKUTI'}
+                        </span>
+                      </div>
+                      <div class="text-[11px] text-slate-500 mt-0.5">
+                        Guru: <strong>${escapeHtml(teacher?.full_name || '-')}</strong> • KKM: <strong>${e.kkm}</strong> • Tanggal: ${escapeHtml(e.exam.exam_date || '-')}
+                      </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                      <div class="text-lg font-black ${hasResult ? (e.isPassed ? 'text-emerald-700' : 'text-amber-700') : 'text-slate-400'}">
+                        ${hasResult ? e.score : '-'}
+                      </div>
+                      <div class="text-[10px] font-bold text-slate-400">Nilai Siswa</div>
+                    </div>
+                  </div>
+                  ${hasResult && e.notes ? `
+                    <div class="mt-2.5 pt-2.5 border-t border-slate-200/60 text-xs text-slate-700">
+                      <strong class="text-slate-900">Catatan Tindak Lanjut Guru:</strong> ${escapeHtml(e.notes)}
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div class="pt-2 flex justify-end">
+            <button type="button" onclick="window.closeFormModal()"
+              class="px-5 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+              Tutup
+            </button>
+          </div>
+        </div>
+      `;
+
+      openFormModal({
+        title: `Rekapitulasi Siswa`,
+        subtitle: `${stu.full_name} (${stu.class_name})`,
+        icon: 'user-check',
+        maxWidthClass: 'max-w-2xl',
+        bodyHtml
+      });
+    };
+
+    window.handlePrintExamCombinedReportFromRekap = function (examId) {
+      const exam = (state.exams || []).find(e => e.id === examId);
+      if (!exam) {
+        showToast('Paket ulangan tidak ditemukan.', 'danger');
+        return;
+      }
+      const sheet = document.getElementById('print-report-sheet');
+      if (!sheet) {
+        window.print();
+        return;
+      }
+      const stats = computeExamStatistics(exam);
+      sheet.innerHTML = buildCombinedReportHtml(exam, stats);
+      document.body.classList.add('printing-combined-report');
+      void sheet.offsetHeight;
+      window.print();
     };
 
     // ==================== LIFECYCLE HOOKS (REFRESH, CLOSE TAB, ONLINE) ====================
