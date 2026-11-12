@@ -1014,6 +1014,9 @@
     const DEFAULT_ACADEMIC_YEAR = '2026/2027';
     const DEFAULT_SEMESTER = 'Ganjil';
     const DEFAULT_ACADEMIC_YEARS = ['2025/2026', '2026/2027', '2027/2028'];
+    const DEFAULT_HEADMASTER_NAME = 'H. Ahmad Syauqi, S.Pd.I, M.Pd.';
+    const DEFAULT_HEADMASTER_NIP = '197808152005011004';
+    const DEFAULT_SIGNATURE_CITY = 'Banjarmasin';
     const SEMESTER_OPTIONS = ['Ganjil', 'Genap'];
     const ACADEMIC_CONFIG_ROW_ID = '00000000-0000-4000-8000-000000000001';
     const ACADEMIC_CONFIG_CLASS_NAME = '__SIHASUL_CONFIG__';
@@ -1149,6 +1152,10 @@
         activeAcademicYear: DEFAULT_ACADEMIC_YEAR,
         activeSemester: DEFAULT_SEMESTER,
         academicYears: [...DEFAULT_ACADEMIC_YEARS],
+        headmasterName: DEFAULT_HEADMASTER_NAME,
+        headmasterNip: DEFAULT_HEADMASTER_NIP,
+        signatureCity: DEFAULT_SIGNATURE_CITY,
+        signatureDate: '',
         updatedAt: 0
       },
       sessionAcademicYear: DEFAULT_ACADEMIC_YEAR,
@@ -1516,10 +1523,19 @@
             ...(Array.isArray(cfg.academicYears) ? cfg.academicYears : [])
           ];
 
+      const headmasterName = String(cfg.headmasterName !== undefined ? cfg.headmasterName : (state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME)).trim() || DEFAULT_HEADMASTER_NAME;
+      const headmasterNip = String(cfg.headmasterNip !== undefined ? cfg.headmasterNip : (state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP)).trim() || DEFAULT_HEADMASTER_NIP;
+      const signatureCity = String(cfg.signatureCity !== undefined ? cfg.signatureCity : (state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY)).trim() || DEFAULT_SIGNATURE_CITY;
+      const signatureDate = String(cfg.signatureDate !== undefined ? cfg.signatureDate : (state.academicSettings?.signatureDate || '')).trim();
+
       state.academicSettings = {
         activeAcademicYear: activeYear,
         activeSemester: activeSem,
         academicYears: sortAcademicYears([...sourceYears, activeYear]),
+        headmasterName,
+        headmasterNip,
+        signatureCity,
+        signatureDate,
         updatedAt: Math.max(incomingTs, currentTs)
       };
       return true;
@@ -1551,6 +1567,10 @@
           activeAcademicYear: state.academicSettings.activeAcademicYear,
           activeSemester: state.academicSettings.activeSemester,
           academicYears: state.academicSettings.academicYears,
+          headmasterName: state.academicSettings.headmasterName || DEFAULT_HEADMASTER_NAME,
+          headmasterNip: state.academicSettings.headmasterNip || DEFAULT_HEADMASTER_NIP,
+          signatureCity: state.academicSettings.signatureCity || DEFAULT_SIGNATURE_CITY,
+          signatureDate: state.academicSettings.signatureDate || '',
           updatedAt: Number(state.academicSettings.updatedAt || 0)
         }),
         student_count: 0
@@ -2297,24 +2317,132 @@
     function decodeTeacherMeta(teacher) {
       const raw = String(teacher?.class_assigned || '').trim();
       const parts = raw.split('|').map(p => p.trim()).filter(Boolean);
+      let classAssigned = raw || 'Semua Kelas';
+      let jabatan = 'Guru Mapel';
+      let idType = 'NIP';
+
       if (parts.length >= 3) {
         return {
           classAssigned: parts[0],
           jabatan: normalizeTeacherJabatan(parts[1]),
           idType: normalizeTeacherIdType(parts[2])
         };
+        classAssigned = parts[0];
+        jabatan = normalizeTeacherJabatan(parts[1]);
+        idType = normalizeTeacherIdType(parts[2]);
+      } else if (parts.length === 2) {
+        classAssigned = parts[0];
+        jabatan = normalizeTeacherJabatan(parts[1]);
+        idType = 'NIP';
       }
       if (parts.length === 2) {
+
+      const isWaliKelas = jabatan === 'Wali Kelas' || jabatan === 'Guru Kelas';
+      const idNumber = String(teacher?.username || teacher?.nip || '').trim() || '-';
+
+      return {
+        classAssigned,
+        jabatan,
+        idType,
+        idNumber,
+        isWaliKelas
+      };
+    }
+
+    function formatIndonesianDate(dateInput) {
+      if (!dateInput) {
+        return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+      if (typeof dateInput === 'string' && isNaN(Date.parse(dateInput)) && !dateInput.includes('-')) {
+        return dateInput;
+      }
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) {
+        return String(dateInput);
+      }
+      return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function getReportSignatureConfig(customDate = null) {
+      const headmasterName = String(state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME).trim() || DEFAULT_HEADMASTER_NAME;
+      const headmasterNip = String(state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP).trim() || DEFAULT_HEADMASTER_NIP;
+      const signatureCity = String(state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY).trim() || DEFAULT_SIGNATURE_CITY;
+      const rawDate = customDate || state.academicSettings?.signatureDate || null;
+      const signatureDateStr = formatIndonesianDate(rawDate);
+      return {
+        headmasterName,
+        headmasterNip,
+        signatureCity,
+        signatureDateStr,
+        fullDatePlace: `${signatureCity}, ${signatureDateStr}`
+      };
+    }
+
+    function formatTeacherRoleTitle(jabatan, targetClass = '', subject = '') {
+      const normJab = String(jabatan || '').trim();
+      const cleanClass = targetClass ? normalizeGradeClass(targetClass) : '';
+      const cleanSubject = String(subject || '').trim();
+
+      if (normJab.toLowerCase().includes('wali')) {
+        return cleanClass ? `Wali ${cleanClass}` : 'Wali Kelas';
+      }
+      if (normJab.toLowerCase().includes('guru kelas')) {
+        return cleanClass ? `Guru ${cleanClass}` : 'Guru Kelas';
+      }
+      if (normJab.toLowerCase().includes('mapel') || normJab.toLowerCase().includes('mata pelajaran')) {
+        return cleanSubject ? `Guru Mapel ${cleanSubject}` : 'Guru Mata Pelajaran';
+      }
+      if (cleanSubject) {
+        return `Guru Mapel ${cleanSubject}`;
+      }
+      if (cleanClass) {
+        return `Wali ${cleanClass}`;
+      }
+      return 'Guru Mata Pelajaran';
+    }
+
+    function getTeacherSignatureMeta(teacher, subject = '', className = '') {
+      let targetTeacher = teacher;
+      if (!targetTeacher && className) {
+        targetTeacher = getHomeroomTeacherForClass(className);
+      }
+      if (!targetTeacher && subject) {
+        targetTeacher = getSubjectTeacher(subject);
+      }
+
+      if (!targetTeacher) {
+        const roleTitle = className ? `Wali ${normalizeGradeClass(className)}` : (subject ? `Guru Mapel ${subject}` : 'Wali Kelas');
         return {
           classAssigned: parts[0],
           jabatan: normalizeTeacherJabatan(parts[1]),
           idType: 'NIP'
+          name: '(Belum Ditetapkan)',
+          roleTitle,
+          idType: 'NIP/NUPTK',
+          idNumber: '-',
+          idLine: 'NIP/NUPTK: -',
+          teacher: null
         };
       }
+
+      const meta = decodeTeacherMeta(targetTeacher);
+      const teacherClass = meta.classAssigned || targetTeacher.class_assigned || className;
+      const roleTitle = formatTeacherRoleTitle(meta.jabatan, className || teacherClass, subject || targetTeacher.subject);
+      const idType = meta.idType || 'NIP';
+      const idNum = String(targetTeacher.username || targetTeacher.nip || meta.idNumber || '').trim();
+      const hasValidNum = idNum && idNum !== '-' && idNum !== 'undefined';
+      const idLine = hasValidNum ? `${idType}. ${idNum}` : `${idType}: -`;
+
       return {
         classAssigned: raw || 'Semua Kelas',
         jabatan: 'Guru Mapel',
         idType: 'NIP'
+        name: targetTeacher.full_name || targetTeacher.username || 'Guru Pengampu',
+        roleTitle,
+        idType,
+        idNumber: idNum || '-',
+        idLine,
+        teacher: targetTeacher
       };
     }
 
@@ -6591,7 +6719,11 @@
       const isMulti = examMeta.isMultiType;
       const showWeightedCol = examMeta.hasWeightedScore;
       const teacherName = getExamTeacher(exam)?.full_name || '-';
+      const examTeacher = getExamTeacher(exam);
+      const teacherName = examTeacher?.full_name || '-';
       const classLabel = formatExamClassLabel(exam.class_name);
+      const sigConfig = getReportSignatureConfig();
+      const teacherSig = getTeacherSignatureMeta(examTeacher, exam.subject, exam.class_name);
       const qTypeSummary = examMeta.sections.map(s => {
         const w = !isNumericQuestionType(s.questionType) && s.scorePerItem !== 1 ? ` @${s.scorePerItem}` : '';
         return isMulti ? `${s.typeMeta.shortLabel} (${s.count}${w})` : `${s.typeMeta.label}${w}`;
@@ -6608,6 +6740,7 @@
         month: 'long',
         year: 'numeric'
       });
+      const printDateStr = sigConfig.signatureDateStr;
 
       const keyStripHtml = isMulti
         ? examMeta.sections.map(sec =>
@@ -6897,6 +7030,23 @@
               ${enrichmentRowsHtml}
             </tbody>
           </table>
+
+          <div style="margin-top:28px; display:flex; justify-content:space-between; page-break-inside:avoid; break-inside:avoid; font-size:11px;">
+            <div style="text-align:center; width:220px;">
+              <div>Mengetahui,</div>
+              <div style="font-weight:700;">Kepala Madrasah</div>
+              <div style="height:55px;"></div>
+              <div style="font-weight:800; text-decoration:underline;">${escapeHtml(sigConfig.headmasterName)}</div>
+              <div style="font-size:10px; color:#475569;">NIP. ${escapeHtml(sigConfig.headmasterNip)}</div>
+            </div>
+            <div style="text-align:center; width:220px;">
+              <div>${escapeHtml(sigConfig.fullDatePlace)}</div>
+              <div style="font-weight:700;">${escapeHtml(teacherSig.roleTitle)}</div>
+              <div style="height:55px;"></div>
+              <div style="font-weight:800; text-decoration:underline;">${escapeHtml(teacherSig.name)}</div>
+              <div style="font-size:10px; color:#475569;">${escapeHtml(teacherSig.idLine)}</div>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -8716,6 +8866,105 @@
         </div>
 
         <!-- Card 2: Backup & Restore Data (Khusus Admin) -->
+        <!-- Card 2: Pengaturan Kepala Madrasah & Tanda Tangan Dokumen (Khusus Admin) -->
+        <div class="glass-surface rounded-3xl p-6 space-y-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <i data-lucide="award" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="text-base md:text-lg font-extrabold text-slate-900">Pengaturan Kepala Madrasah &amp; Tanda Tangan</h3>
+                  <span class="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-extrabold uppercase">Khusus Admin</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">Kelola identitas Kepala Madrasah, kota domisili, dan tanggal pengesahan tanda tangan pada seluruh cetak laporan dan rekapitulasi nilai</p>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold">
+                ${escapeHtml(state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY)} • ${escapeHtml(formatIndonesianDate(state.academicSettings?.signatureDate))}
+              </span>
+            </div>
+          </div>
+
+          <form onsubmit="window.handleSaveSignatureSettings(event)" oninput="window.updateSignatureLivePreview()" class="p-5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-4">
+            <div>
+              <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-700">Form Identitas &amp; Pengesahan Tanda Tangan</h4>
+              <p class="text-[11px] text-slate-500 mt-0.5">Pengaturan ini akan langsung diterapkan pada Lembar Rekap Hasil Ulangan Siswa, Laporan Kelas, dan Analisis Butir Soal.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap &amp; Gelar Kepala Madrasah</label>
+                <input type="text" id="set-headmaster-name" required
+                  placeholder="Contoh: H. Ahmad Syauqi, S.Pd.I, M.Pd."
+                  value="${escapeHtml(state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME)}"
+                  class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <p class="text-[11px] text-slate-400 mt-1">Dicantumkan pada bagian "Mengetahui, Kepala Madrasah".</p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">NIP Kepala Madrasah</label>
+                <input type="text" id="set-headmaster-nip" required
+                  placeholder="Contoh: 197808152005011004"
+                  value="${escapeHtml(state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP)}"
+                  class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <p class="text-[11px] text-slate-400 mt-1">Nomor Induk Pegawai Kepala Madrasah (18 digit angka atau strip jika belum ada).</p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Kota Lokasi Tanda Tangan</label>
+                <input type="text" id="set-signature-city" required
+                  placeholder="Contoh: Banjarmasin"
+                  value="${escapeHtml(state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY)}"
+                  class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <p class="text-[11px] text-slate-400 mt-1">Kota domisili penerbitan dokumen laporan (misal: Banjarmasin).</p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal Pengesahan (Opsional)</label>
+                <input type="date" id="set-signature-date"
+                  value="${escapeHtml(state.academicSettings?.signatureDate || '')}"
+                  class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <p class="text-[11px] text-slate-400 mt-1">Kosongkan agar tanggal tanda tangan otomatis mengikuti tanggal saat ini ketika mencetak.</p>
+              </div>
+            </div>
+
+            <!-- Preview Format Tanda Tangan -->
+            <div class="p-4 rounded-2xl bg-white border border-slate-200/90 space-y-2">
+              <div class="flex items-center justify-between text-xs font-bold text-slate-600">
+                <span class="flex items-center gap-1.5"><i data-lucide="eye" class="w-3.5 h-3.5 text-indigo-500"></i> Pratinjau Format Tanda Tangan Dokumen:</span>
+                <span class="text-[11px] text-indigo-600 font-semibold">Dinamis Otomatis Sesuai Jabatan &amp; Mapel Guru</span>
+              </div>
+              <div class="grid grid-cols-2 gap-4 text-center py-3 px-4 bg-slate-50/60 rounded-xl border border-slate-200/70 text-xs">
+                <div class="space-y-1">
+                  <div class="text-slate-500 font-medium">Mengetahui,</div>
+                  <div class="font-bold text-slate-800">Kepala Madrasah</div>
+                  <div class="h-10"></div>
+                  <div id="preview-headmaster-name" class="font-extrabold text-slate-900 underline">${escapeHtml(state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME)}</div>
+                  <div id="preview-headmaster-nip" class="text-[11px] text-slate-500">NIP. ${escapeHtml(state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP)}</div>
+                </div>
+                <div class="space-y-1">
+                  <div id="preview-signature-city-date" class="text-slate-500 font-medium">${escapeHtml(state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY)}, ${escapeHtml(formatIndonesianDate(state.academicSettings?.signatureDate))}</div>
+                  <div class="font-bold text-slate-800">Wali Kelas / Guru Mapel</div>
+                  <div class="h-10"></div>
+                  <div class="font-extrabold text-slate-900 underline">Nama Guru Pengampu</div>
+                  <div class="text-[11px] text-slate-500">Sesuai Jenis ID (NIP / NUPTK / PegID)</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-end pt-2">
+              <button type="submit"
+                class="w-full sm:w-auto py-2.5 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition">
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Simpan Pengaturan Tanda Tangan
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Card 3: Backup & Restore Data (Khusus Admin) -->
         <div class="glass-surface rounded-3xl p-6 space-y-5">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div class="flex items-start gap-3">
@@ -8868,6 +9117,70 @@
       }
     };
 
+    window.updateSignatureLivePreview = function () {
+      const nameVal = document.getElementById('set-headmaster-name')?.value.trim() || DEFAULT_HEADMASTER_NAME;
+      const nipVal = document.getElementById('set-headmaster-nip')?.value.trim() || DEFAULT_HEADMASTER_NIP;
+      const cityVal = document.getElementById('set-signature-city')?.value.trim() || DEFAULT_SIGNATURE_CITY;
+      const dateVal = document.getElementById('set-signature-date')?.value.trim() || '';
+
+      const nameEl = document.getElementById('preview-headmaster-name');
+      const nipEl = document.getElementById('preview-headmaster-nip');
+      const cityDateEl = document.getElementById('preview-signature-city-date');
+
+      if (nameEl) nameEl.textContent = nameVal;
+      if (nipEl) nipEl.textContent = `NIP. ${nipVal}`;
+      if (cityDateEl) cityDateEl.textContent = `${cityVal}, ${formatIndonesianDate(dateVal)}`;
+    };
+
+    window.handleSaveSignatureSettings = async function (e) {
+      e.preventDefault();
+      if (!isAdminUser()) {
+        showToast('Pengaturan tanda tangan khusus untuk Administrator.', 'warning');
+        return;
+      }
+      const nameVal = String(document.getElementById('set-headmaster-name')?.value || '').trim() || DEFAULT_HEADMASTER_NAME;
+      const nipVal = String(document.getElementById('set-headmaster-nip')?.value || '').trim() || DEFAULT_HEADMASTER_NIP;
+      const cityVal = String(document.getElementById('set-signature-city')?.value || '').trim() || DEFAULT_SIGNATURE_CITY;
+      const dateVal = String(document.getElementById('set-signature-date')?.value || '').trim();
+
+      const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
+      setButtonLoading(submitterBtn, true, 'Menyimpan...');
+
+      try {
+        applyAcademicSettingsObject({
+          ...state.academicSettings,
+          headmasterName: nameVal,
+          headmasterNip: nipVal,
+          signatureCity: cityVal,
+          signatureDate: dateVal,
+          updatedAt: Date.now()
+        }, { replaceYears: true });
+
+        saveAcademicSettingsToStorage();
+        saveCacheToStorage();
+
+        if (!IS_PREVIEW && supabase) {
+          enqueuePendingSync({
+            id: crypto.randomUUID(),
+            table: 'classes',
+            action: 'upsert',
+            record: buildAcademicConfigRow()
+          });
+          updateSyncBadge('syncing');
+          await flushPendingSyncToSupabase();
+          updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+        }
+
+        renderCurrentMenu();
+        showToast('Pengaturan Kepala Madrasah & Tanda Tangan berhasil disimpan!', 'success');
+      } catch (err) {
+        console.error('Save signature settings error:', err);
+        showToast('Gagal menyimpan pengaturan tanda tangan: ' + err.message, 'danger');
+      } finally {
+        setButtonLoading(submitterBtn, false);
+      }
+    };
+
     window.handleAddAcademicYear = async function () {
       if (!isAdminUser()) {
         showToast('Fitur ini khusus untuk Administrator.', 'warning');
@@ -8986,6 +9299,11 @@
           activeAcademicYear: state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR,
           activeSemester: normalizeSemester(state.academicSettings?.activeSemester || DEFAULT_SEMESTER),
           academicYears: [...(state.academicSettings?.academicYears || DEFAULT_ACADEMIC_YEARS)]
+          academicYears: [...(state.academicSettings?.academicYears || DEFAULT_ACADEMIC_YEARS)],
+          headmasterName: state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME,
+          headmasterNip: state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP,
+          signatureCity: state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY,
+          signatureDate: state.academicSettings?.signatureDate || ''
         },
         data: {
           teachers: state.teachers || [],
@@ -9331,21 +9649,28 @@
 
     function getHomeroomTeacherForClass(className) {
       const norm = String(className || '').trim().toLowerCase();
+      const norm = normalizeGradeClass(className).toLowerCase();
       const teacher = (state.teachers || []).find(t => {
         const meta = decodeTeacherMeta(t);
         return meta.isWaliKelas && String(meta.classAssigned || '').trim().toLowerCase() === norm;
+        const isWali = meta.isWaliKelas || meta.jabatan === 'Wali Kelas' || meta.jabatan === 'Guru Kelas';
+        const assignedNorm = normalizeGradeClass(meta.classAssigned || '').toLowerCase();
+        return isWali && (assignedNorm === norm || String(meta.classAssigned || '').toLowerCase().includes(norm));
       });
       if (teacher) {
         const meta = decodeTeacherMeta(teacher);
         return {
+          ...teacher,
           name: teacher.full_name || 'Guru Kelas',
           nip: meta.idNumber || '-'
+          nip: meta.idLine || meta.idNumber || '-'
         };
       }
       return {
         name: 'Guru Kelas / Wali Kelas',
         nip: '-'
       };
+      return null;
     }
 
     function renderRekapLaporanView() {
@@ -10162,6 +10487,10 @@
       const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
       const printDateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
       const homeroom = getHomeroomTeacherForClass(student.class_name);
+      const sigConfig = getReportSignatureConfig();
+      const printDateStr = sigConfig.signatureDateStr;
+      const homeroomTeacher = getHomeroomTeacherForClass(student.class_name);
+      const teacherSig = getTeacherSignatureMeta(homeroomTeacher, '', student.class_name);
       const applicableSubjects = getApplicableSubjectsForStudentClass(student.class_name);
 
       // Bagian I: Baris Rekapitulasi Nilai Asesmen & Pemetaan Butir Benar/Salah (10 atau 13 Mapel Sesuai Kelas)
@@ -10281,6 +10610,8 @@
                 <span>Skor: <strong>${graded.earnedTotal} / ${graded.maxTotal}</strong></span>
               </div>
             </div>
+    
+... [truncated for diff preview]
           `;
         }).join('');
       }
@@ -10587,15 +10918,15 @@
             <div>Mengetahui,</div>
             <div style="font-weight:700;">Kepala Madrasah</div>
             <div style="height:50px;"></div>
-            <div style="font-weight:800; text-decoration:underline;">H. Ahmad Syauqi, S.Pd.I, M.Pd.</div>
-            <div style="font-size:10px; color:#475569;">NIP. 197808152005011004</div>
+            <div style="font-weight:800; text-decoration:underline;">${escapeHtml(sigConfig.headmasterName)}</div>
+            <div style="font-size:10px; color:#475569;">NIP. ${escapeHtml(sigConfig.headmasterNip)}</div>
           </div>
           <div style="text-align:center; width:220px;">
-            <div>Banjarmasin, ${printDateStr}</div>
-            <div style="font-weight:700;">Wali Kelas / Guru Kelas</div>
+            <div>${escapeHtml(sigConfig.fullDatePlace)}</div>
+            <div style="font-weight:700;">${escapeHtml(teacherSig.roleTitle)}</div>
             <div style="height:50px;"></div>
-            <div style="font-weight:800; text-decoration:underline;">${escapeHtml(homeroom.name)}</div>
-            <div style="font-size:10px; color:#475569;">NIP/NUPTK: ${escapeHtml(homeroom.nip)}</div>
+            <div style="font-weight:800; text-decoration:underline;">${escapeHtml(teacherSig.name)}</div>
+            <div style="font-size:10px; color:#475569;">${escapeHtml(teacherSig.idLine)}</div>
           </div>
         </div>
       `;
@@ -10701,6 +11032,19 @@
         `${stats.totalTaken} dari ${applicableSubjects.length} mapel dinilai (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)`
       ]);
 
+      const sigConfig = getReportSignatureConfig();
+      const homeroomTeacher = getHomeroomTeacherForClass(stu.class_name);
+      const teacherSig = getTeacherSignatureMeta(homeroomTeacher, '', stu.class_name);
+
+      aoaSheet1.push([]);
+      aoaSheet1.push([]);
+      aoaSheet1.push(['', 'Mengetahui,', '', '', '', '', sigConfig.fullDatePlace]);
+      aoaSheet1.push(['', 'Kepala Madrasah,', '', '', '', '', teacherSig.roleTitle]);
+      aoaSheet1.push([]);
+      aoaSheet1.push([]);
+      aoaSheet1.push(['', sigConfig.headmasterName, '', '', '', '', teacherSig.name]);
+      aoaSheet1.push(['', `NIP. ${sigConfig.headmasterNip}`, '', '', '', '', teacherSig.idLine]);
+
       // Sheet 2: Rekap Lembar Jawaban Siswa per Butir
       const aoaSheet2 = [
         ['REKAP HASIL INPUT JAWABAN SISWA PER BUTIR SOAL'],
@@ -10788,8 +11132,10 @@
     function buildClassRecapReportSheetHtml(className, students, classExams) {
       const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
       const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
-      const printDateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-      const homeroom = getHomeroomTeacherForClass(className);
+      const sigConfig = getReportSignatureConfig();
+      const printDateStr = sigConfig.signatureDateStr;
+      const homeroomTeacher = getHomeroomTeacherForClass(className);
+      const teacherSig = getTeacherSignatureMeta(homeroomTeacher, '', className);
 
       let totalAllTakenScores = 0;
       let countAllTakenScores = 0;
@@ -10895,15 +11241,15 @@
             <div>Mengetahui,</div>
             <div style="font-weight:700;">Kepala Madrasah</div>
             <div style="height:55px;"></div>
-            <div style="font-weight:800; text-decoration:underline;">H. Ahmad Syauqi, S.Pd.I, M.Pd.</div>
-            <div style="font-size:10px; color:#475569;">NIP. 197808152005011004</div>
+            <div style="font-weight:800; text-decoration:underline;">${escapeHtml(sigConfig.headmasterName)}</div>
+            <div style="font-size:10px; color:#475569;">NIP. ${escapeHtml(sigConfig.headmasterNip)}</div>
           </div>
           <div style="text-align:center; width:220px;">
-            <div>Banjarmasin, ${printDateStr}</div>
-            <div style="font-weight:700;">Wali Kelas / Guru Kelas</div>
+            <div>${escapeHtml(sigConfig.fullDatePlace)}</div>
+            <div style="font-weight:700;">${escapeHtml(teacherSig.roleTitle)}</div>
             <div style="height:55px;"></div>
-            <div style="font-weight:800; text-decoration:underline;">${escapeHtml(homeroom.name)}</div>
-            <div style="font-size:10px; color:#475569;">NIP/NUPTK: ${escapeHtml(homeroom.nip)}</div>
+            <div style="font-weight:800; text-decoration:underline;">${escapeHtml(teacherSig.name)}</div>
+            <div style="font-size:10px; color:#475569;">${escapeHtml(teacherSig.idLine)}</div>
           </div>
         </div>
       `;
@@ -10975,6 +11321,19 @@
         );
         aoa.push(row);
       });
+
+      const sigConfig = getReportSignatureConfig();
+      const homeroomTeacher = getHomeroomTeacherForClass(targetClass);
+      const teacherSig = getTeacherSignatureMeta(homeroomTeacher, '', targetClass);
+
+      aoa.push([]);
+      aoa.push([]);
+      aoa.push(['', 'Mengetahui,', '', '', ...classExams.slice(2).map(() => ''), sigConfig.fullDatePlace]);
+      aoa.push(['', 'Kepala Madrasah,', '', '', ...classExams.slice(2).map(() => ''), teacherSig.roleTitle]);
+      aoa.push([]);
+      aoa.push([]);
+      aoa.push(['', sigConfig.headmasterName, '', '', ...classExams.slice(2).map(() => ''), teacherSig.name]);
+      aoa.push(['', `NIP. ${sigConfig.headmasterNip}`, '', '', ...classExams.slice(2).map(() => ''), teacherSig.idLine]);
 
       const cleanClass = targetClass.replace(/[^a-zA-Z0-9_-]/g, '_');
       const cleanYear = activeYear.replace(/[^a-zA-Z0-9_-]/g, '-');
