@@ -3119,7 +3119,6 @@
         if (yrSel) delete yrSel.dataset.userChanged;
         if (semSel) delete semSel.dataset.userChanged;
         populateLoginAcademicSelectors({ preserveSelection: false });
-        updateImpersonationUI();
 
         showActionOverlay({
           stateType: 'logout-done',
@@ -3230,7 +3229,6 @@
             state.impersonatedByAdmin = null;
             state.activeMenu = 'dashboard';
             clearSessionFromStorage();
-            updateImpersonationUI();
             await switchViewAnimated(
               document.getElementById('app-view'),
               document.getElementById('auth-view')
@@ -3318,6 +3316,12 @@
       if (!allowedMenuIds.has(state.activeMenu)) {
         state.activeMenu = 'dashboard';
       }
+
+      const tRole = getCurrentTeacherRoleMeta(u);
+      const isWali = Boolean(u.role === 'guru' && tRole?.isWaliKelas && tRole.assignedGrade);
+      const tSubjs = u.role === 'guru' ? parseTeacherSubjects(u.subject) : [];
+      if (isWali) state.examClassFilter = tRole.assignedGrade;
+      if (tSubjs.length === 1) state.examSubjectFilter = tSubjs[0];
 
       updateImpersonationUI();
       updateWorkspacePeriodUI();
@@ -3607,6 +3611,14 @@
       }
       closeFormModal({ resetEditState: false });
       state.activeMenu = menuId;
+      if (menuId === 'manajemen_ulangan') {
+        const isAdmin = isAdminUser();
+        const tRole = getCurrentTeacherRoleMeta();
+        const isWaliLocked = Boolean(!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade);
+        const tSubjects = !isAdmin ? parseTeacherSubjects(state.currentUser?.subject) : [];
+        if (isWaliLocked) state.examClassFilter = tRole.assignedGrade;
+        if (tSubjects.length === 1) state.examSubjectFilter = tSubjects[0];
+      }
       state.editingSubjectId = null;
       state.editingStudentId = null;
       state.editingTeacherId = null;
@@ -4578,17 +4590,41 @@
         <!-- Daftar Paket Ulangan -->
         <div class="lg:col-span-7 glass-surface rounded-3xl p-6 space-y-4">
           ${(() => {
-        const classChoices = sortClassNamesNatural(visibleExams.map(ex => ex.class_name));
-        if (state.examClassFilter !== 'ALL' && !classChoices.includes(state.examClassFilter)) {
-          state.examClassFilter = 'ALL';
+        let classFilterOptionsHtml = '';
+        if (isWaliLockedClass) {
+          state.examClassFilter = tRole.assignedGrade;
+          classFilterOptionsHtml = `<option value="${escapeHtml(tRole.assignedGrade)}" selected>${escapeHtml(tRole.assignedGrade)} (Kelas Anda)</option>`;
+        } else {
+          const classChoices = sortClassNamesNatural(visibleExams.map(ex => ex.class_name));
+          if (state.examClassFilter !== 'ALL' && !classChoices.includes(state.examClassFilter)) {
+            state.examClassFilter = 'ALL';
+          }
+          classFilterOptionsHtml = `<option value="ALL" ${state.examClassFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
+            classChoices.map(cls => `<option value="${escapeHtml(cls)}" ${cls === state.examClassFilter ? 'selected' : ''}>${escapeHtml(cls)}</option>`).join('');
         }
-        const examsForSubjects = state.examClassFilter === 'ALL'
-          ? visibleExams
-          : visibleExams.filter(ex => ex.class_name === state.examClassFilter);
-        const subjectChoices = Array.from(new Set(examsForSubjects.map(ex => String(ex.subject || '').trim()).filter(Boolean)))
-          .sort((a, b) => a.localeCompare(b, 'id'));
-        if (state.examSubjectFilter !== 'ALL' && !subjectChoices.some(s => s.toLowerCase() === state.examSubjectFilter.toLowerCase())) {
-          state.examSubjectFilter = 'ALL';
+
+        const isSingleSubject = !isAdmin && subjectList.length === 1;
+        let subjectFilterOptionsHtml = '';
+        if (isSingleSubject) {
+          state.examSubjectFilter = subjectList[0];
+          subjectFilterOptionsHtml = `<option value="${escapeHtml(subjectList[0])}" selected>${escapeHtml(subjectList[0])} (Mapel Anda)</option>`;
+        } else if (subjectList.length > 1 && !isAdmin) {
+          if (state.examSubjectFilter !== 'ALL' && !subjectList.some(s => s.toLowerCase() === state.examSubjectFilter.toLowerCase())) {
+            state.examSubjectFilter = 'ALL';
+          }
+          subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>Semua Mapel (${subjectList.length} Mapel Ampuan)</option>` +
+            subjectList.map(subj => `<option value="${escapeHtml(subj)}" ${subj.toLowerCase() === state.examSubjectFilter.toLowerCase() ? 'selected' : ''}>${escapeHtml(subj)}</option>`).join('');
+        } else {
+          const examsForSubjects = state.examClassFilter === 'ALL'
+            ? visibleExams
+            : visibleExams.filter(ex => ex.class_name === state.examClassFilter);
+          const subjectChoices = Array.from(new Set(examsForSubjects.map(ex => String(ex.subject || '').trim()).filter(Boolean)))
+            .sort((a, b) => a.localeCompare(b, 'id'));
+          if (state.examSubjectFilter !== 'ALL' && !subjectChoices.some(s => s.toLowerCase() === state.examSubjectFilter.toLowerCase())) {
+            state.examSubjectFilter = 'ALL';
+          }
+          subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>Semua Mapel</option>` +
+            subjectChoices.map(subj => `<option value="${escapeHtml(subj)}" ${subj.toLowerCase() === state.examSubjectFilter.toLowerCase() ? 'selected' : ''}>${escapeHtml(subj)}</option>`).join('');
         }
 
         const q = String(state.examSearchQuery || '').trim().toLowerCase();
@@ -4603,16 +4639,13 @@
           return true;
         });
 
-        const hasActiveFilters = state.examClassFilter !== 'ALL' || state.examSubjectFilter !== 'ALL' || q !== '';
+        const defaultClassFilter = isWaliLockedClass ? tRole.assignedGrade : 'ALL';
+        const defaultSubjectFilter = isSingleSubject ? subjectList[0] : 'ALL';
+        const hasActiveFilters = state.examClassFilter !== defaultClassFilter || state.examSubjectFilter !== defaultSubjectFilter || q !== '';
         const examsPage = paginateItems(filteredExams, 'exams');
         const badgeCountText = hasActiveFilters
           ? `${filteredExams.length} dari ${visibleExams.length} Paket`
           : `${visibleExams.length} Paket`;
-
-        const classFilterOptionsHtml = `<option value="ALL" ${state.examClassFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
-          classChoices.map(cls => `<option value="${escapeHtml(cls)}" ${cls === state.examClassFilter ? 'selected' : ''}>${escapeHtml(cls)}</option>`).join('');
-        const subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>Semua Mapel</option>` +
-          subjectChoices.map(subj => `<option value="${escapeHtml(subj)}" ${subj.toLowerCase() === state.examSubjectFilter.toLowerCase() ? 'selected' : ''}>${escapeHtml(subj)}</option>`).join('');
 
         return `
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -4632,12 +4665,12 @@
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-            <select id="exam-filter-class" onchange="window.handleFilterExams()"
-              class="sm:col-span-3 px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <select id="exam-filter-class" ${isWaliLockedClass ? 'disabled title="Terkunci di kelas ampuan Anda"' : 'onchange="window.handleFilterExams()"'}
+              class="sm:col-span-3 px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${isWaliLockedClass ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 text-slate-700 focus:ring-2 focus:ring-indigo-500'}">
               ${classFilterOptionsHtml}
             </select>
-            <select id="exam-filter-subject" onchange="window.handleFilterExams()"
-              class="sm:col-span-4 px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <select id="exam-filter-subject" ${isSingleSubject ? 'disabled title="Terkunci di mapel ampuan Anda"' : 'onchange="window.handleFilterExams()"'}
+              class="sm:col-span-4 px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${isSingleSubject ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 text-slate-700 focus:ring-2 focus:ring-indigo-500'}">
               ${subjectFilterOptionsHtml}
             </select>
             <input type="text" id="exam-search-input" value="${escapeHtml(state.examSearchQuery || '')}" oninput="window.handleFilterExams(this)"
@@ -4875,13 +4908,30 @@
     };
 
     window.handleFilterExams = function (searchInputEl = null) {
+      const isAdmin = isAdminUser();
+      const tRole = getCurrentTeacherRoleMeta();
+      const isWaliLockedClass = Boolean(!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade);
+      const teacherSubjects = !isAdmin ? parseTeacherSubjects(state.currentUser?.subject) : [];
+      const isSingleSubject = !isAdmin && teacherSubjects.length === 1;
+
       const classEl = document.getElementById('exam-filter-class');
       const subjectEl = document.getElementById('exam-filter-subject');
       const searchEl = searchInputEl || document.getElementById('exam-search-input');
       const hadFocus = document.activeElement === searchEl;
       const selStart = searchEl?.selectionStart ?? null;
-      if (classEl) state.examClassFilter = classEl.value || 'ALL';
-      if (subjectEl) state.examSubjectFilter = subjectEl.value || 'ALL';
+
+      if (isWaliLockedClass) {
+        state.examClassFilter = tRole.assignedGrade;
+      } else if (classEl) {
+        state.examClassFilter = classEl.value || 'ALL';
+      }
+
+      if (isSingleSubject) {
+        state.examSubjectFilter = teacherSubjects[0];
+      } else if (subjectEl) {
+        state.examSubjectFilter = subjectEl.value || 'ALL';
+      }
+
       if (searchEl) state.examSearchQuery = searchEl.value || '';
       state.pagination.exams = 1;
       renderCurrentMenu();
@@ -4895,8 +4945,14 @@
     };
 
     window.handleResetExamFilters = function () {
-      state.examClassFilter = 'ALL';
-      state.examSubjectFilter = 'ALL';
+      const isAdmin = isAdminUser();
+      const tRole = getCurrentTeacherRoleMeta();
+      const isWaliLockedClass = Boolean(!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade);
+      const teacherSubjects = !isAdmin ? parseTeacherSubjects(state.currentUser?.subject) : [];
+      const isSingleSubject = !isAdmin && teacherSubjects.length === 1;
+
+      state.examClassFilter = isWaliLockedClass ? tRole.assignedGrade : 'ALL';
+      state.examSubjectFilter = isSingleSubject ? teacherSubjects[0] : 'ALL';
       state.examSearchQuery = '';
       state.pagination.exams = 1;
       renderCurrentMenu();
