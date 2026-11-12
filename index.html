@@ -1149,7 +1149,8 @@
       academicSettings: {
         activeAcademicYear: DEFAULT_ACADEMIC_YEAR,
         activeSemester: DEFAULT_SEMESTER,
-        academicYears: [...DEFAULT_ACADEMIC_YEARS]
+        academicYears: [...DEFAULT_ACADEMIC_YEARS],
+        updatedAt: 0
       },
       sessionAcademicYear: DEFAULT_ACADEMIC_YEAR,
       sessionSemester: DEFAULT_SEMESTER,
@@ -1321,7 +1322,7 @@
         if (Array.isArray(cached.students)) state.students = cached.students;
         if (Array.isArray(cached.deletedSubjectNames)) state.deletedSubjectNames = cached.deletedSubjectNames;
         if (cached.activeExamId) state.activeExamId = cached.activeExamId;
-        if (cached.academicSettings) applyAcademicSettingsObject(cached.academicSettings);
+        if (cached.academicSettings) applyAcademicSettingsObject(cached.academicSettings, { onlyIfNewer: true, replaceYears: true });
         return true;
       } catch (e) {
         return false;
@@ -1354,21 +1355,31 @@
       return unique.sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
     }
 
-    function applyAcademicSettingsObject(cfg) {
-      if (!cfg || typeof cfg !== 'object') return;
-      const mergedYears = sortAcademicYears([
-        ...DEFAULT_ACADEMIC_YEARS,
-        ...(Array.isArray(state.academicSettings?.academicYears) ? state.academicSettings.academicYears : []),
-        ...(Array.isArray(cfg.academicYears) ? cfg.academicYears : []),
-        cfg.activeAcademicYear || ''
-      ]);
+    function applyAcademicSettingsObject(cfg, { onlyIfNewer = false, replaceYears = true } = {}) {
+      if (!cfg || typeof cfg !== 'object') return false;
+      const incomingTs = Number(cfg.updatedAt || 0);
+      const currentTs = Number(state.academicSettings?.updatedAt || 0);
+      if (onlyIfNewer && currentTs > 0 && incomingTs < currentTs) {
+        return false;
+      }
+
       const activeYear = String(cfg.activeAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR).trim() || DEFAULT_ACADEMIC_YEAR;
       const activeSem = normalizeSemester(cfg.activeSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      const hasExplicitYears = Array.isArray(cfg.academicYears) && cfg.academicYears.length > 0;
+      const sourceYears = replaceYears
+        ? (hasExplicitYears ? cfg.academicYears : (Array.isArray(state.academicSettings?.academicYears) && state.academicSettings.academicYears.length > 0 ? state.academicSettings.academicYears : DEFAULT_ACADEMIC_YEARS))
+        : [
+            ...(Array.isArray(state.academicSettings?.academicYears) ? state.academicSettings.academicYears : DEFAULT_ACADEMIC_YEARS),
+            ...(Array.isArray(cfg.academicYears) ? cfg.academicYears : [])
+          ];
+
       state.academicSettings = {
         activeAcademicYear: activeYear,
         activeSemester: activeSem,
-        academicYears: sortAcademicYears([...mergedYears, activeYear])
+        academicYears: sortAcademicYears([...sourceYears, activeYear]),
+        updatedAt: Math.max(incomingTs, currentTs)
       };
+      return true;
     }
 
     function saveAcademicSettingsToStorage() {
@@ -1382,7 +1393,7 @@
         const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
         if (!raw) return false;
         const parsed = JSON.parse(raw);
-        applyAcademicSettingsObject(parsed);
+        applyAcademicSettingsObject(parsed, { replaceYears: true });
         return true;
       } catch (e) {
         return false;
@@ -1396,7 +1407,8 @@
         homeroom_teacher: JSON.stringify({
           activeAcademicYear: state.academicSettings.activeAcademicYear,
           activeSemester: state.academicSettings.activeSemester,
-          academicYears: state.academicSettings.academicYears
+          academicYears: state.academicSettings.academicYears,
+          updatedAt: Number(state.academicSettings.updatedAt || 0)
         }),
         student_count: 0
       };
@@ -1407,9 +1419,9 @@
       try {
         const parsed = JSON.parse(row.homeroom_teacher);
         if (parsed && (parsed.activeAcademicYear || Array.isArray(parsed.academicYears))) {
-          applyAcademicSettingsObject(parsed);
-          saveAcademicSettingsToStorage();
-          return true;
+          const applied = applyAcademicSettingsObject(parsed, { onlyIfNewer: true, replaceYears: true });
+          if (applied) saveAcademicSettingsToStorage();
+          return applied;
         }
       } catch (e) { }
       return false;
@@ -1417,8 +1429,11 @@
 
     function mergeAcademicYearsFromExams() {
       const yearsFromExams = (state.exams || []).map(ex => decodeExamPeriod(ex).academicYear);
+      const currentYears = Array.isArray(state.academicSettings?.academicYears) && state.academicSettings.academicYears.length > 0
+        ? state.academicSettings.academicYears
+        : DEFAULT_ACADEMIC_YEARS;
       const merged = sortAcademicYears([
-        ...(state.academicSettings?.academicYears || DEFAULT_ACADEMIC_YEARS),
+        ...currentYears,
         state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR,
         ...yearsFromExams
       ]);
@@ -8363,8 +8378,9 @@
         applyAcademicSettingsObject({
           activeAcademicYear: nextYear,
           activeSemester: nextSem,
-          academicYears: [...(state.academicSettings?.academicYears || []), nextYear]
-        });
+          academicYears: [...(state.academicSettings?.academicYears || []), nextYear],
+          updatedAt: Date.now()
+        }, { replaceYears: true });
         state.sessionAcademicYear = nextYear;
         state.sessionSemester = nextSem;
         state.headerExamClassFilter = 'ALL';
@@ -8424,8 +8440,9 @@
 
       applyAcademicSettingsObject({
         ...state.academicSettings,
-        academicYears: [...(state.academicSettings?.academicYears || []), rawVal]
-      });
+        academicYears: [...(state.academicSettings?.academicYears || []), rawVal],
+        updatedAt: Date.now()
+      }, { replaceYears: true });
       saveAcademicSettingsToStorage();
       saveCacheToStorage();
       populateLoginAcademicSelectors({ preserveSelection: false });
@@ -8462,6 +8479,7 @@
         `<p>Hapus Tahun Ajaran <strong>${escapeHtml(cleanYear)}</strong> dari daftar pilihan?</p>`,
         async () => {
           state.academicSettings.academicYears = (state.academicSettings.academicYears || []).filter(y => y !== cleanYear);
+          state.academicSettings.updatedAt = Date.now();
           if (state.sessionAcademicYear === cleanYear) {
             state.sessionAcademicYear = state.academicSettings.activeAcademicYear;
           }
@@ -8622,7 +8640,10 @@
               state.exams = structuredClone(d.exams);
               state.examResults = structuredClone(d.examResults);
               if (parsed.academicSettings) {
-                applyAcademicSettingsObject(parsed.academicSettings);
+                applyAcademicSettingsObject({
+                  ...parsed.academicSettings,
+                  updatedAt: Date.now()
+                }, { replaceYears: true });
               }
               mergeAcademicYearsFromExams();
               mergeSubjectsState();
