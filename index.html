@@ -661,6 +661,35 @@
               </div>
             </div>
 
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                Tahun Ajaran
+              </label>
+              <div class="relative">
+                <i data-lucide="calendar" class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                <select id="login-academic-year" required
+                  class="w-full pl-11 pr-10 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition appearance-none cursor-pointer">
+                  <option value="2026/2027">2026/2027</option>
+                </select>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                Semester
+              </label>
+              <div class="relative">
+                <i data-lucide="calendar-days" class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                <select id="login-semester" required
+                  class="w-full pl-11 pr-10 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition appearance-none cursor-pointer">
+                  <option value="Ganjil">Ganjil</option>
+                  <option value="Genap">Genap</option>
+                </select>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              </div>
+            </div>
+
             <div id="auth-helper-box"
               class="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-100 text-xs text-indigo-900 flex items-start gap-2.5">
               <i data-lucide="info" class="w-4 h-4 text-indigo-600 shrink-0 mt-0.5"></i>
@@ -688,7 +717,7 @@
       <aside class="desktop-sidebar no-print w-72 h-full glass-sidebar flex-col justify-between p-5 shrink-0 z-20">
         <div>
           <!-- Brand Logo -->
-          <div class="flex items-center justify-between px-2 mb-8">
+          <div class="flex items-center justify-between px-2 mb-5">
             <div class="flex items-center gap-3">
               <div
                 class="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-base tracking-tight shadow-md shadow-indigo-500/30">
@@ -703,6 +732,23 @@
               class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
               GURU
             </span>
+          </div>
+
+          <!-- Active Academic Year & Semester Pill -->
+          <div id="sidebar-period-pill"
+            class="mb-4 px-3.5 py-2.5 rounded-2xl bg-indigo-50/80 border border-indigo-200/70 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <i data-lucide="calendar-range" class="w-4 h-4 text-indigo-600 shrink-0"></i>
+              <div class="min-w-0">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-indigo-500 leading-none">Tahun Ajaran</div>
+                <div id="sidebar-period-text" class="text-xs font-extrabold text-indigo-950 truncate mt-0.5">2026/2027 • Ganjil</div>
+              </div>
+            </div>
+            <button type="button" id="btn-sidebar-period-edit" onclick="window.navigateMenu('pengaturan_sistem')"
+              class="hidden p-1.5 rounded-xl bg-white hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-200/80 transition shrink-0"
+              title="Pengaturan Tahun Ajaran & Semester">
+              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+            </button>
           </div>
 
           <!-- Navigation Menu List -->
@@ -756,7 +802,14 @@
           </div>
 
           <!-- Global Exam Filter & Quick Actions -->
-          <div class="flex items-center gap-2.5 md:gap-4">
+          <div class="flex items-center gap-2.5 md:gap-3">
+            <button type="button" id="header-period-badge" onclick="if (window.__isAdminActive && window.__isAdminActive()) window.navigateMenu('pengaturan_sistem')"
+              class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-[11px] font-bold transition shrink-0"
+              title="Tahun Ajaran & Semester Aktif">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 shrink-0"></i>
+              <span id="header-period-text">2026/2027 • Ganjil</span>
+            </button>
+
             <button type="button" id="sync-status-badge" onclick="window.manualSyncSupabase()"
               title="Klik untuk sinkronisasi manual ke Supabase"
               class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-bold transition hover:bg-emerald-100/80 shrink-0">
@@ -960,8 +1013,16 @@
       CACHE: 'flowora_state_cache_v1',
       PENDING_SYNC: 'flowora_pending_sync_v1',
       SUBJECTS: 'flowora_subjects_v1',
-      STUDENTS: 'flowora_students_v1'
+      STUDENTS: 'flowora_students_v1',
+      SETTINGS: 'flowora_academic_settings_v1'
     };
+
+    const DEFAULT_ACADEMIC_YEAR = '2026/2027';
+    const DEFAULT_SEMESTER = 'Ganjil';
+    const DEFAULT_ACADEMIC_YEARS = ['2025/2026', '2026/2027', '2027/2028'];
+    const SEMESTER_OPTIONS = ['Ganjil', 'Genap'];
+    const ACADEMIC_CONFIG_ROW_ID = '00000000-0000-4000-8000-000000000001';
+    const ACADEMIC_CONFIG_CLASS_NAME = '__SIHASUL_CONFIG__';
 
     const GRADE_CLASS_OPTIONS = [
       'Kelas 1',
@@ -1085,6 +1146,13 @@
       editingExamId: null,
       editingResultId: null,
       lastSavedStudentRef: null,
+      academicSettings: {
+        activeAcademicYear: DEFAULT_ACADEMIC_YEAR,
+        activeSemester: DEFAULT_SEMESTER,
+        academicYears: [...DEFAULT_ACADEMIC_YEARS]
+      },
+      sessionAcademicYear: DEFAULT_ACADEMIC_YEAR,
+      sessionSemester: DEFAULT_SEMESTER,
       subjects: [],
       students: [],
       teachers: [],
@@ -1202,6 +1270,8 @@
           impersonatedByAdmin: state.impersonatedByAdmin || null,
           activeMenu: state.activeMenu,
           activeExamId: state.activeExamId,
+          sessionAcademicYear: state.sessionAcademicYear,
+          sessionSemester: state.sessionSemester,
           savedAt: Date.now()
         }));
       } catch (e) { }
@@ -1232,7 +1302,8 @@
           subjects: state.subjects,
           students: state.students,
           deletedSubjectNames: state.deletedSubjectNames,
-          activeExamId: state.activeExamId
+          activeExamId: state.activeExamId,
+          academicSettings: state.academicSettings
         }));
       } catch (e) { }
     }
@@ -1250,6 +1321,7 @@
         if (Array.isArray(cached.students)) state.students = cached.students;
         if (Array.isArray(cached.deletedSubjectNames)) state.deletedSubjectNames = cached.deletedSubjectNames;
         if (cached.activeExamId) state.activeExamId = cached.activeExamId;
+        if (cached.academicSettings) applyAcademicSettingsObject(cached.academicSettings);
         return true;
       } catch (e) {
         return false;
@@ -1270,6 +1342,189 @@
       } catch (e) {
         return [];
       }
+    }
+
+    // ==================== HELPERS: TAHUN AJARAN, SEMESTER & HAK AKSES ====================
+    function normalizeSemester(val) {
+      return String(val || '').trim().toLowerCase() === 'genap' ? 'Genap' : 'Ganjil';
+    }
+
+    function sortAcademicYears(list) {
+      const unique = Array.from(new Set((Array.isArray(list) ? list : []).map(y => String(y || '').trim()).filter(Boolean)));
+      return unique.sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
+    }
+
+    function applyAcademicSettingsObject(cfg) {
+      if (!cfg || typeof cfg !== 'object') return;
+      const mergedYears = sortAcademicYears([
+        ...DEFAULT_ACADEMIC_YEARS,
+        ...(Array.isArray(state.academicSettings?.academicYears) ? state.academicSettings.academicYears : []),
+        ...(Array.isArray(cfg.academicYears) ? cfg.academicYears : []),
+        cfg.activeAcademicYear || ''
+      ]);
+      const activeYear = String(cfg.activeAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR).trim() || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = normalizeSemester(cfg.activeSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      state.academicSettings = {
+        activeAcademicYear: activeYear,
+        activeSemester: activeSem,
+        academicYears: sortAcademicYears([...mergedYears, activeYear])
+      };
+    }
+
+    function saveAcademicSettingsToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(state.academicSettings));
+      } catch (e) { }
+    }
+
+    function loadAcademicSettingsFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        applyAcademicSettingsObject(parsed);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function buildAcademicConfigRow() {
+      return {
+        id: ACADEMIC_CONFIG_ROW_ID,
+        class_name: ACADEMIC_CONFIG_CLASS_NAME,
+        homeroom_teacher: JSON.stringify({
+          activeAcademicYear: state.academicSettings.activeAcademicYear,
+          activeSemester: state.academicSettings.activeSemester,
+          academicYears: state.academicSettings.academicYears
+        }),
+        student_count: 0
+      };
+    }
+
+    function applyRemoteAcademicConfigRow(row) {
+      if (!row || typeof row.homeroom_teacher !== 'string') return false;
+      try {
+        const parsed = JSON.parse(row.homeroom_teacher);
+        if (parsed && (parsed.activeAcademicYear || Array.isArray(parsed.academicYears))) {
+          applyAcademicSettingsObject(parsed);
+          saveAcademicSettingsToStorage();
+          return true;
+        }
+      } catch (e) { }
+      return false;
+    }
+
+    function mergeAcademicYearsFromExams() {
+      const yearsFromExams = (state.exams || []).map(ex => decodeExamPeriod(ex).academicYear);
+      const merged = sortAcademicYears([
+        ...(state.academicSettings?.academicYears || DEFAULT_ACADEMIC_YEARS),
+        state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR,
+        ...yearsFromExams
+      ]);
+      state.academicSettings.academicYears = merged;
+    }
+
+    function populateLoginAcademicSelectors({ preserveSelection = false } = {}) {
+      const yearSelect = document.getElementById('login-academic-year');
+      const semSelect = document.getElementById('login-semester');
+      if (!yearSelect || !semSelect) return;
+
+      mergeAcademicYearsFromExams();
+      const years = state.academicSettings.academicYears || [...DEFAULT_ACADEMIC_YEARS];
+      const defaultYear = state.academicSettings.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const defaultSem = normalizeSemester(state.academicSettings.activeSemester || DEFAULT_SEMESTER);
+
+      const prevYear = preserveSelection && yearSelect.dataset.userChanged === '1' ? yearSelect.value : defaultYear;
+      const prevSem = preserveSelection && semSelect.dataset.userChanged === '1' ? semSelect.value : defaultSem;
+
+      const selectedYear = years.includes(prevYear) ? prevYear : defaultYear;
+      const selectedSem = SEMESTER_OPTIONS.includes(prevSem) ? prevSem : defaultSem;
+
+      yearSelect.innerHTML = years.map(y =>
+        `<option value="${escapeHtml(y)}" ${y === selectedYear ? 'selected' : ''}>${escapeHtml(y)}</option>`
+      ).join('');
+      yearSelect.value = selectedYear;
+
+      semSelect.innerHTML = SEMESTER_OPTIONS.map(s =>
+        `<option value="${escapeHtml(s)}" ${s === selectedSem ? 'selected' : ''}>${escapeHtml(s)}</option>`
+      ).join('');
+      semSelect.value = selectedSem;
+    }
+
+    function updateWorkspacePeriodUI() {
+      const year = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const sem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      const label = `${year} • ${sem}`;
+
+      const sidebarText = document.getElementById('sidebar-period-text');
+      const headerText = document.getElementById('header-period-text');
+      const sidebarEditBtn = document.getElementById('btn-sidebar-period-edit');
+      const headerBadge = document.getElementById('header-period-badge');
+
+      if (sidebarText) sidebarText.textContent = label;
+      if (headerText) headerText.textContent = label;
+
+      const isAdmin = isAdminUser();
+      if (sidebarEditBtn) {
+        sidebarEditBtn.classList.toggle('hidden', !isAdmin);
+      }
+      if (headerBadge) {
+        headerBadge.classList.toggle('cursor-pointer', isAdmin);
+        headerBadge.classList.toggle('hover:bg-indigo-100', isAdmin);
+        headerBadge.title = isAdmin
+          ? 'Klik untuk mengatur Tahun Ajaran & Semester'
+          : `Tahun Ajaran ${year} • Semester ${sem}`;
+      }
+    }
+
+    function isAdminUser(user = state.currentUser) {
+      return user?.role === 'admin';
+    }
+    window.__isAdminActive = () => isAdminUser();
+
+    function getCurrentTeacherRoleMeta(user = state.currentUser) {
+      if (!user || user.role !== 'guru') return null;
+      const meta = decodeTeacherMeta(user);
+      const isWaliKelas = meta.jabatan === 'Wali Kelas';
+      const rawClass = String(meta.classAssigned || '').trim();
+      const isAll = !rawClass || /semua|seluruh|all/i.test(rawClass);
+      const normalizedGrade = normalizeGradeClass(rawClass);
+      const hasSpecificGrade = !isAll && GRADE_CLASS_OPTIONS.includes(normalizedGrade);
+      return {
+        ...meta,
+        isWaliKelas,
+        isGuruMapel: !isWaliKelas,
+        assignedGrade: hasSpecificGrade ? normalizedGrade : null
+      };
+    }
+
+    function decodeExamPeriod(exam) {
+      const rawField = String(exam?.answer_key || '').trim();
+      const match = rawField.match(/^AY\[([^|\]]+)\|([^\]]+)\];;(.*)$/s);
+      if (match) {
+        const year = match[1].trim() || DEFAULT_ACADEMIC_YEAR;
+        const semester = normalizeSemester(match[2].trim());
+        return {
+          academicYear: year,
+          semester,
+          innerKey: match[3].trim(),
+          hasExplicitPeriod: true
+        };
+      }
+      return {
+        academicYear: DEFAULT_ACADEMIC_YEAR,
+        semester: DEFAULT_SEMESTER,
+        innerKey: rawField,
+        hasExplicitPeriod: false
+      };
+    }
+
+    function encodeExamPeriodPrefix(academicYear, semester, innerKey) {
+      const yr = String(academicYear || state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR).trim();
+      const sem = normalizeSemester(semester || state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      const cleanInner = String(innerKey || '').replace(/^AY\[[^|\]]+\|[^\]]+\];;/, '').trim();
+      return `AY[${yr}|${sem}];;${cleanInner}`;
     }
 
     // ==================== HELPERS: ESCAPE, JENIS SOAL, KOREKSI & MAPEL ====================
@@ -1400,7 +1655,8 @@
 
     /** Decode metadata jenis soal (tunggal maupun multi-ceklis), daftar kunci/bobot, dan tampilan kunci dari object exam. */
     function decodeExamMeta(exam) {
-      const rawField = String(exam?.answer_key || '').trim();
+      const periodInfo = decodeExamPeriod(exam);
+      const rawField = periodInfo.innerKey;
       const totalDeclared = Number(exam?.total_questions) || null;
       let sections = [];
 
@@ -1461,6 +1717,8 @@
       const allNumeric = sections.every(s => isNumericQuestionType(s.questionType));
 
       return {
+        academicYear: periodInfo.academicYear,
+        semester: periodInfo.semester,
         isMultiType,
         sections,
         questionTypes: sections.map(s => s.questionType),
@@ -2380,6 +2638,8 @@
         if (state.examResults.length === 0) state.examResults = structuredClone(INITIAL_SEED_DATA.examResults);
         ensureStudentsLoadedFromLocal();
         mergeSubjectsState();
+        mergeAcademicYearsFromExams();
+        if (!state.currentUser) populateLoginAcademicSelectors({ preserveSelection: true });
         if (!state.activeExamId) state.activeExamId = state.exams[0]?.id || null;
         state.lastSyncedAt = new Date();
         updateSyncBadge('synced', 'Mode Lokal');
@@ -2409,6 +2669,8 @@
         console.error('Supabase AutoSetup Error:', err);
         ensureStudentsLoadedFromLocal();
         mergeSubjectsState();
+        mergeAcademicYearsFromExams();
+        if (!state.currentUser) populateLoginAcademicSelectors({ preserveSelection: true });
         updateSyncBadge('pending');
         showToast('Gagal sinkronisasi ke Supabase. Cek koneksi atau script SQL.', 'warning');
       }
@@ -2418,6 +2680,7 @@
       if (IS_PREVIEW || !supabase) {
         ensureStudentsLoadedFromLocal();
         mergeSubjectsState();
+        mergeAcademicYearsFromExams();
         return;
       }
       const [tRes, cRes, eRes, rRes] = await Promise.all([
@@ -2427,7 +2690,11 @@
         supabase.from('exam_results').select('*').order('student_name', { ascending: true })
       ]);
       if (tRes.data) state.teachers = tRes.data;
-      if (cRes.data) state.classes = cRes.data;
+      if (cRes.data) {
+        const cfgRow = cRes.data.find(c => c.id === ACADEMIC_CONFIG_ROW_ID || c.class_name === ACADEMIC_CONFIG_CLASS_NAME);
+        if (cfgRow) applyRemoteAcademicConfigRow(cfgRow);
+        state.classes = cRes.data.filter(c => c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME);
+      }
       if (eRes.data) state.exams = eRes.data;
       if (rRes.data) state.examResults = rRes.data;
 
@@ -2469,6 +2736,8 @@
       }
 
       mergeSubjectsState({ dbSubjects });
+      mergeAcademicYearsFromExams();
+      if (!state.currentUser) populateLoginAcademicSelectors({ preserveSelection: true });
       if ((!state.activeExamId || !state.exams.some(e => e.id === state.activeExamId)) && state.exams.length > 0) {
         state.activeExamId = state.exams[0].id;
       }
@@ -2681,7 +2950,15 @@
       e.preventDefault();
       const identifier = document.getElementById('login-identifier').value.trim();
       const password = document.getElementById('login-password').value.trim();
+      const selectedAcademicYear = String(document.getElementById('login-academic-year')?.value || state.academicSettings.activeAcademicYear || DEFAULT_ACADEMIC_YEAR).trim();
+      const selectedSemester = normalizeSemester(document.getElementById('login-semester')?.value || state.academicSettings.activeSemester || DEFAULT_SEMESTER);
       const loginBtn = document.getElementById('btn-submit-login');
+
+      if (!selectedAcademicYear || !selectedSemester) {
+        triggerAuthShake();
+        showToast('Silakan pilih Tahun Ajaran dan Semester terlebih dahulu.', 'warning');
+        return;
+      }
 
       setButtonLoading(loginBtn, true, 'Memverifikasi...');
 
@@ -2765,6 +3042,9 @@
 
         // Animasi Login + Sinkronisasi Otomatis ke Supabase
         state.impersonatedByAdmin = null;
+        state.sessionAcademicYear = selectedAcademicYear;
+        state.sessionSemester = selectedSemester;
+        state.activeMenu = 'dashboard';
         saveSessionToStorage();
         showActionOverlay({
           stateType: 'loading',
@@ -2773,16 +3053,19 @@
         });
 
         await syncWithSupabase({ reason: 'login' });
+        state.sessionAcademicYear = selectedAcademicYear;
+        state.sessionSemester = selectedSemester;
+        saveSessionToStorage();
 
         showActionOverlay({
           stateType: 'success',
           title: 'Selamat Datang!',
-          subtitle: `${state.currentUser.full_name} • Tersinkron dengan Supabase`
+          subtitle: `${state.currentUser.full_name} • TA ${selectedAcademicYear} (${selectedSemester})`
         });
         await sleep(550);
         await enterWorkspace({ animate: true });
         await hideActionOverlay();
-        showToast(`Selamat datang, ${state.currentUser.full_name}!`, 'success');
+        showToast(`Selamat datang, ${state.currentUser.full_name}! (${selectedAcademicYear} • ${selectedSemester})`, 'success');
       } finally {
         setButtonLoading(loginBtn, false);
       }
@@ -2813,6 +3096,8 @@
         state.currentUser = null;
         state.impersonatedByAdmin = null;
         state.activeMenu = 'dashboard';
+        state.sessionAcademicYear = state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+        state.sessionSemester = state.academicSettings?.activeSemester || DEFAULT_SEMESTER;
         state.editingSubjectId = null;
         state.editingStudentId = null;
         state.editingTeacherId = null;
@@ -2823,12 +3108,19 @@
         state.examClassFilter = 'ALL';
         state.examSubjectFilter = 'ALL';
         state.examSearchQuery = '';
+        state.studentClassFilter = 'ALL';
+        state.studentSearchQuery = '';
         state.supabaseAccessToken = null;
         clearSessionFromStorage();
 
         const passInput = document.getElementById('login-password');
         if (passInput) passInput.value = '';
         setLoginPasswordVisibility(false);
+        const yrSel = document.getElementById('login-academic-year');
+        const semSel = document.getElementById('login-semester');
+        if (yrSel) delete yrSel.dataset.userChanged;
+        if (semSel) delete semSel.dataset.userChanged;
+        populateLoginAcademicSelectors({ preserveSelection: false });
         updateImpersonationUI();
 
         showActionOverlay({
@@ -3017,7 +3309,20 @@
           : 'px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200';
       }
 
+      if (!state.sessionAcademicYear) {
+        state.sessionAcademicYear = state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      }
+      if (!state.sessionSemester) {
+        state.sessionSemester = state.academicSettings?.activeSemester || DEFAULT_SEMESTER;
+      }
+
+      const allowedMenuIds = new Set(MENU_CONFIG.filter(m => m.roles.includes(u.role)).map(m => m.id));
+      if (!allowedMenuIds.has(state.activeMenu)) {
+        state.activeMenu = 'dashboard';
+      }
+
       updateImpersonationUI();
+      updateWorkspacePeriodUI();
       mergeSubjectsState();
       populateExamSelectors();
       renderNavigationMenus();
@@ -3030,11 +3335,12 @@
       { id: 'dashboard', label: 'Dashboard', shortLabel: 'Dashboard', icon: 'layout-dashboard', subtitle: 'Ringkasan performa ulangan, ketuntasan KKM, dan grafik klasikal', roles: ['admin', 'guru'] },
       { id: 'manajemen_siswa', label: 'Data Siswa', shortLabel: 'Siswa', icon: 'graduation-cap', subtitle: 'Kelola data siswa per kelas, NIS/NISN, serta template, import & ekspor Excel', roles: ['admin', 'guru'] },
       { id: 'manajemen_guru', label: 'Data Guru', shortLabel: 'Guru', icon: 'users-round', subtitle: 'Manajemen akun guru, jenis ID, jabatan, kelas ampuan, serta template & ekspor Excel', roles: ['admin'] },
-      { id: 'manajemen_mapel', label: 'Mapel & Kelas', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Kelola daftar mata pelajaran dan pembagian kelas untuk setiap mapel', roles: ['admin', 'guru'] },
+      { id: 'manajemen_mapel', label: 'Mapel & Kelas', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Kelola daftar mata pelajaran dan pembagian kelas untuk setiap mapel', roles: ['admin'] },
       { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, jenis soal, KKM, jumlah butir, dan kunci jawaban', roles: ['admin', 'guru'] },
       { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban PG, Benar Salah, Isian, dan Uraian', roles: ['admin', 'guru'] },
       { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Tingkat kesukaran (P), capaian penguasaan siswa, dan tindak lanjut pembelajaran', roles: ['admin', 'guru'] },
-      { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['admin', 'guru'] }
+      { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['admin', 'guru'] },
+      { id: 'pengaturan_sistem', label: 'Pengaturan & Backup', shortLabel: 'Pengaturan', icon: 'settings', subtitle: 'Atur Tahun Ajaran & Semester aktif serta Backup & Restore data aplikasi', roles: ['admin'] }
     ];
 
     function sortClassNamesNatural(classList) {
@@ -3060,15 +3366,20 @@
         .map(item => item.ex);
     }
 
-    /** Kembalikan daftar paket ulangan sesuai hak akses user (Admin = semua; Guru = sesuai kelas & mapel ampuan atau miliknya). */
+    /** Kembalikan daftar paket ulangan sesuai periode Tahun Ajaran & Semester aktif serta hak akses user. */
     function getVisibleExams() {
-      const sorted = sortExamsForDisplay(state.exams || []);
+      const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      const sorted = sortExamsForDisplay(state.exams || []).filter(ex => {
+        const p = decodeExamPeriod(ex);
+        return p.academicYear === activeYear && p.semester === activeSem;
+      });
       const user = state.currentUser;
       if (!user || user.role === 'admin') return sorted;
 
       const userId = String(user.id || '').trim();
-      const teacherMeta = decodeTeacherMeta(user);
-      const teacherClasses = String(teacherMeta.classAssigned || '')
+      const tRole = getCurrentTeacherRoleMeta(user);
+      const teacherClasses = String(tRole?.classAssigned || '')
         .split(',')
         .map(c => c.trim().toLowerCase())
         .filter(Boolean);
@@ -3076,11 +3387,14 @@
       const teacherSubjectsLower = new Set(parseTeacherSubjects(user.subject).map(s => s.toLowerCase()));
 
       return sorted.filter(ex => {
+        const examClassNorm = String(ex.class_name || '').trim().toLowerCase();
+        if (tRole?.isWaliKelas && tRole.assignedGrade && examClassNorm !== tRole.assignedGrade.toLowerCase()) {
+          return false;
+        }
         const examTeacherId = String(ex.teacher_id || '').trim();
         if (examTeacherId && examTeacherId === userId) return true;
         if (examTeacherId && examTeacherId !== userId) return false;
 
-        const examClassNorm = String(ex.class_name || '').trim().toLowerCase();
         const examSubjNorm = String(ex.subject || '').trim().toLowerCase();
         const classMatches = isAllClassesTeacher || teacherClasses.includes(examClassNorm);
         const subjectMatches = teacherSubjectsLower.size > 0 && teacherSubjectsLower.has(examSubjNorm);
@@ -3344,8 +3658,15 @@
 
       const currentMeta = MENU_CONFIG.find(m => m.id === state.activeMenu);
       if (currentMeta) {
+        let subtitle = currentMeta.subtitle;
+        if (currentMeta.id === 'manajemen_siswa' && role !== 'admin') {
+          const tRole = getCurrentTeacherRoleMeta();
+          subtitle = (tRole?.isWaliKelas && tRole.assignedGrade)
+            ? `Lihat daftar data siswa khusus ${tRole.assignedGrade} dan ekspor Excel`
+            : 'Lihat seluruh daftar data siswa sekolah dan ekspor Excel';
+        }
         document.getElementById('page-header-title').textContent = currentMeta.label;
-        document.getElementById('page-header-subtitle').textContent = currentMeta.subtitle;
+        document.getElementById('page-header-subtitle').textContent = subtitle;
       }
 
       lucide.createIcons();
@@ -3544,6 +3865,11 @@
       const exam = getActiveExam();
       const stats = computeExamStatistics(exam);
 
+      const allowedMenuIds = new Set(MENU_CONFIG.filter(m => m.roles.includes(state.currentUser?.role || 'guru')).map(m => m.id));
+      if (!allowedMenuIds.has(state.activeMenu)) {
+        state.activeMenu = 'dashboard';
+      }
+
       switch (state.activeMenu) {
         case 'dashboard':
           container.innerHTML = renderDashboardView(exam, stats);
@@ -3568,6 +3894,9 @@
           break;
         case 'manajemen_guru':
           container.innerHTML = renderManajemenGuruView();
+          break;
+        case 'pengaturan_sistem':
+          container.innerHTML = renderPengaturanSistemView();
           break;
         default:
           container.innerHTML = renderDashboardView(exam, stats);
@@ -3608,7 +3937,7 @@
         <div class="space-y-2 max-w-2xl relative z-10">
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200/60 text-indigo-700 text-xs font-bold">
             <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
-            SISTEM ANALISIS HASIL ULANGAN
+            TA ${escapeHtml(state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR)} • SEMESTER ${escapeHtml((state.sessionSemester || DEFAULT_SEMESTER).toUpperCase())}
           </div>
           <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
             Analisis Ketuntasan & Kualitas Soal <span class="flowora-gradient-text">${exam ? exam.class_name : 'Sekolah'}</span>
@@ -3953,34 +4282,52 @@
       const initKkm = editingExam && editingExam.kkm !== null && editingExam.kkm !== undefined ? String(editingExam.kkm) : '';
       const initDate = editingExam ? String(editingExam.exam_date || '').trim() : '';
 
+      const isAdmin = isAdminUser();
+      const tRole = getCurrentTeacherRoleMeta();
+      const isWaliLockedClass = Boolean(!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade);
+
       const titleList = [...EXAM_TITLE_OPTIONS];
       if (initTitle && !titleList.includes(initTitle)) titleList.unshift(initTitle);
       const titleOptions = `<option value="" ${!initTitle ? 'selected' : ''}>-- Pilih Judul Ulangan / Penilaian --</option>` + titleList.map(t =>
         `<option value="${escapeHtml(t)}" ${t === initTitle ? 'selected' : ''}>${escapeHtml(t)}</option>`
       ).join('');
 
-      const classList = [...GRADE_CLASS_OPTIONS];
-      if (initClass && !classList.includes(initClass)) classList.unshift(initClass);
-      const classOptions = `<option value="" ${!initClass ? 'selected' : ''}>-- Pilih Kelas --</option>` + classList.map(cls =>
-        `<option value="${escapeHtml(cls)}" ${cls === initClass ? 'selected' : ''}>${escapeHtml(cls)}</option>`
-      ).join('');
+      let classOptions = '';
+      if (isWaliLockedClass) {
+        const lockedCls = tRole.assignedGrade;
+        classOptions = `<option value="${escapeHtml(lockedCls)}" selected>${escapeHtml(lockedCls)}</option>`;
+      } else {
+        const classList = [...GRADE_CLASS_OPTIONS];
+        if (initClass && !classList.includes(initClass)) classList.unshift(initClass);
+        classOptions = `<option value="" ${!initClass ? 'selected' : ''}>-- Pilih Kelas --</option>` + classList.map(cls =>
+          `<option value="${escapeHtml(cls)}" ${cls === initClass ? 'selected' : ''}>${escapeHtml(cls)}</option>`
+        ).join('');
+      }
 
-      const subjectList = state.subjects.map(s => s.name);
+      const subjectList = isAdmin
+        ? state.subjects.map(s => s.name)
+        : parseTeacherSubjects(state.currentUser?.subject);
       if (initSubject && !subjectList.some(n => n.toLowerCase() === initSubject.toLowerCase())) {
         subjectList.unshift(initSubject);
       }
+      const autoSingleSubject = !isAdmin && subjectList.length === 1 ? subjectList[0] : '';
+      const effectiveInitSubject = initSubject || autoSingleSubject;
       const subjectOptions = subjectList.length > 0
-        ? `<option value="" ${!initSubject ? 'selected' : ''}>-- Pilih Mata Pelajaran --</option>` + subjectList.map(name => {
-            const isSel = initSubject && name.toLowerCase() === initSubject.toLowerCase();
-            return `<option value="${escapeHtml(name)}" ${isSel ? 'selected' : ''}>${escapeHtml(name)}</option>`;
-          }).join('')
-        : '<option value="" selected>Belum ada mata pelajaran</option>';
+        ? (subjectList.length === 1 && !isAdmin
+          ? subjectList.map(name => `<option value="${escapeHtml(name)}" selected>${escapeHtml(name)}</option>`).join('')
+          : `<option value="" ${!effectiveInitSubject ? 'selected' : ''}>-- Pilih Mata Pelajaran --</option>` + subjectList.map(name => {
+              const isSel = effectiveInitSubject && name.toLowerCase() === effectiveInitSubject.toLowerCase();
+              return `<option value="${escapeHtml(name)}" ${isSel ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+            }).join(''))
+        : `<option value="" selected>${isAdmin ? 'Belum ada mata pelajaran' : 'Belum ada mapel diampu'}</option>`;
 
-      const teacherOptions = state.teachers.length > 0
-        ? `<option value="" ${!initTeacherId ? 'selected' : ''}>-- Pilih Nama Guru --</option>` + state.teachers.map(t =>
-            `<option value="${t.id}" ${t.id === initTeacherId ? 'selected' : ''}>${escapeHtml(t.full_name)}</option>`
-          ).join('')
-        : '<option value="" selected>Belum ada data guru</option>';
+      const teacherOptions = !isAdmin && state.currentUser
+        ? `<option value="${escapeHtml(state.currentUser.id)}" selected>${escapeHtml(state.currentUser.full_name)}</option>`
+        : (state.teachers.length > 0
+          ? `<option value="" ${!initTeacherId ? 'selected' : ''}>-- Pilih Nama Guru --</option>` + state.teachers.map(t =>
+              `<option value="${t.id}" ${t.id === initTeacherId ? 'selected' : ''}>${escapeHtml(t.full_name)}</option>`
+            ).join('')
+          : '<option value="" selected>Belum ada data guru</option>');
 
       const qTypeChecklistHtml = QUESTION_TYPE_ORDER.map(qType => {
         const qt = QUESTION_TYPES[qType];
@@ -4146,7 +4493,7 @@
               <div>
                 <div class="flex items-center justify-between mb-1.5">
                   <label class="block text-xs font-bold text-slate-700">Mata Pelajaran</label>
-                  <button type="button" onclick="window.navigateMenu('manajemen_mapel')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Mapel</button>
+                  ${isAdmin ? '<button type="button" onclick="window.navigateMenu(\'manajemen_mapel\')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Mapel</button>' : ''}
                 </div>
                 <select id="exam-subject" required
                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -4154,9 +4501,12 @@
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Guru</label>
-                <select id="exam-teacher"
-                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700">Nama Guru</label>
+                  ${!isAdmin ? '<span class="text-[10px] font-extrabold text-indigo-600 flex items-center gap-0.5"><i data-lucide="lock" class="w-3 h-3"></i> Terkunci</span>' : ''}
+                </div>
+                <select id="exam-teacher" ${!isAdmin ? 'disabled' : ''}
+                  class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${!isAdmin ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-indigo-500'}">
                   ${teacherOptions}
                 </select>
               </div>
@@ -4164,8 +4514,12 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Pilih Kelas</label>
-                <select id="exam-class" required class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700">Pilih Kelas</label>
+                  ${isWaliLockedClass ? '<span class="text-[10px] font-extrabold text-indigo-600 flex items-center gap-0.5"><i data-lucide="lock" class="w-3 h-3"></i> Terkunci</span>' : ''}
+                </div>
+                <select id="exam-class" required ${isWaliLockedClass ? 'disabled' : ''}
+                  class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${isWaliLockedClass ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-indigo-500'}">
                   ${classOptions}
                 </select>
               </div>
@@ -4560,10 +4914,16 @@
       const editingId = state.editingExamId;
       const existingExam = editingId ? state.exams.find(ex => ex.id === editingId) : null;
 
+      const isAdmin = isAdminUser();
+      const tRole = getCurrentTeacherRoleMeta();
       const title = document.getElementById('exam-title').value.trim();
       const subject = document.getElementById('exam-subject').value.trim();
-      const teacherId = document.getElementById('exam-teacher')?.value || (!existingExam && state.currentUser?.role === 'guru' ? state.currentUser.id : null);
-      const className = document.getElementById('exam-class').value.trim();
+      const teacherId = !isAdmin && state.currentUser?.id
+        ? state.currentUser.id
+        : (document.getElementById('exam-teacher')?.value || null);
+      const className = (!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade)
+        ? tRole.assignedGrade
+        : document.getElementById('exam-class').value.trim();
       const kkm = Number(document.getElementById('exam-kkm').value);
       const examDate = document.getElementById('exam-date').value;
 
@@ -4665,7 +5025,13 @@
       }
 
       const totalQuestions = sections.reduce((acc, s) => acc + s.count, 0);
-      const encodedKey = encodeMultiExamAnswerKey(sections);
+      const periodYear = existingExam
+        ? decodeExamPeriod(existingExam).academicYear
+        : (state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR);
+      const periodSem = existingExam
+        ? decodeExamPeriod(existingExam).semester
+        : normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      const encodedKey = encodeExamPeriodPrefix(periodYear, periodSem, encodeMultiExamAnswerKey(sections));
 
       const examRecord = {
         id: existingExam ? existingExam.id : crypto.randomUUID(),
@@ -4790,7 +5156,7 @@
                 state.editingExamId = null;
               }
               if (state.activeExamId === examId) {
-                state.activeExamId = state.exams[0]?.id || null;
+                state.activeExamId = getVisibleExams()[0]?.id || null;
               }
             },
             toastMsg: 'Paket ulangan berhasil dihapus dan tersinkron.'
@@ -4907,9 +5273,14 @@
           nextStudent: null
         };
       }
+      const tRole = getCurrentTeacherRoleMeta();
+      const isWaliLocked = Boolean(!isAdminUser() && tRole?.isWaliKelas && tRole.assignedGrade);
       const matchingStudents = state.students.filter(stu => stu.class_name === exam.class_name);
+      const fallbackPool = isWaliLocked
+        ? state.students.filter(stu => stu.class_name === tRole.assignedGrade)
+        : state.students;
       const listToPick = sortByNameAlphabetical(
-        matchingStudents.length > 0 ? matchingStudents : state.students,
+        matchingStudents.length > 0 ? matchingStudents : fallbackPool,
         'full_name',
         'nis'
       );
@@ -5840,7 +6211,7 @@
       const reportHeaderHtml = `
         <div class="pr-kop">
           <div>
-            <div class="pr-kop-school">SIHASUL • MIS. Nurul Islam Km. 5</div>
+            <div class="pr-kop-school">SIHASUL • MIS. Nurul Islam Km. 5 • TA ${escapeHtml(examMeta.academicYear || state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR)} (${escapeHtml(examMeta.semester || state.sessionSemester || DEFAULT_SEMESTER)})</div>
             <div class="pr-kop-title">LAPORAN REKAP JAWABAN SISWA, ANALISIS BUTIR SOAL, REMEDIAL &amp; PENGAYAAN</div>
           </div>
           <div class="pr-kop-date">
@@ -6691,7 +7062,14 @@
 
     // ==================== 7. MANAJEMEN DATA SISWA ====================
     function renderManajemenSiswaView() {
-      const classFilter = state.studentClassFilter || 'ALL';
+      const isAdmin = isAdminUser();
+      const tRole = getCurrentTeacherRoleMeta();
+      const isWaliLocked = Boolean(!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade);
+      if (isWaliLocked) {
+        state.studentClassFilter = tRole.assignedGrade;
+      }
+
+      const classFilter = isWaliLocked ? tRole.assignedGrade : (state.studentClassFilter || 'ALL');
       const searchQ = (state.studentSearchQuery || '').trim().toLowerCase();
 
       const filteredStudents = (state.students || [])
@@ -6701,8 +7079,16 @@
         .sort((a, b) => (a.class_name || '').localeCompare(b.class_name || '') || (a.full_name || '').localeCompare(b.full_name || ''));
 
       const stuPage = paginateItems(filteredStudents, 'students');
-      const filterOptionsHtml = `<option value="ALL" ${classFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
-        GRADE_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}" ${classFilter === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+      const filterOptionsHtml = isWaliLocked
+        ? `<option value="${escapeHtml(tRole.assignedGrade)}" selected>${escapeHtml(tRole.assignedGrade)} (Kelas Anda)</option>`
+        : `<option value="ALL" ${classFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
+          GRADE_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}" ${classFilter === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+
+      const subtitleText = isAdmin
+        ? 'Kelola daftar siswa per kelas, NIS/NISN, atau impor massal via Excel (.xlsx)'
+        : (isWaliLocked
+          ? `Menampilkan data siswa khusus ${tRole.assignedGrade} yang Anda ampu`
+          : 'Menampilkan seluruh data siswa di semua kelas yang Anda ampu');
 
       return `
       <div class="glass-surface rounded-3xl p-6 space-y-5">
@@ -6712,22 +7098,24 @@
               <h3 class="text-base md:text-lg font-extrabold text-slate-900">Daftar Data Siswa</h3>
               <span class="px-3 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold">${filteredStudents.length} Siswa</span>
             </div>
-            <p class="text-xs text-slate-500 mt-0.5">Kelola daftar siswa per kelas, NIS/NISN, atau impor massal via Excel (.xlsx)</p>
+            <p class="text-xs text-slate-500 mt-0.5">${escapeHtml(subtitleText)}</p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <button type="button" onclick="window.handleOpenAddStudentModal()"
-              class="px-4 py-2 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5 shadow-sm">
-              <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Tambah Data Siswa
-            </button>
-            <button type="button" onclick="window.handleDownloadStudentTemplate()"
-              class="px-3 py-2 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
-              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i> Template (.xlsx)
-            </button>
-            <button type="button" onclick="document.getElementById('import-siswa-file').click()"
-              class="px-3 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 border border-indigo-200/80 transition">
-              <i data-lucide="upload" class="w-3.5 h-3.5"></i> Import
-            </button>
-            <input type="file" id="import-siswa-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="window.handleImportStudentsXlsx(event)" />
+            ${isAdmin ? `
+              <button type="button" onclick="window.handleOpenAddStudentModal()"
+                class="px-4 py-2 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Tambah Data Siswa
+              </button>
+              <button type="button" onclick="window.handleDownloadStudentTemplate()"
+                class="px-3 py-2 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
+                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i> Template (.xlsx)
+              </button>
+              <button type="button" onclick="document.getElementById('import-siswa-file').click()"
+                class="px-3 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 border border-indigo-200/80 transition">
+                <i data-lucide="upload" class="w-3.5 h-3.5"></i> Import
+              </button>
+              <input type="file" id="import-siswa-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="window.handleImportStudentsXlsx(event)" />
+            ` : ''}
             <button type="button" onclick="window.handleExportStudentsXlsx()"
               class="px-3 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
               <i data-lucide="download" class="w-3.5 h-3.5"></i> Ekspor
@@ -6737,8 +7125,8 @@
 
         <!-- Filter Bar -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          <select id="stu-filter-class" onchange="window.handleFilterStudents()"
-            class="px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <select id="stu-filter-class" ${isWaliLocked ? 'disabled' : 'onchange="window.handleFilterStudents()"'}
+            class="px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${isWaliLocked ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 text-slate-700 focus:ring-2 focus:ring-indigo-500'}">
             ${filterOptionsHtml}
           </select>
           <input type="text" id="stu-search-input" value="${escapeHtml(state.studentSearchQuery || '')}" oninput="window.handleFilterStudents(this)"
@@ -6755,12 +7143,12 @@
                 <th class="py-3 px-3 text-center">Nama Lengkap</th>
                 <th class="py-3 px-3 text-center">L/P</th>
                 <th class="py-3 px-3 text-center">Kelas</th>
-                <th class="py-3 px-3 text-center">Aksi</th>
+                ${isAdmin ? '<th class="py-3 px-3 text-center">Aksi</th>' : ''}
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-xs">
               ${stuPage.totalItems === 0 ? `
-                <tr><td colspan="6" class="py-12 text-center text-slate-400">Belum ada data siswa${classFilter !== 'ALL' ? ` di ${escapeHtml(classFilter)}` : ''}. Klik <strong>+ Tambah Data Siswa</strong> atau <strong>Import</strong> Excel.</td></tr>
+                <tr><td colspan="${isAdmin ? 6 : 5}" class="py-12 text-center text-slate-400">Belum ada data siswa${classFilter !== 'ALL' ? ` di ${escapeHtml(classFilter)}` : ''}.${isAdmin ? ' Klik <strong>+ Tambah Data Siswa</strong> atau <strong>Import</strong> Excel.' : ''}</td></tr>
               ` : stuPage.items.map((stu, idx) => `
                 <tr class="hover:bg-slate-50/80 transition">
                   <td class="py-3 px-3 font-bold text-slate-400">${stuPage.startIndex + idx + 1}</td>
@@ -6774,6 +7162,7 @@
                   <td class="py-3 px-3 text-center">
                     <span class="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">${escapeHtml(stu.class_name)}</span>
                   </td>
+                  ${isAdmin ? `
                   <td class="py-3 px-3 text-right whitespace-nowrap">
                     <div class="inline-flex items-center justify-end gap-1">
                       <button type="button" onclick="window.handleEditStudent('${stu.id}')" class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit">
@@ -6784,6 +7173,7 @@
                       </button>
                     </div>
                   </td>
+                  ` : ''}
                 </tr>
               `).join('')}
             </tbody>
@@ -6866,11 +7256,17 @@
     }
 
     window.handleFilterStudents = function (searchInputEl = null) {
+      const tRole = getCurrentTeacherRoleMeta();
+      const isWaliLocked = Boolean(!isAdminUser() && tRole?.isWaliKelas && tRole.assignedGrade);
       const filterEl = document.getElementById('stu-filter-class');
       const searchEl = searchInputEl || document.getElementById('stu-search-input');
       const hadFocus = document.activeElement === searchEl;
       const selStart = searchEl?.selectionStart ?? null;
-      if (filterEl) state.studentClassFilter = filterEl.value || 'ALL';
+      if (isWaliLocked) {
+        state.studentClassFilter = tRole.assignedGrade;
+      } else if (filterEl) {
+        state.studentClassFilter = filterEl.value || 'ALL';
+      }
       if (searchEl) state.studentSearchQuery = searchEl.value || '';
       state.pagination.students = 1;
       renderCurrentMenu();
@@ -6884,11 +7280,19 @@
     };
 
     window.handleOpenAddStudentModal = function () {
+      if (!isAdminUser()) {
+        showToast('Fitur tambah data siswa khusus untuk Administrator.', 'warning');
+        return;
+      }
       state.editingStudentId = null;
       openStudentFormModal(null);
     };
 
     window.handleEditStudent = function (studentId) {
+      if (!isAdminUser()) {
+        showToast('Fitur edit data siswa khusus untuk Administrator.', 'warning');
+        return;
+      }
       const target = state.students.find(s => s.id === studentId);
       if (!target) return;
       state.editingStudentId = studentId;
@@ -6901,6 +7305,10 @@
 
     window.handleSaveStudent = async function (e) {
       e.preventDefault();
+      if (!isAdminUser()) {
+        showToast('Fitur simpan data siswa khusus untuk Administrator.', 'warning');
+        return;
+      }
       const editingId = state.editingStudentId;
       const existingTarget = editingId ? state.students.find(s => s.id === editingId) : null;
       const fullName = document.getElementById('stu-fullname').value.trim();
@@ -6965,6 +7373,10 @@
     };
 
     window.handleDeleteStudent = function (studentId) {
+      if (!isAdminUser()) {
+        showToast('Fitur hapus data siswa khusus untuk Administrator.', 'warning');
+        return;
+      }
       const target = state.students.find(s => s.id === studentId);
       if (!target) return;
 
@@ -6989,6 +7401,10 @@
     };
 
     window.handleDownloadStudentTemplate = function () {
+      if (!isAdminUser()) {
+        showToast('Fitur unduh template siswa khusus untuk Administrator.', 'warning');
+        return;
+      }
       downloadXlsxWorkbook('Template_Data_Siswa.xlsx', [
         {
           name: 'Data Siswa',
@@ -7019,6 +7435,10 @@
       const file = event?.target?.files?.[0];
       if (!file) return;
       event.target.value = '';
+      if (!isAdminUser()) {
+        showToast('Fitur import data siswa khusus untuk Administrator.', 'warning');
+        return;
+      }
 
       try {
         const rows = await readXlsxFirstSheetRows(file);
@@ -7100,7 +7520,9 @@
     };
 
     window.handleExportStudentsXlsx = function () {
-      const classFilter = state.studentClassFilter || 'ALL';
+      const tRole = getCurrentTeacherRoleMeta();
+      const isWaliLocked = Boolean(!isAdminUser() && tRole?.isWaliKelas && tRole.assignedGrade);
+      const classFilter = isWaliLocked ? tRole.assignedGrade : (state.studentClassFilter || 'ALL');
       const list = (state.students || [])
         .filter(s => classFilter === 'ALL' || s.class_name === classFilter)
         .slice()
@@ -7653,6 +8075,641 @@
       showToast(`Berhasil mengekspor ${state.teachers.length} data guru ke Excel!`, 'success');
     };
 
+    // ==================== 9. PENGATURAN TAHUN AJARAN, SEMESTER & BACKUP/RESTORE (KHUSUS ADMIN) ====================
+    function getNextSuggestedAcademicYear() {
+      const years = sortAcademicYears(state.academicSettings?.academicYears || DEFAULT_ACADEMIC_YEARS);
+      const last = years[years.length - 1] || DEFAULT_ACADEMIC_YEAR;
+      const match = last.match(/^(\d{4})\/(\d{4})$/);
+      if (match) {
+        const y1 = Number(match[1]) + 1;
+        const y2 = Number(match[2]) + 1;
+        return `${y1}/${y2}`;
+      }
+      const nowY = new Date().getFullYear();
+      return `${nowY}/${nowY + 1}`;
+    }
+
+    function renderPengaturanSistemView() {
+      if (!isAdminUser()) {
+        return `<div class="glass-surface rounded-3xl p-8 text-center text-sm font-bold text-rose-600">Akses ditolak. Menu ini khusus untuk Administrator.</div>`;
+      }
+
+      mergeAcademicYearsFromExams();
+      const years = state.academicSettings?.academicYears || [...DEFAULT_ACADEMIC_YEARS];
+      const activeYear = state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = normalizeSemester(state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
+      const viewYear = state.sessionAcademicYear || activeYear;
+      const viewSem = normalizeSemester(state.sessionSemester || activeSem);
+      const suggestedNextYear = getNextSuggestedAcademicYear();
+
+      const yearStatsRows = years.map(yr => {
+        let ganjilExams = 0;
+        let genapExams = 0;
+        (state.exams || []).forEach(ex => {
+          const p = decodeExamPeriod(ex);
+          if (p.academicYear === yr) {
+            if (p.semester === 'Genap') genapExams++;
+            else ganjilExams++;
+          }
+        });
+        const totalInYear = ganjilExams + genapExams;
+        const isActiveDefault = yr === activeYear;
+        const isViewingGanjil = yr === viewYear && viewSem === 'Ganjil';
+        const isViewingGenap = yr === viewYear && viewSem === 'Genap';
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="py-3 px-3">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-extrabold text-slate-900">${escapeHtml(yr)}</span>
+                ${isActiveDefault ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-extrabold">Default Aktif</span>' : ''}
+              </div>
+            </td>
+            <td class="py-3 px-3 text-center">
+              <span class="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">${ganjilExams} Paket</span>
+            </td>
+            <td class="py-3 px-3 text-center">
+              <span class="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[11px] font-bold">${genapExams} Paket</span>
+            </td>
+            <td class="py-3 px-3 text-right whitespace-nowrap">
+              <div class="inline-flex items-center justify-end gap-1.5">
+                <button type="button" onclick="window.handleSwitchAdminPeriod('${escapeHtml(yr)}', 'Ganjil')"
+                  class="px-2.5 py-1 rounded-full text-[11px] font-bold transition ${isViewingGanjil ? 'bg-indigo-600 text-white shadow-sm' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700'}">
+                  ${isViewingGanjil ? '✓ Ganjil' : 'Buka Ganjil'}
+                </button>
+                <button type="button" onclick="window.handleSwitchAdminPeriod('${escapeHtml(yr)}', 'Genap')"
+                  class="px-2.5 py-1 rounded-full text-[11px] font-bold transition ${isViewingGenap ? 'bg-purple-600 text-white shadow-sm' : 'bg-purple-50 hover:bg-purple-100 text-purple-700'}">
+                  ${isViewingGenap ? '✓ Genap' : 'Buka Genap'}
+                </button>
+                ${!isActiveDefault && totalInYear === 0 ? `
+                  <button type="button" onclick="window.handleDeleteAcademicYear('${escapeHtml(yr)}')"
+                    class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus Tahun Ajaran Kosong">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      const yearOptions = years.map(yr =>
+        `<option value="${escapeHtml(yr)}" ${yr === activeYear ? 'selected' : ''}>${escapeHtml(yr)}</option>`
+      ).join('');
+      const semOptions = SEMESTER_OPTIONS.map(s =>
+        `<option value="${escapeHtml(s)}" ${s === activeSem ? 'selected' : ''}>${escapeHtml(s)}</option>`
+      ).join('');
+
+      return `
+      <div class="space-y-6">
+        <!-- Card 1: Pengaturan Tahun Ajaran & Semester -->
+        <div class="glass-surface rounded-3xl p-6 space-y-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <i data-lucide="calendar-range" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Pengaturan Tahun Ajaran &amp; Semester</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Atur periode default saat login dan kelola arsip data antar tahun ajaran</p>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
+                Default Login: ${escapeHtml(activeYear)} • ${escapeHtml(activeSem)}
+              </span>
+              <span class="px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold">
+                Sedang Dibuka: ${escapeHtml(viewYear)} • ${escapeHtml(viewSem)}
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <!-- Form Set Active Period -->
+            <form onsubmit="window.handleSaveAcademicPeriodSettings(event)" class="lg:col-span-5 p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-4">
+              <div>
+                <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-700">Atur Periode Aktif Sekolah</h4>
+                <p class="text-[11px] text-slate-500 mt-0.5">Menjadi pilihan utama otomatis di halaman login Guru &amp; Admin.</p>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Tahun Ajaran Aktif</label>
+                  <select id="set-active-year" required
+                    class="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    ${yearOptions}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Semester Aktif</label>
+                  <select id="set-active-semester" required
+                    class="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    ${semOptions}
+                  </select>
+                </div>
+              </div>
+              <button type="submit"
+                class="w-full py-2.5 px-5 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Simpan &amp; Aktifkan Periode
+              </button>
+
+              <div class="pt-3 border-t border-slate-200/80 space-y-2">
+                <label class="block text-xs font-bold text-slate-700">Tambah Tahun Ajaran Baru</label>
+                <div class="flex items-center gap-2">
+                  <input type="text" id="new-academic-year-input" value="${escapeHtml(suggestedNextYear)}" placeholder="Misal: 2028/2029"
+                    class="flex-1 px-3.5 py-2 rounded-2xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <button type="button" onclick="window.handleAddAcademicYear()"
+                    class="px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition shrink-0">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Tambah
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            <!-- Daftar Tahun Ajaran & Akses Arsip -->
+            <div class="lg:col-span-7 space-y-3">
+              <div class="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-xs text-indigo-900 flex items-start gap-2.5">
+                <i data-lucide="shield-check" class="w-4 h-4 text-indigo-600 shrink-0 mt-0.5"></i>
+                <span>
+                  <strong>Data Tahun Lalu Tetap Aman:</strong> Mengganti ke Tahun Ajaran atau Semester baru tidak akan menghapus data lama. Klik <strong>Buka Ganjil / Genap</strong> di bawah atau pilih tahun ajaran saat login untuk mengakses data periode sebelumnya kapan saja.
+                </span>
+              </div>
+
+              <div class="overflow-x-auto custom-scroll rounded-2xl border border-slate-200/80 bg-white">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400 bg-slate-50/80">
+                      <th class="py-2.5 px-3">Tahun Ajaran</th>
+                      <th class="py-2.5 px-3 text-center">Sem. Ganjil</th>
+                      <th class="py-2.5 px-3 text-center">Sem. Genap</th>
+                      <th class="py-2.5 px-3 text-right">Akses Data</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100 text-xs">
+                    ${yearStatsRows}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Backup & Restore Data (Khusus Admin) -->
+        <div class="glass-surface rounded-3xl p-6 space-y-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <i data-lucide="database-backup" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="text-base md:text-lg font-extrabold text-slate-900">Backup &amp; Restore Data</h3>
+                  <span class="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-extrabold uppercase">Khusus Admin</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">Cadangkan seluruh data aplikasi ke file JSON atau pulihkan kembali dari file backup</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
+              <div class="text-xl font-extrabold text-slate-900">${state.teachers.length}</div>
+              <div class="text-[11px] font-bold text-slate-500">Data Guru</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
+              <div class="text-xl font-extrabold text-slate-900">${state.students.length}</div>
+              <div class="text-[11px] font-bold text-slate-500">Data Siswa</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
+              <div class="text-xl font-extrabold text-slate-900">${state.subjects.length}</div>
+              <div class="text-[11px] font-bold text-slate-500">Mapel</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
+              <div class="text-xl font-extrabold text-indigo-700">${state.exams.length}</div>
+              <div class="text-[11px] font-bold text-slate-500">Total Paket</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
+              <div class="text-xl font-extrabold text-emerald-700">${state.examResults.length}</div>
+              <div class="text-[11px] font-bold text-slate-500">Hasil Nilai</div>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
+              <div class="text-xl font-extrabold text-purple-700">${years.length}</div>
+              <div class="text-[11px] font-bold text-slate-500">Tahun Ajaran</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 flex flex-col justify-between gap-4">
+              <div class="space-y-1.5">
+                <div class="flex items-center gap-2 text-sm font-extrabold text-emerald-900">
+                  <i data-lucide="download-cloud" class="w-4 h-4 text-emerald-600"></i>
+                  Backup Data Lengkap (.json)
+                </div>
+                <p class="text-xs text-emerald-800/80 leading-relaxed">
+                  Mengunduh salinan lengkap seluruh akun Guru, Data Siswa, Mapel &amp; Kelas, Paket Ulangan, Kunci Jawaban, Hasil Nilai dari semua Tahun Ajaran &amp; Semester, serta pengaturan periode aktif.
+                </p>
+              </div>
+              <button type="button" onclick="window.handleBackupAllDataJson()"
+                class="w-full py-3 px-5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition">
+                <i data-lucide="download" class="w-4 h-4"></i> Download Backup (.json)
+              </button>
+            </div>
+
+            <div class="p-5 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex flex-col justify-between gap-4">
+              <div class="space-y-1.5">
+                <div class="flex items-center gap-2 text-sm font-extrabold text-amber-950">
+                  <i data-lucide="upload-cloud" class="w-4 h-4 text-amber-600"></i>
+                  Restore Data dari Backup (.json)
+                </div>
+                <p class="text-xs text-amber-900/80 leading-relaxed">
+                  Pulihkan seluruh data dari file backup <code>.json</code> yang pernah diunduh. Data akan dipulihkan ke penyimpanan lokal dan otomatis disinkronkan ke database Supabase.
+                </p>
+              </div>
+              <div>
+                <input type="file" id="restore-backup-file" accept=".json,application/json" class="hidden" onchange="window.handleRestoreBackupJson(event)" />
+                <button type="button" onclick="document.getElementById('restore-backup-file').click()"
+                  class="w-full py-3 px-5 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition">
+                  <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Pilih File Backup &amp; Restore
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      `;
+    }
+
+    window.handleSaveAcademicPeriodSettings = async function (e) {
+      e.preventDefault();
+      if (!isAdminUser()) {
+        showToast('Pengaturan periode khusus untuk Administrator.', 'warning');
+        return;
+      }
+      const nextYear = String(document.getElementById('set-active-year')?.value || '').trim();
+      const nextSem = normalizeSemester(document.getElementById('set-active-semester')?.value || DEFAULT_SEMESTER);
+      if (!nextYear) {
+        showToast('Pilih Tahun Ajaran aktif terlebih dahulu.', 'warning');
+        return;
+      }
+
+      const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
+      setButtonLoading(submitterBtn, true, 'Menyimpan...');
+      showActionOverlay({
+        stateType: 'loading',
+        title: 'Menyimpan Pengaturan Periode...',
+        subtitle: `Mengaktifkan TA ${nextYear} • Semester ${nextSem}`
+      });
+
+      try {
+        applyAcademicSettingsObject({
+          activeAcademicYear: nextYear,
+          activeSemester: nextSem,
+          academicYears: [...(state.academicSettings?.academicYears || []), nextYear]
+        });
+        state.sessionAcademicYear = nextYear;
+        state.sessionSemester = nextSem;
+        state.headerExamClassFilter = 'ALL';
+        state.examClassFilter = 'ALL';
+        state.examSubjectFilter = 'ALL';
+        state.activeExamId = null;
+
+        saveAcademicSettingsToStorage();
+        saveCacheToStorage();
+        saveSessionToStorage();
+        populateLoginAcademicSelectors({ preserveSelection: false });
+        updateWorkspacePeriodUI();
+        populateExamSelectors();
+
+        if (!IS_PREVIEW && supabase) {
+          enqueuePendingSync({
+            id: crypto.randomUUID(),
+            table: 'classes',
+            action: 'upsert',
+            record: buildAcademicConfigRow()
+          });
+          updateSyncBadge('syncing');
+          await flushPendingSyncToSupabase();
+          updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+        }
+
+        renderCurrentMenu();
+        showActionOverlay({
+          stateType: 'success',
+          title: 'Periode Aktif Diperbarui!',
+          subtitle: `TA ${nextYear} • Semester ${nextSem} telah diaktifkan`
+        });
+        await sleep(500);
+        await hideActionOverlay();
+        showToast(`Tahun Ajaran ${nextYear} • Semester ${nextSem} berhasil diaktifkan!`, 'success');
+      } finally {
+        setButtonLoading(submitterBtn, false);
+      }
+    };
+
+    window.handleAddAcademicYear = async function () {
+      if (!isAdminUser()) {
+        showToast('Fitur ini khusus untuk Administrator.', 'warning');
+        return;
+      }
+      const input = document.getElementById('new-academic-year-input');
+      const rawVal = String(input?.value || '').trim();
+      if (!rawVal) {
+        showToast('Masukkan nama Tahun Ajaran, misal: 2027/2028.', 'warning');
+        if (input) input.focus();
+        return;
+      }
+      if ((state.academicSettings?.academicYears || []).some(y => y.toLowerCase() === rawVal.toLowerCase())) {
+        showToast(`Tahun Ajaran ${rawVal} sudah tersedia di daftar.`, 'info');
+        return;
+      }
+
+      applyAcademicSettingsObject({
+        ...state.academicSettings,
+        academicYears: [...(state.academicSettings?.academicYears || []), rawVal]
+      });
+      saveAcademicSettingsToStorage();
+      saveCacheToStorage();
+      populateLoginAcademicSelectors({ preserveSelection: false });
+
+      if (!IS_PREVIEW && supabase) {
+        enqueuePendingSync({
+          id: crypto.randomUUID(),
+          table: 'classes',
+          action: 'upsert',
+          record: buildAcademicConfigRow()
+        });
+        await flushPendingSyncToSupabase();
+        updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+      }
+
+      renderCurrentMenu();
+      showToast(`Tahun Ajaran ${rawVal} berhasil ditambahkan!`, 'success');
+    };
+
+    window.handleDeleteAcademicYear = function (yearStr) {
+      if (!isAdminUser()) return;
+      const cleanYear = String(yearStr || '').trim();
+      if (!cleanYear || cleanYear === state.academicSettings?.activeAcademicYear) {
+        showToast('Tahun Ajaran aktif tidak dapat dihapus.', 'warning');
+        return;
+      }
+      const hasExams = (state.exams || []).some(ex => decodeExamPeriod(ex).academicYear === cleanYear);
+      if (hasExams) {
+        showToast(`Tahun Ajaran ${cleanYear} masih memiliki paket ulangan dan tidak boleh dihapus.`, 'warning');
+        return;
+      }
+      openConfirmModal(
+        'Hapus Tahun Ajaran',
+        `<p>Hapus Tahun Ajaran <strong>${escapeHtml(cleanYear)}</strong> dari daftar pilihan?</p>`,
+        async () => {
+          state.academicSettings.academicYears = (state.academicSettings.academicYears || []).filter(y => y !== cleanYear);
+          if (state.sessionAcademicYear === cleanYear) {
+            state.sessionAcademicYear = state.academicSettings.activeAcademicYear;
+          }
+          saveAcademicSettingsToStorage();
+          saveCacheToStorage();
+          saveSessionToStorage();
+          populateLoginAcademicSelectors({ preserveSelection: false });
+          if (!IS_PREVIEW && supabase) {
+            enqueuePendingSync({
+              id: crypto.randomUUID(),
+              table: 'classes',
+              action: 'upsert',
+              record: buildAcademicConfigRow()
+            });
+            await flushPendingSyncToSupabase();
+            updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+          }
+          updateWorkspacePeriodUI();
+          renderCurrentMenu();
+          showToast(`Tahun Ajaran ${cleanYear} dihapus dari daftar.`, 'info');
+        },
+        'Ya, Hapus'
+      );
+    };
+
+    window.handleSwitchAdminPeriod = function (yearStr, semesterStr) {
+      if (!isAdminUser()) return;
+      const nextYear = String(yearStr || '').trim() || DEFAULT_ACADEMIC_YEAR;
+      const nextSem = normalizeSemester(semesterStr);
+      state.sessionAcademicYear = nextYear;
+      state.sessionSemester = nextSem;
+      state.headerExamClassFilter = 'ALL';
+      state.examClassFilter = 'ALL';
+      state.examSubjectFilter = 'ALL';
+      state.activeExamId = null;
+      state.editingExamId = null;
+      state.editingResultId = null;
+      saveSessionToStorage();
+      updateWorkspacePeriodUI();
+      populateExamSelectors();
+      renderCurrentMenu();
+      showToast(`Menampilkan data TA ${nextYear} • Semester ${nextSem}.`, 'info');
+    };
+
+    window.handleBackupAllDataJson = function () {
+      if (!isAdminUser()) {
+        showToast('Fitur backup khusus untuk Administrator.', 'warning');
+        return;
+      }
+      mergeAcademicYearsFromExams();
+      const payload = {
+        app: 'SIHASUL',
+        schemaVersion: 2,
+        exportedAt: new Date().toISOString(),
+        exportedBy: state.currentUser?.full_name || 'Administrator',
+        academicSettings: {
+          activeAcademicYear: state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR,
+          activeSemester: normalizeSemester(state.academicSettings?.activeSemester || DEFAULT_SEMESTER),
+          academicYears: [...(state.academicSettings?.academicYears || DEFAULT_ACADEMIC_YEARS)]
+        },
+        data: {
+          teachers: state.teachers || [],
+          classes: (state.classes || []).filter(c => c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME),
+          subjects: state.subjects || [],
+          deletedSubjectNames: state.deletedSubjectNames || [],
+          students: state.students || [],
+          exams: state.exams || [],
+          examResults: state.examResults || []
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const now = new Date();
+      const stamp = `${now.toISOString().slice(0, 10)}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SIHASUL_Backup_${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Backup data lengkap (.json) berhasil diunduh!', 'success');
+    };
+
+    async function upsertTableInBatches(table, rows, batchSize = 100) {
+      if (!supabase || !Array.isArray(rows) || rows.length === 0) return { error: null };
+      for (let i = 0; i < rows.length; i += batchSize) {
+        const chunk = rows.slice(i, i + batchSize);
+        const res = await supabase.from(table).upsert(chunk, { onConflict: 'id' });
+        if (res?.error) return { error: res.error };
+      }
+      return { error: null };
+    }
+
+    window.handleRestoreBackupJson = async function (event) {
+      const file = event?.target?.files?.[0];
+      if (!file) return;
+      event.target.value = '';
+
+      if (!isAdminUser()) {
+        showToast('Fitur restore data khusus untuk Administrator.', 'warning');
+        return;
+      }
+
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed || parsed.app !== 'SIHASUL' || !parsed.data || typeof parsed.data !== 'object') {
+          showToast('File bukan backup SIHASUL yang valid.', 'danger');
+          return;
+        }
+        const d = parsed.data;
+        if (!Array.isArray(d.teachers) || !Array.isArray(d.exams) || !Array.isArray(d.examResults)) {
+          showToast('Struktur data di dalam file backup tidak lengkap.', 'danger');
+          return;
+        }
+
+        const studentsArr = Array.isArray(d.students) ? d.students : [];
+        const subjectsArr = Array.isArray(d.subjects) ? d.subjects : [];
+        const classesArr = Array.isArray(d.classes)
+          ? d.classes.filter(c => c && c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME)
+          : [];
+        const deletedSubjArr = Array.isArray(d.deletedSubjectNames) ? d.deletedSubjectNames : [];
+        const exportedDateText = parsed.exportedAt
+          ? new Date(parsed.exportedAt).toLocaleString('id-ID')
+          : '-';
+
+        openConfirmModal(
+          'Konfirmasi Restore Backup Data',
+          `
+            <div class="space-y-3 text-xs">
+              <p>Data aplikasi saat ini akan dipulihkan menggunakan file backup tanggal <strong>${escapeHtml(exportedDateText)}</strong>:</p>
+              <div class="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700">
+                <div>Guru: <strong>${d.teachers.length}</strong></div>
+                <div>Siswa: <strong>${studentsArr.length}</strong></div>
+                <div>Mapel: <strong>${subjectsArr.length}</strong></div>
+                <div>Paket Ulangan: <strong>${d.exams.length}</strong></div>
+                <div>Hasil Nilai: <strong>${d.examResults.length}</strong></div>
+                <div>Tahun Aktif: <strong>${escapeHtml(parsed.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR)}</strong></div>
+              </div>
+              <p class="text-amber-700 font-semibold">Pastikan file backup ini benar sebelum melanjutkan.</p>
+            </div>
+          `,
+          async () => {
+            showActionOverlay({
+              stateType: 'loading',
+              title: 'Memulihkan Data Backup...',
+              subtitle: 'Menerapkan data & menyinkronkan ke Supabase'
+            });
+
+            try {
+              state.teachers = structuredClone(d.teachers);
+              state.classes = structuredClone(classesArr);
+              state.students = structuredClone(studentsArr);
+              state.subjects = structuredClone(subjectsArr);
+              state.deletedSubjectNames = structuredClone(deletedSubjArr);
+              state.exams = structuredClone(d.exams);
+              state.examResults = structuredClone(d.examResults);
+              if (parsed.academicSettings) {
+                applyAcademicSettingsObject(parsed.academicSettings);
+              }
+              mergeAcademicYearsFromExams();
+              mergeSubjectsState();
+
+              state.sessionAcademicYear = state.academicSettings.activeAcademicYear;
+              state.sessionSemester = state.academicSettings.activeSemester;
+              state.headerExamClassFilter = 'ALL';
+              state.examClassFilter = 'ALL';
+              state.examSubjectFilter = 'ALL';
+              state.activeExamId = null;
+
+              savePendingSyncQueue([]);
+              saveAcademicSettingsToStorage();
+              saveSubjectsMetaToStorage();
+              saveStudentsToStorage();
+              saveCacheToStorage();
+              saveSessionToStorage();
+
+              let syncWarning = '';
+              if (!IS_PREVIEW && supabase) {
+                updateSyncBadge('syncing');
+                const syncSteps = [
+                  upsertTableInBatches('classes', [buildAcademicConfigRow(), ...state.classes]),
+                  upsertTableInBatches('teachers', state.teachers),
+                  upsertTableInBatches('exams', state.exams),
+                  upsertTableInBatches('exam_results', state.examResults)
+                ];
+                if (state.hasSubjectsTable === true && state.subjects.length > 0) {
+                  syncSteps.push(upsertTableInBatches('subjects', state.subjects.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    teacher_id: s.teacher_id ?? null
+                  }))));
+                }
+                if (state.hasStudentsTable === true && state.students.length > 0) {
+                  syncSteps.push(upsertTableInBatches('students', state.students.map(s => ({
+                    id: s.id,
+                    nis: s.nis,
+                    full_name: s.full_name,
+                    gender: s.gender,
+                    class_name: s.class_name
+                  }))));
+                }
+                const results = await Promise.all(syncSteps);
+                const firstErr = results.find(r => r?.error)?.error;
+                if (firstErr) {
+                  syncWarning = firstErr.message || 'Sebagian data gagal disinkronkan ke Supabase.';
+                  updateSyncBadge('pending');
+                } else {
+                  state.lastSyncedAt = new Date();
+                  updateSyncBadge('synced');
+                }
+              }
+
+              populateLoginAcademicSelectors({ preserveSelection: false });
+              updateWorkspacePeriodUI();
+              populateExamSelectors();
+              renderNavigationMenus();
+              renderCurrentMenu();
+
+              showActionOverlay({
+                stateType: 'success',
+                title: 'Restore Data Selesai!',
+                subtitle: syncWarning ? 'Dipulihkan lokal (cek sinkronisasi Supabase)' : 'Seluruh data berhasil dipulihkan & tersinkron'
+              });
+              await sleep(550);
+              await hideActionOverlay();
+              showToast(
+                syncWarning
+                  ? `Data dipulihkan secara lokal, namun sinkronisasi Supabase bermasalah: ${syncWarning}`
+                  : 'Seluruh data backup berhasil dipulihkan dan disinkronkan!',
+                syncWarning ? 'warning' : 'success'
+              );
+            } catch (restoreErr) {
+              console.error('Restore Execution Error:', restoreErr);
+              await hideActionOverlay();
+              showToast('Terjadi kesalahan saat memulihkan data backup.', 'danger');
+            }
+          },
+          'Ya, Restore Data'
+        );
+      } catch (err) {
+        console.error('Restore Parse Error:', err);
+        showToast('Gagal membaca file backup JSON. Pastikan format file valid.', 'danger');
+      }
+    };
+
     // ==================== LIFECYCLE HOOKS (REFRESH, CLOSE TAB, ONLINE) ====================
     window.addEventListener('beforeunload', flushPendingSyncKeepalive);
     window.addEventListener('pagehide', flushPendingSyncKeepalive);
@@ -7670,7 +8727,15 @@
     // ==================== INITIALIZE APP ON LOAD ====================
     window.addEventListener('DOMContentLoaded', async () => {
       registerSingleFilePWA();
+      loadAcademicSettingsFromStorage();
       loadCacheFromStorage();
+      populateLoginAcademicSelectors({ preserveSelection: false });
+
+      const loginYearEl = document.getElementById('login-academic-year');
+      const loginSemEl = document.getElementById('login-semester');
+      if (loginYearEl) loginYearEl.addEventListener('change', () => { loginYearEl.dataset.userChanged = '1'; });
+      if (loginSemEl) loginSemEl.addEventListener('change', () => { loginSemEl.dataset.userChanged = '1'; });
+
       const savedSession = loadSessionFromStorage();
 
       if (!IS_PREVIEW && supabase) {
@@ -7700,6 +8765,8 @@
         state.currentUser = savedSession.currentUser;
         state.impersonatedByAdmin = savedSession.impersonatedByAdmin || null;
         state.activeMenu = savedSession.activeMenu || 'dashboard';
+        state.sessionAcademicYear = savedSession.sessionAcademicYear || state.academicSettings.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+        state.sessionSemester = normalizeSemester(savedSession.sessionSemester || state.academicSettings.activeSemester || DEFAULT_SEMESTER);
         if (savedSession.activeExamId) state.activeExamId = savedSession.activeExamId;
         await enterWorkspace({ animate: true, fromRefresh: true });
         updateSyncBadge('syncing', 'Menyinkronkan...');
