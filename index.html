@@ -1007,7 +1007,8 @@
       PENDING_SYNC: 'flowora_pending_sync_v1',
       SUBJECTS: 'flowora_subjects_v1',
       STUDENTS: 'flowora_students_v1',
-      SETTINGS: 'flowora_academic_settings_v1'
+      SETTINGS: 'flowora_academic_settings_v1',
+      LOGIN_LOGS: 'flowora_teacher_login_logs_v1'
     };
 
     const DEFAULT_ACADEMIC_YEAR = '2026/2027';
@@ -1157,7 +1158,8 @@
       teachers: [],
       classes: [],
       exams: [],
-      examResults: []
+      examResults: [],
+      teacherLoginLogs: []
     };
 
     const INITIAL_SEED_DATA = {
@@ -1321,6 +1323,7 @@
         if (Array.isArray(cached.deletedSubjectNames)) state.deletedSubjectNames = cached.deletedSubjectNames;
         if (cached.activeExamId) state.activeExamId = cached.activeExamId;
         if (cached.academicSettings) applyAcademicSettingsObject(cached.academicSettings, { onlyIfNewer: true, replaceYears: true });
+        loadTeacherLoginLogs();
         return true;
       } catch (e) {
         return false;
@@ -1340,6 +1343,148 @@
         return Array.isArray(parsed) ? parsed : [];
       } catch (e) {
         return [];
+      }
+    }
+
+    // ==================== RIWAYAT LOGIN GURU (REAL-TIME) ====================
+    function loadTeacherLoginLogs() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.LOGIN_LOGS);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            state.teacherLoginLogs = parsed;
+            return parsed;
+          }
+        }
+      } catch (e) { }
+      const initialLogs = generateInitialLoginLogs();
+      state.teacherLoginLogs = initialLogs;
+      saveTeacherLoginLogs();
+      return initialLogs;
+    }
+
+    function saveTeacherLoginLogs() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.LOGIN_LOGS, JSON.stringify(state.teacherLoginLogs || []));
+      } catch (e) { }
+    }
+
+    function generateInitialLoginLogs() {
+      const now = Date.now();
+      const ay = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const sem = state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER;
+      const teachersList = (Array.isArray(state.teachers) && state.teachers.length > 0)
+        ? state.teachers
+        : [
+          { id: '11111111-1111-4111-8111-111111111101', full_name: 'NUR IKHSANI, S.Pd.I', username: 'nur.ikhsani', class_assigned: 'Kelas 3', subject: 'Pend. Pancasila, Bahasa Indonesia, Matematika' },
+          { id: '11111111-1111-4111-8111-111111111102', full_name: 'ABDURRAHMAN, S.Pd', username: 'abdurrahman', class_assigned: 'Kelas 6', subject: 'Bahasa Indonesia' },
+          { id: '11111111-1111-4111-8111-111111111103', full_name: 'SITI RAHMAH, S.Pd.I', username: 'siti.rahmah', class_assigned: 'Kelas 4', subject: 'Akidah Akhlak, Fikih' },
+          { id: '11111111-1111-4111-8111-111111111104', full_name: 'H. AHMAD SYAUQI, S.Pd.I, M.Pd.', username: 'ahmad.syauqi', class_assigned: 'Semua Kelas', subject: 'Al-Qur\'an Hadis' }
+        ];
+
+      return teachersList.slice(0, 5).map((t, idx) => {
+        const meta = decodeTeacherMeta(t.class_assigned);
+        const roleLabel = meta.isWaliKelas ? `Wali Kelas • ${meta.assignedGrade || 'Kelas'}` : (meta.roleTitle || 'Guru Mapel');
+        const minutesAgo = (idx * 14) + 4;
+        const loginIso = new Date(now - minutesAgo * 60 * 1000).toISOString();
+        const isOnline = idx < 2;
+        return {
+          id: `seed-log-${t.id || idx}`,
+          teacher_id: t.id,
+          full_name: t.full_name,
+          username: t.username || 'guru',
+          role: 'guru',
+          role_label: roleLabel,
+          class_assigned: t.class_assigned || 'Semua Kelas',
+          subject: t.subject || 'Semua Mapel',
+          academic_year: ay,
+          semester: sem,
+          login_time: loginIso,
+          logout_time: isOnline ? null : new Date(now - (minutesAgo - 10) * 60 * 1000).toISOString(),
+          status: isOnline ? 'ONLINE' : 'OFFLINE',
+          device: idx % 2 === 0 ? 'Desktop • Windows (Chrome)' : 'Mobile • Android (Chrome)'
+        };
+      });
+    }
+
+    function recordTeacherLoginLog(user, selectedAcademicYear, selectedSemester) {
+      if (!user) return;
+      if (!Array.isArray(state.teacherLoginLogs)) state.teacherLoginLogs = [];
+      const meta = decodeTeacherMeta(user.class_assigned);
+      const roleLabel = user.role === 'admin'
+        ? 'Administrator'
+        : (meta.isWaliKelas ? `Wali Kelas • ${meta.assignedGrade || 'Kelas'}` : (meta.roleTitle || 'Guru Mapel'));
+
+      const newLog = {
+        id: crypto.randomUUID(),
+        teacher_id: user.id,
+        full_name: user.full_name,
+        username: user.username || user.email || 'user',
+        role: user.role,
+        role_label: roleLabel,
+        class_assigned: user.class_assigned || 'Semua Kelas',
+        subject: user.subject || 'Semua Mapel',
+        academic_year: selectedAcademicYear,
+        semester: selectedSemester,
+        login_time: new Date().toISOString(),
+        logout_time: null,
+        status: 'ONLINE',
+        device: /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile Browser' : 'Desktop (PC / Laptop)'
+      };
+
+      // Set previous online log for this user to OFFLINE
+      state.teacherLoginLogs.forEach(l => {
+        if (l.teacher_id === user.id && l.status === 'ONLINE') {
+          l.status = 'OFFLINE';
+          l.logout_time = new Date().toISOString();
+        }
+      });
+
+      state.teacherLoginLogs.unshift(newLog);
+      if (state.teacherLoginLogs.length > 50) {
+        state.teacherLoginLogs = state.teacherLoginLogs.slice(0, 50);
+      }
+      saveTeacherLoginLogs();
+    }
+
+    function recordTeacherLogoutLog() {
+      if (!state.currentUser || !Array.isArray(state.teacherLoginLogs)) return;
+      const target = state.teacherLoginLogs.find(
+        l => l.teacher_id === state.currentUser?.id && l.status === 'ONLINE'
+      );
+      if (target) {
+        target.status = 'OFFLINE';
+        target.logout_time = new Date().toISOString();
+        saveTeacherLoginLogs();
+      }
+    }
+
+    function formatRelativeTime(dateStr) {
+      if (!dateStr) return '-';
+      try {
+        const d = new Date(dateStr);
+        const diffMs = Date.now() - d.getTime();
+        const diffSec = Math.floor(diffMs / 1000);
+        if (diffSec < 60) return 'Baru saja';
+        const diffMin = Math.floor(diffSec / 60);
+        if (diffMin < 60) return `${diffMin} mnt lalu`;
+        const diffHr = Math.floor(diffMin / 60);
+        if (diffHr < 24) return `${diffHr} jam lalu`;
+        const diffDay = Math.floor(diffHr / 24);
+        return `${diffDay} hari lalu`;
+      } catch (e) {
+        return dateStr;
+      }
+    }
+
+    function formatDateTimeShort(dateStr) {
+      if (!dateStr) return '-';
+      try {
+        const d = new Date(dateStr);
+        return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA';
+      } catch (e) {
+        return dateStr;
       }
     }
 
@@ -3060,6 +3205,7 @@
         state.sessionAcademicYear = selectedAcademicYear;
         state.sessionSemester = selectedSemester;
         saveSessionToStorage();
+        recordTeacherLoginLog(state.currentUser, selectedAcademicYear, selectedSemester);
 
         showActionOverlay({
           stateType: 'success',
@@ -3076,6 +3222,7 @@
     };
 
     window.handleLogout = async function () {
+      recordTeacherLogoutLog();
       const desktopBtn = document.getElementById('btn-logout-desktop');
       const mobileBtn = document.getElementById('btn-logout-mobile');
       setButtonLoading(desktopBtn, true, 'Sinkronisasi...');
@@ -4202,8 +4349,140 @@
         </div>
 
       </div>
+
+      <!-- Real-Time Teacher Login History Card -->
+      <div id="dashboard-login-history-card" class="glass-surface rounded-3xl p-6 space-y-4">
+        ${renderDashboardLoginHistoryHtml()}
+      </div>
     `;
     }
+
+    function renderDashboardLoginHistoryHtml() {
+      const logs = (Array.isArray(state.teacherLoginLogs) && state.teacherLoginLogs.length > 0)
+        ? state.teacherLoginLogs
+        : loadTeacherLoginLogs();
+
+      const onlineCount = logs.filter(l => l.status === 'ONLINE').length;
+      const todayCount = logs.length;
+
+      const rowsHtml = logs.slice(0, 10).map((l, idx) => {
+        const initials = String(l.full_name || 'Guru')
+          .split(' ')
+          .filter(Boolean)
+          .slice(0, 2)
+          .map(w => w[0].toUpperCase())
+          .join('');
+        const isOnline = l.status === 'ONLINE';
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="py-3 px-3.5 text-center font-bold text-slate-400 text-xs">${idx + 1}</td>
+            <td class="py-3 px-3.5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-full ${isOnline ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'} flex items-center justify-center font-black text-xs shrink-0">
+                  ${initials || 'G'}
+                </div>
+                <div class="min-w-0">
+                  <div class="font-extrabold text-slate-900 text-xs truncate">${escapeHtml(l.full_name)}</div>
+                  <div class="text-[11px] font-mono text-slate-500">${escapeHtml(l.username)}</div>
+                </div>
+              </div>
+            </td>
+            <td class="py-3 px-3.5">
+              <div class="font-bold text-slate-800 text-xs">${escapeHtml(l.role_label || 'Guru')}</div>
+              <div class="text-[11px] text-slate-500 truncate max-w-xs">${escapeHtml(l.subject || '-')}</div>
+            </td>
+            <td class="py-3 px-3.5 whitespace-nowrap">
+              <div class="font-extrabold text-slate-900 text-xs">${formatRelativeTime(l.login_time)}</div>
+              <div class="text-[11px] text-slate-500 font-mono">${formatDateTimeShort(l.login_time)}</div>
+            </td>
+            <td class="py-3 px-3.5 whitespace-nowrap">
+              <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-bold">
+                TA ${escapeHtml(l.academic_year || DEFAULT_ACADEMIC_YEAR)} • ${escapeHtml(l.semester || DEFAULT_SEMESTER)}
+              </span>
+            </td>
+            <td class="py-3 px-3.5 whitespace-nowrap text-slate-600 text-xs">
+              <span class="inline-flex items-center gap-1.5">
+                <i data-lucide="${(l.device || '').includes('Mobile') ? 'smartphone' : 'laptop'}" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span class="text-[11px]">${escapeHtml(l.device || 'Desktop')}</span>
+              </span>
+            </td>
+            <td class="py-3 px-3.5 text-center whitespace-nowrap">
+              ${isOnline ? `
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black shadow-2xs">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Sedang Online
+                </span>
+              ` : `
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold">
+                  Selesai
+                </span>
+              `}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      return `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <i data-lucide="activity" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="text-base font-extrabold text-slate-900">Riwayat Login Guru &amp; Sesi Aktif</h3>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10.5px] font-extrabold">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping"></span> Real-Time Monitoring
+                </span>
+              </div>
+              <p class="text-xs text-slate-500">Pantau guru yang sedang aktif login dan histori aktivitas sesi penilaian madrasah</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-black">
+              ${onlineCount} Guru Online
+            </span>
+            <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
+              ${todayCount} Sesi Tercatat
+            </span>
+            <button type="button" onclick="window.refreshDashboardLoginLogs()"
+              class="px-3 py-1.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 text-xs font-bold flex items-center gap-1.5 transition shadow-2xs"
+              title="Segarkan riwayat login guru">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-600"></i> Segarkan
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scroll rounded-2xl border border-slate-200/80">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500">
+                <th class="py-3 px-3.5 w-12 text-center">No</th>
+                <th class="py-3 px-3.5">Nama Guru &amp; NIP</th>
+                <th class="py-3 px-3.5">Penugasan / Jabatan</th>
+                <th class="py-3 px-3.5">Waktu Login</th>
+                <th class="py-3 px-3.5">Periode Sesi</th>
+                <th class="py-3 px-3.5">Perangkat</th>
+                <th class="py-3 px-3.5 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-xs">
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    window.refreshDashboardLoginLogs = function () {
+      const card = document.getElementById('dashboard-login-history-card');
+      if (card) {
+        card.innerHTML = renderDashboardLoginHistoryHtml();
+        lucide.createIcons();
+        showToast('Riwayat login guru berhasil disegarkan (Real-Time).', 'info');
+      }
+    };
 
     // ==================== 2. MANAJEMEN ULANGAN & KUNCI JAWABAN ====================
     function renderNumericScoreBoxesHtml(qType, count, scoresArr = [], isEnabled = true) {
@@ -5260,6 +5539,15 @@
 
     function readAndSanitizeStudentInputs(examMeta) {
       if (!examMeta.isMultiType) {
+        if (isNumericQuestionType(examMeta.questionType)) {
+          const boxes = document.querySelectorAll(`[data-student-score-qtype="${examMeta.questionType}"]`);
+          if (boxes.length > 0) {
+            const vals = Array.from(boxes).map(b => b.value.trim() !== '' ? b.value.trim() : '0');
+            const hidden = document.getElementById('student-answers');
+            if (hidden) hidden.value = vals.join(',');
+            return vals.join(',');
+          }
+        }
         const ansInput = document.getElementById('student-answers');
         if (!ansInput) return null;
         const cleanVal = sanitizeAnswerInputValue(examMeta.questionType, ansInput.value);
@@ -5269,6 +5557,16 @@
 
       const map = {};
       examMeta.sections.forEach(sec => {
+        if (isNumericQuestionType(sec.questionType)) {
+          const boxes = document.querySelectorAll(`[data-student-score-qtype="${sec.questionType}"]`);
+          if (boxes.length > 0) {
+            const vals = Array.from(boxes).map(b => b.value.trim() !== '' ? b.value.trim() : '0');
+            const hidden = document.getElementById(`student-answers-${sec.questionType}`);
+            if (hidden) hidden.value = vals.join(',');
+            map[sec.questionType] = vals.join(',');
+            return;
+          }
+        }
         const inp = document.getElementById(`student-answers-${sec.questionType}`);
         if (!inp) return;
         const cleanVal = sanitizeAnswerInputValue(sec.questionType, inp.value);
@@ -5400,6 +5698,138 @@
       return `<i data-lucide="arrow-right" class="w-3.5 h-3.5 shrink-0"></i><span>Siap diisi: <strong>${escapeHtml(studentName)}</strong> • Otomatis pindah ke siswa selanjutnya setelah disimpan.</span>`;
     }
 
+    // ==================== KOTAK SKOR NUMERIK ISIAN & URAIAN SISWA ====================
+    function renderStudentNumericInputSectionHtml(sec, initSecVal = '', isMulti = false) {
+      const count = Number(sec.count) || 0;
+      const startNumber = Number(sec.startNumber) || 1;
+      const qType = sec.questionType;
+      const itemMaxScores = (Array.isArray(sec.keyScores) && sec.keyScores.length === count)
+        ? sec.keyScores
+        : parseNumericScores(sec.rawKey, count);
+      const currentScores = parseNumericScores(initSecVal, count);
+      const hiddenId = isMulti ? `student-answers-${qType}` : 'student-answers';
+
+      const scoreBoxes = [];
+      for (let i = 1; i <= count; i++) {
+        const globalNo = startNumber + i - 1;
+        const maxVal = itemMaxScores[i - 1] !== undefined ? itemMaxScores[i - 1] : 10;
+        const val = currentScores[i - 1] !== undefined ? currentScores[i - 1] : '';
+        scoreBoxes.push(`
+          <div class="flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition shadow-2xs">
+            <div class="flex flex-col min-w-0">
+              <span class="text-xs font-black text-slate-800">No. ${globalNo}</span>
+              <span class="text-[9.5px] font-bold text-slate-400">Maks: ${maxVal}</span>
+            </div>
+            <input type="number" min="0" max="${maxVal}" step="any"
+              id="student-item-score-${qType}-${i}"
+              data-student-score-qtype="${qType}"
+              data-student-score-index="${i}"
+              data-max-score="${maxVal}"
+              value="${escapeHtml(String(val))}"
+              oninput="window.handleStudentScoreBoxChange('${qType}')"
+              placeholder="0"
+              class="student-score-box w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-right font-mono text-xs font-black text-indigo-950 focus:bg-white focus:outline-none focus:border-indigo-500" />
+          </div>
+        `);
+      }
+
+      return `
+        <div class="p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <span class="inline-flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+              <span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${sec.typeMeta.badgeClass}">${sec.typeMeta.label}</span>
+              <span>No. ${startNumber}–${startNumber + count - 1} (${count} Soal • Maks ${sec.maxTotalScore} Poin)</span>
+            </span>
+            <span id="student-ans-counter-${qType}" class="text-[11px] font-extrabold text-slate-500">0 / ${count} Nomor</span>
+          </div>
+
+          <!-- Skor Sama Semua Soal & Pintasan Nilai Penuh -->
+          <div class="p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-200/80 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            <div class="flex items-center gap-2">
+              <label class="text-[11px] font-bold text-indigo-950 whitespace-nowrap">Skor Sama Semua Soal:</label>
+              <input type="number" min="0" step="any" id="student-uniform-score-${qType}"
+                placeholder="Misal: 10"
+                oninput="window.applyUniformStudentScore('${qType}')"
+                class="w-20 px-2 py-1 rounded-lg bg-white border border-indigo-300 font-mono text-xs font-extrabold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" onclick="window.fillMaxStudentScores('${qType}')"
+                class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs">
+                <span>✓ Beri Nilai Penuh</span>
+              </button>
+              <button type="button" onclick="window.clearStudentScores('${qType}')"
+                class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-bold transition">
+                Reset 0
+              </button>
+            </div>
+          </div>
+
+          <!-- Grid Kotak Skor per Nomor -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] font-bold text-slate-600 px-0.5">
+              <span>Perolehan Skor Tiap Nomor Soal:</span>
+              <span class="text-[10px] text-slate-400 font-normal">Isi skor yang diperoleh siswa (0 s/d Maks)</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              ${scoreBoxes.join('')}
+            </div>
+          </div>
+
+          <!-- Hidden Input for seamless form serialization & compatibility -->
+          <input type="hidden" id="${hiddenId}" value="${escapeHtml(initSecVal)}" />
+        </div>
+      `;
+    }
+
+    window.handleStudentScoreBoxChange = function (qType) {
+      const inputs = document.querySelectorAll(`[data-student-score-qtype="${qType}"]`);
+      if (inputs.length === 0) return;
+      const vals = [];
+      inputs.forEach(inp => {
+        const val = inp.value.trim();
+        vals.push(val !== '' ? val : '0');
+      });
+      const hiddenInput = document.getElementById(`student-answers-${qType}`) || document.getElementById('student-answers');
+      if (hiddenInput) {
+        hiddenInput.value = vals.join(',');
+      }
+      window.previewLiveScore();
+    };
+
+    window.applyUniformStudentScore = function (qType) {
+      const uniformInput = document.getElementById(`student-uniform-score-${qType}`);
+      if (!uniformInput) return;
+      const rawVal = uniformInput.value.trim();
+      if (rawVal === '') return;
+      const num = Number(rawVal);
+      if (!Number.isFinite(num) || num < 0) return;
+
+      const inputs = document.querySelectorAll(`[data-student-score-qtype="${qType}"]`);
+      inputs.forEach(inp => {
+        const maxScore = Number(inp.dataset.maxScore || 100);
+        inp.value = Math.min(num, maxScore);
+      });
+      window.handleStudentScoreBoxChange(qType);
+    };
+
+    window.fillMaxStudentScores = function (qType) {
+      const inputs = document.querySelectorAll(`[data-student-score-qtype="${qType}"]`);
+      inputs.forEach(inp => {
+        inp.value = inp.dataset.maxScore || '10';
+      });
+      window.handleStudentScoreBoxChange(qType);
+    };
+
+    window.clearStudentScores = function (qType) {
+      const inputs = document.querySelectorAll(`[data-student-score-qtype="${qType}"]`);
+      inputs.forEach(inp => {
+        inp.value = '0';
+      });
+      const uniformInput = document.getElementById(`student-uniform-score-${qType}`);
+      if (uniformInput) uniformInput.value = '';
+      window.handleStudentScoreBoxChange(qType);
+    };
+
     function focusStudentAnswerInput(exam) {
       if (!exam) return;
       const examMeta = decodeExamMeta(exam);
@@ -5484,6 +5914,9 @@
               ${examMeta.sections.map(sec => {
           const secIsNum = isNumericQuestionType(sec.questionType);
           const initSecVal = editingResult ? String(editSectionAnswers[sec.questionType] || '') : '';
+          if (secIsNum) {
+            return renderStudentNumericInputSectionHtml(sec, initSecVal, true);
+          }
           return `
                   <div class="p-3 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-1.5">
                     <div class="flex items-center justify-between gap-2">
@@ -5493,13 +5926,11 @@
                       </span>
                       <span id="student-ans-counter-${sec.questionType}" class="text-[11px] font-extrabold text-slate-400">0 / ${sec.count}</span>
                     </div>
-                    <input type="text" id="student-answers-${sec.questionType}" required maxlength="${secIsNum ? 250 : sec.count}" value="${escapeHtml(initSecVal)}" oninput="window.previewLiveScore()"
+                    <input type="text" id="student-answers-${sec.questionType}" required maxlength="${sec.count}" value="${escapeHtml(initSecVal)}" oninput="window.previewLiveScore()"
                       placeholder="${sec.typeMeta.studentPlaceholder}"
-                      class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 font-mono text-xs font-extrabold tracking-widest ${secIsNum ? '' : 'uppercase'} text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                      class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 font-mono text-xs font-extrabold tracking-widest uppercase text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                     <p class="text-[10px] text-slate-500">
-                      ${secIsNum
-              ? `Ketik skor per nomor langsung atau dipisah koma (misal ${sec.displayKey}).`
-              : (sec.questionType === 'BS' ? 'Ketik B (Benar) / S (Salah) tanpa spasi.' : 'Ketik huruf A–E tanpa spasi.')}
+                      ${sec.questionType === 'BS' ? 'Ketik B (Benar) / S (Salah) tanpa spasi.' : 'Ketik huruf A–E tanpa spasi.'}
                     </p>
                   </div>
                 `;
@@ -5507,7 +5938,17 @@
             </div>
           </div>
         `
-        : `
+        : (isNumType
+          ? renderStudentNumericInputSectionHtml({
+            questionType: examMeta.questionType,
+            typeMeta: examMeta.typeMeta,
+            count: exam.total_questions,
+            startNumber: 1,
+            maxTotalScore: examMeta.maxTotalScore,
+            rawKey: examMeta.displayKey,
+            keyScores: examMeta.keyScores
+          }, editingResult ? String(editSectionAnswers[examMeta.questionType] || '') : '', false)
+          : `
           <div>
             <div class="flex items-center justify-between mb-1.5">
               <label class="text-xs font-bold text-slate-700">${examMeta.typeMeta.studentLabel} (${exam.total_questions} Soal)</label>
@@ -5515,16 +5956,14 @@
                 + Isi Simulasi Cepat
               </button>
             </div>
-            <input type="text" id="student-answers" required maxlength="${isNumType ? 250 : exam.total_questions}" value="${escapeHtml(editingResult ? String(editSectionAnswers[examMeta.questionType] || '') : '')}" oninput="window.previewLiveScore()"
+            <input type="text" id="student-answers" required maxlength="${exam.total_questions}" value="${escapeHtml(editingResult ? String(editSectionAnswers[examMeta.questionType] || '') : '')}" oninput="window.previewLiveScore()"
               placeholder="${examMeta.typeMeta.studentPlaceholder}"
-              class="w-full px-4 py-3 rounded-2xl bg-white border border-slate-300 font-mono text-sm font-extrabold tracking-widest ${isNumType ? '' : 'uppercase'} text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              class="w-full px-4 py-3 rounded-2xl bg-white border border-slate-300 font-mono text-sm font-extrabold tracking-widest uppercase text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             <p class="text-[11px] text-slate-500 mt-1">
-              ${isNumType
-          ? `Ketik skor per nomor langsung (misal 2415) atau dipisah koma (misal ${examMeta.displayKey}).`
-          : (examMeta.questionType === 'BS' ? 'Ketik huruf B (Benar) atau S (Salah) tanpa spasi sesuai jumlah soal.' : 'Ketik huruf A-E tanpa spasi sesuai jumlah soal.')}
+              ${examMeta.questionType === 'BS' ? 'Ketik huruf B (Benar) atau S (Salah) tanpa spasi sesuai jumlah soal.' : 'Ketik huruf A-E tanpa spasi sesuai jumlah soal.'}
             </p>
           </div>
-        `;
+        `);
 
       const tableLegendText = examMeta.isMultiType
         ? 'Hijau = Benar / Tuntas (≥75% bobot), Kuning = Parsial, Merah = Salah / Skor 0'
@@ -5883,6 +6322,16 @@
       const examMeta = decodeExamMeta(exam);
 
       if (!examMeta.isMultiType) {
+        if (isNumericQuestionType(examMeta.questionType)) {
+          const boxes = document.querySelectorAll(`[data-student-score-qtype="${examMeta.questionType}"]`);
+          boxes.forEach(b => {
+            const maxVal = Number(b.dataset.maxScore || 10);
+            const r = Math.random();
+            b.value = r > 0.3 ? maxVal : (r > 0.1 ? Math.round(maxVal * 0.7) : 0);
+          });
+          window.handleStudentScoreBoxChange(examMeta.questionType);
+          return;
+        }
         const ansInput = document.getElementById('student-answers');
         if (ansInput) {
           ansInput.value = generateSectionRandomAnswer(examMeta.sections[0]);
@@ -5892,8 +6341,18 @@
       }
 
       examMeta.sections.forEach(sec => {
-        const inp = document.getElementById(`student-answers-${sec.questionType}`);
-        if (inp) inp.value = generateSectionRandomAnswer(sec);
+        if (isNumericQuestionType(sec.questionType)) {
+          const boxes = document.querySelectorAll(`[data-student-score-qtype="${sec.questionType}"]`);
+          boxes.forEach(b => {
+            const maxVal = Number(b.dataset.maxScore || 10);
+            const r = Math.random();
+            b.value = r > 0.3 ? maxVal : (r > 0.1 ? Math.round(maxVal * 0.7) : 0);
+          });
+          window.handleStudentScoreBoxChange(sec.questionType);
+        } else {
+          const inp = document.getElementById(`student-answers-${sec.questionType}`);
+          if (inp) inp.value = generateSectionRandomAnswer(sec);
+        }
       });
       window.previewLiveScore();
     };
@@ -8908,8 +9367,8 @@
         <div class="glass-surface rounded-3xl p-6 md:p-8 space-y-6">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
             <div>
-              <h3 class="text-lg md:text-xl font-extrabold text-slate-900">Cetak Rapor &amp; Rekapitulasi Siswa</h3>
-              <p class="text-xs text-slate-500 mt-1">Pantau &amp; rekap hasil input jawaban siswa, analisis butir soal, status remedial &amp; pengayaan, serta cetak rapor per kelas</p>
+              <h3 class="text-lg md:text-xl font-extrabold text-slate-900">Rekap Analisis Hasil Ulangan Siswa</h3>
+              <p class="text-xs text-slate-500 mt-1">Pantau &amp; rekap hasil input jawaban siswa, analisis butir soal, status remedial &amp; pengayaan, serta cetak rekap per kelas</p>
             </div>
           </div>
 
@@ -9004,10 +9463,10 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
           <div>
             <div class="flex items-center gap-2.5 flex-wrap">
-              <h3 class="text-lg md:text-xl font-extrabold text-slate-900">Cetak Rapor &amp; Rekapitulasi Siswa</h3>
+              <h3 class="text-lg md:text-xl font-extrabold text-slate-900">Rekap Analisis Hasil Ulangan Siswa</h3>
               <span class="px-3 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-extrabold">${escapeHtml(selectedClass)}</span>
             </div>
-            <p class="text-xs text-slate-500 mt-1">Pantau &amp; rekap hasil input jawaban siswa, analisis butir soal, status remedial &amp; pengayaan, serta cetak rapor per kelas</p>
+            <p class="text-xs text-slate-500 mt-1">Pantau &amp; rekap hasil input jawaban siswa, analisis butir soal, status remedial &amp; pengayaan, serta cetak rekap per kelas</p>
           </div>
         </div>
 
@@ -9086,7 +9545,7 @@
         <div class="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-2 custom-scroll">
           <button type="button" onclick="window.handleRekapSwitchTab('rapor')"
             class="px-4 py-2.5 rounded-2xl text-xs font-extrabold flex items-center gap-2 whitespace-nowrap transition ${activeTab === 'rapor' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/70'}">
-            <i data-lucide="file-text" class="w-4 h-4"></i> Rapor &amp; Rekap Siswa (${filteredStudents.length})
+            <i data-lucide="file-text" class="w-4 h-4"></i> Rekap Analisis Siswa (${filteredStudents.length})
           </button>
           <button type="button" onclick="window.handleRekapSwitchTab('jawaban')"
             class="px-4 py-2.5 rounded-2xl text-xs font-extrabold flex items-center gap-2 whitespace-nowrap transition ${activeTab === 'jawaban' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/70'}">
@@ -9107,10 +9566,10 @@
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <h4 class="text-sm font-extrabold text-slate-900">Daftar Siswa &amp; Cetak Rapor</h4>
+                <h4 class="text-sm font-extrabold text-slate-900">Daftar Siswa &amp; Rekap Analisis</h4>
                 <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-extrabold">${filteredStudents.length} Siswa</span>
               </div>
-              <span class="text-xs text-slate-500">Klik Cetak PDF untuk mencetak rapor 4 bagian lengkap atau Excel untuk mengunduh rekap</span>
+              <span class="text-xs text-slate-500">Klik Cetak PDF untuk mencetak lembar rekap analisis lengkap atau Excel untuk mengunduh rekap</span>
             </div>
 
             <div class="overflow-x-auto custom-scroll rounded-2xl border border-slate-200/80">
@@ -9165,12 +9624,12 @@
                         <div class="inline-flex items-center justify-center gap-1.5">
                           <button type="button" onclick="window.handlePrintStudentReport('${stu.id}')"
                             class="px-2.5 py-1.5 rounded-full flowora-btn-primary text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition hover:scale-105"
-                            title="Cetak Lembar Rekap Lengkap (4 Bagian) PDF">
+                            title="Cetak Lembar Rekap Analisis Lengkap PDF">
                             <i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak PDF
                           </button>
                           <button type="button" onclick="window.handleExportStudentXlsx('${stu.id}')"
                             class="px-2.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition hover:scale-105"
-                            title="Ekspor Rapor Siswa ke Excel (.xlsx)">
+                            title="Ekspor Rekap Analisis Siswa ke Excel (.xlsx)">
                             <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Excel
                           </button>
                           <button type="button" onclick="window.handleViewStudentDetail('${stu.id}')"
@@ -9670,42 +10129,100 @@
       renderCurrentMenu();
     };
 
+    function getApplicableSubjectsForStudentClass(className) {
+      const isLowerGrade = /kelas\s*[12]\b/i.test(String(className || ''));
+      const excludedLower = new Set(['ski', 'sejarah kebudayaan islam', 'ipas', 'ilmu pengetahuan alam dan sosial', 'bahasa inggris', 'b. inggris']);
+
+      const canonical13 = [
+        "Al Qur'an Hadis",
+        "Akidah Akhlak",
+        "Fikih",
+        "SKI",
+        "Bahasa Arab",
+        "Pend. Pancasila",
+        "Bahasa Indonesia",
+        "Matematika",
+        "IPAS",
+        "PJOK",
+        "SBDP",
+        "Bahasa Inggris",
+        "Baca Tulis Al Qur'an"
+      ];
+
+      if (isLowerGrade) {
+        // Kelas 1 & 2: Tepat 10 Mata Pelajaran (Tanpa SKI, IPAS, Bahasa Inggris)
+        return canonical13.filter(name => !excludedLower.has(name.toLowerCase()));
+      }
+      // Kelas 3, 4, 5, 6: Tepat 13 Mata Pelajaran
+      return canonical13;
+    }
+
     function buildStudentReportSheetHtml(student, stats, classExams) {
       const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
       const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
       const printDateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
       const homeroom = getHomeroomTeacherForClass(student.class_name);
+      const applicableSubjects = getApplicableSubjectsForStudentClass(student.class_name);
 
-      // Bagian I: Baris Rekapitulasi Nilai Asesmen
-      let examRowsHtml = '';
-      if (stats.examSummaries.length === 0) {
-        examRowsHtml = `<tr><td colspan="8" style="text-align:center; padding:16px; color:#64748b;">Belum ada paket ulangan pada periode ini.</td></tr>`;
-      } else {
-        examRowsHtml = stats.examSummaries.map((e, idx) => {
-          const teacher = getExamTeacher(e.exam);
-          const hasResult = e.result !== null;
-          return `
-            <tr>
-              <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
-              <td style="font-weight:bold;">${escapeHtml(e.exam.subject || '-')}</td>
-              <td>${escapeHtml(e.exam.title || '-')}</td>
-              <td>${escapeHtml(teacher?.full_name || '-')}</td>
-              <td style="text-align:center; font-weight:bold;">${e.kkm}</td>
-              <td style="text-align:center; font-weight:bold; font-size:11px; color:${hasResult ? (e.isPassed ? '#047857' : '#b45309') : '#64748b'};">
-                ${hasResult ? e.score : '-'}
-              </td>
-              <td style="text-align:center;">
-                <span class="pr-pill ${hasResult ? (e.isPassed ? 'pr-pill-emerald' : 'pr-pill-amber') : 'pr-pill-slate'}">
-                  ${hasResult ? (e.isPassed ? 'TUNTAS' : 'REMEDIAL') : 'BELUM ADA'}
-                </span>
-              </td>
-              <td style="font-size:9.5px; color:#334155;">
-                ${escapeHtml(e.notes || (hasResult && !e.isPassed ? 'Perlu bimbingan remedial' : '-'))}
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
+      // Bagian I: Baris Rekapitulasi Nilai Asesmen & Pemetaan Butir Benar/Salah (10 atau 13 Mapel Sesuai Kelas)
+      const examRowsHtml = applicableSubjects.map((subjName, idx) => {
+        const summary = stats.examSummaries.find(e =>
+          String(e.exam?.subject || '').trim().toLowerCase() === subjName.toLowerCase()
+        );
+        const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName);
+        const teacherName = subjTeacher?.full_name || '-';
+        const hasResult = summary && summary.result !== null;
+
+        let kkmVal = summary ? summary.kkm : 70;
+        let scoreVal = '-';
+        let scoreColor = '#64748b';
+        let statusBadge = '<span class="pr-pill pr-pill-slate">BELUM ADA</span>';
+        let correctButirHtml = '<span style="color:#64748b;">-</span>';
+        let missedButirHtml = '<span style="color:#64748b;">-</span>';
+        let notesText = 'Belum ada ulangan tersimpan';
+
+        if (summary && hasResult) {
+          scoreVal = summary.score;
+          scoreColor = summary.isPassed ? '#047857' : '#b45309';
+          statusBadge = `<span class="pr-pill ${summary.isPassed ? 'pr-pill-emerald' : 'pr-pill-amber'}">${summary.isPassed ? 'TUNTAS' : 'REMEDIAL'}</span>`;
+
+          const graded = scoreStudentResponse(summary.exam, summary.result.student_answers);
+          const correctItems = graded.itemResults.filter(i => i.isCorrect);
+          const missedItems = graded.itemResults.filter(i => !i.isCorrect);
+
+          if (correctItems.length > 0) {
+            const numList = correctItems.map(i => i.number).join(', ');
+            correctButirHtml = `<span style="color:#047857; font-weight:700;">No. ${numList}</span> <span style="color:#475569; font-size:8.5px;">(${correctItems.length} butir)</span>`;
+          } else {
+            correctButirHtml = `<span style="color:#b91c1c; font-style:italic;">Tidak ada</span>`;
+          }
+
+          if (missedItems.length > 0) {
+            const numList = missedItems.map(i => i.number).join(', ');
+            missedButirHtml = `<span style="color:#b91c1c; font-weight:700;">No. ${numList}</span> <span style="color:#475569; font-size:8.5px;">(${missedItems.length} butir)</span>`;
+          } else {
+            missedButirHtml = `<span style="color:#047857; font-weight:700;">✓ 100% Benar</span>`;
+          }
+
+          notesText = summary.notes || (summary.isPassed ? 'Tuntas mencapai KKM' : 'Perlu bimbingan remedial pada butir yang belum tuntas');
+        } else if (summary && !hasResult) {
+          notesText = 'Belum mengikuti asesmen';
+        }
+
+        return `
+          <tr>
+            <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+            <td style="font-weight:bold; color:#0f172a;">${escapeHtml(subjName)}</td>
+            <td style="font-size:9.5px; color:#334155;">${escapeHtml(teacherName)}</td>
+            <td style="text-align:center; font-weight:bold;">${kkmVal}</td>
+            <td style="text-align:center; font-weight:bold; font-size:11px; color:${scoreColor};">${scoreVal}</td>
+            <td style="text-align:center;">${statusBadge}</td>
+            <td style="font-size:9px; line-height:1.3;">${correctButirHtml}</td>
+            <td style="font-size:9px; line-height:1.3;">${missedButirHtml}</td>
+            <td style="font-size:9px; color:#334155;">${escapeHtml(notesText)}</td>
+          </tr>
+        `;
+      }).join('');
 
       // Filter ulangan yang sudah diikuti siswa untuk Bagian II, III, dan IV
       const takenExams = stats.examSummaries.filter(e => e.result !== null);
@@ -9971,10 +10488,10 @@
 
         <div style="text-align:center; margin:10px 0 14px;">
           <div style="font-size:13.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#0f172a;">
-            LEMBAR REKAPITULASI HASIL ULANGAN, ANALISIS BUTIR &amp; TINDAK LANJUT SISWA
+            LEMBAR REKAP ANALISIS HASIL ULANGAN
           </div>
           <div style="font-size:10px; color:#475569; margin-top:2px;">
-            Laporan Rekapitulasi Nilai Asesmen, Lembar Jawaban Siswa, Analisis Butir Soal, Serta Program Remedial dan Pengayaan
+            Lembar Rekapitulasi Hasil Ulangan, Pemetaan Butir Soal Benar/Salah, Serta Analisis &amp; Program Remedial Seluruh Mata Pelajaran
           </div>
         </div>
 
@@ -9999,26 +10516,27 @@
 
         <!-- BAGIAN I: REKAPITULASI NILAI & STATUS KETUNTASAN -->
         <div class="pr-block-title">
-          <span>BAGIAN I: REKAPITULASI NILAI ASESMEN &amp; STATUS KETUNTASAN</span>
-          <span style="font-size:9px; font-weight:normal; color:#64748b;">${stats.totalTaken} dari ${stats.totalExams} Ulangan Diikuti</span>
+          <span>BAGIAN I: REKAPITULASI NILAI ASESMEN &amp; STATUS KETUNTASAN (${applicableSubjects.length} MATA PELAJARAN)</span>
+          <span style="font-size:9px; font-weight:normal; color:#64748b;">${stats.totalTaken} dari ${applicableSubjects.length} Mapel Dinilai</span>
         </div>
         <table class="pr-table" style="margin-bottom:12px;">
           <thead>
             <tr>
-              <th style="width:32px; text-align:center;">No</th>
-              <th style="width:130px; text-align:left;">Mata Pelajaran</th>
-              <th style="text-align:left;">Judul Ulangan / Asesmen</th>
-              <th style="width:120px; text-align:left;">Guru Pengampu</th>
-              <th style="width:44px; text-align:center;">KKM</th>
-              <th style="width:50px; text-align:center;">Nilai</th>
-              <th style="width:80px; text-align:center;">Ketuntasan</th>
-              <th style="width:180px; text-align:left;">Catatan / Tindak Lanjut</th>
+              <th style="width:26px; text-align:center;">No</th>
+              <th style="width:125px; text-align:left;">Mata Pelajaran</th>
+              <th style="width:115px; text-align:left;">Guru Pengampu</th>
+              <th style="width:38px; text-align:center;">KKM</th>
+              <th style="width:45px; text-align:center;">Nilai</th>
+              <th style="width:72px; text-align:center;">Ketuntasan</th>
+              <th style="width:140px; text-align:left;">Nomor Butir Benar</th>
+              <th style="width:140px; text-align:left;">Nomor Butir Salah / Remedial</th>
+              <th style="text-align:left;">Catatan Guru / Tindak Lanjut</th>
             </tr>
           </thead>
           <tbody>
             ${examRowsHtml}
             <tr style="background:#f1f5f9; font-weight:800;">
-              <td colspan="5" style="text-align:right; padding:5px 8px;">RATA-RATA NILAI &amp; STATUS KETUNTASAN:</td>
+              <td colspan="4" style="text-align:right; padding:5px 8px;">RATA-RATA NILAI &amp; STATUS KETUNTASAN:</td>
               <td style="text-align:center; font-size:11px; color:${stats.avgScore >= 75 ? '#047857' : '#b45309'};">
                 ${stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '-'}
               </td>
@@ -10027,8 +10545,8 @@
                   ${escapeHtml(stats.overallStatus)}
                 </span>
               </td>
-              <td style="font-size:9px; color:#475569;">
-                ${stats.totalTaken} dari ${stats.totalExams} ulangan diikuti (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)
+              <td colspan="3" style="font-size:9px; color:#475569; padding:5px 8px;">
+                ${stats.totalTaken} dari ${applicableSubjects.length} mapel dinilai (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)
               </td>
             </tr>
           </tbody>
@@ -10120,37 +10638,67 @@
       const dateStr = new Date().toISOString().slice(0, 10);
 
       // Sheet 1: Rekap Nilai Siswa
+      const applicableSubjects = getApplicableSubjectsForStudentClass(stu.class_name);
       const aoaSheet1 = [
-        ['LEMBAR REKAPITULASI HASIL ULANGAN & TINDAK LANJUT SISWA'],
+        ['LEMBAR REKAP ANALISIS HASIL ULANGAN'],
         ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
         ['Tahun Ajaran:', activeYear, 'Semester:', activeSem, 'Tanggal Ekspor:', dateStr],
         [],
         ['Nama Siswa:', stu.full_name, 'NIS/NISN:', stu.nis || '-'],
         ['Kelas:', stu.class_name, 'Jenis Kelamin:', stu.gender === 'P' ? 'Perempuan' : 'Laki-laki'],
         [],
-        ['No', 'Mata Pelajaran', 'Judul Ulangan', 'Guru Pengampu', 'KKM', 'Nilai Siswa', 'Status Ketuntasan', 'Catatan Guru / Remedial']
+        ['No', 'Mata Pelajaran', 'Guru Pengampu', 'KKM', 'Nilai Asesmen', 'Status Ketuntasan', 'Nomor Butir Benar', 'Nomor Butir Salah / Remedial', 'Catatan Guru / Tindak Lanjut']
       ];
 
-      stats.examSummaries.forEach((e, idx) => {
-        const teacherName = getExamTeacher(e.exam)?.full_name || '-';
+      applicableSubjects.forEach((subjName, idx) => {
+        const summary = stats.examSummaries.find(e =>
+          String(e.exam?.subject || '').trim().toLowerCase() === subjName.toLowerCase()
+        );
+        const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName);
+        const teacherName = subjTeacher?.full_name || '-';
+        const hasResult = summary && summary.result !== null;
+
+        let kkmVal = summary ? summary.kkm : 70;
+        let scoreVal = 'Belum Ada';
+        let statusVal = 'Belum Ada';
+        let correctStr = '-';
+        let missedStr = '-';
+        let notesVal = 'Belum ada ulangan tersimpan';
+
+        if (summary && hasResult) {
+          scoreVal = summary.score;
+          statusVal = summary.status;
+          const graded = scoreStudentResponse(summary.exam, summary.result.student_answers);
+          const correctItems = graded.itemResults.filter(i => i.isCorrect);
+          const missedItems = graded.itemResults.filter(i => !i.isCorrect);
+
+          correctStr = correctItems.length > 0 ? ('No. ' + correctItems.map(i => i.number).join(', ') + ` (${correctItems.length} butir)`) : 'Tidak ada';
+          missedStr = missedItems.length > 0 ? ('No. ' + missedItems.map(i => i.number).join(', ') + ` (${missedItems.length} butir)`) : '✓ 100% Benar';
+          notesVal = summary.notes || (summary.isPassed ? 'Tuntas mencapai KKM' : 'Perlu program remedial');
+        } else if (summary && !hasResult) {
+          notesVal = 'Belum mengikuti asesmen';
+        }
+
         aoaSheet1.push([
           idx + 1,
-          e.exam.subject || '-',
-          e.exam.title || '-',
+          subjName,
           teacherName,
-          e.kkm,
-          e.score !== null ? e.score : 'Belum Ada',
-          e.status,
-          e.notes || '-'
+          kkmVal,
+          scoreVal,
+          statusVal,
+          correctStr,
+          missedStr,
+          notesVal
         ]);
       });
 
       aoaSheet1.push([]);
       aoaSheet1.push([
-        '', 'RATA-RATA NILAI', '', '', '',
+        '', 'RATA-RATA NILAI', '', '',
         stats.avgScore > 0 ? stats.avgScore : '-',
         stats.overallStatus,
-        `${stats.totalTaken} dari ${stats.totalExams} ulangan diikuti (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)`
+        '', '',
+        `${stats.totalTaken} dari ${applicableSubjects.length} mapel dinilai (${stats.passedCount} Tuntas, ${stats.remedialCount} Remedial)`
       ]);
 
       // Sheet 2: Rekap Lembar Jawaban Siswa per Butir
@@ -10580,7 +11128,7 @@
       `;
 
       openFormModal({
-        title: `Rekapitulasi Siswa`,
+        title: `Rekap Analisis Hasil Ulangan`,
         subtitle: `${stu.full_name} (${stu.class_name})`,
         icon: 'user-check',
         maxWidthClass: 'max-w-2xl',
