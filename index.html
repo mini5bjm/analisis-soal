@@ -2322,11 +2322,6 @@
       let idType = 'NIP';
 
       if (parts.length >= 3) {
-        return {
-          classAssigned: parts[0],
-          jabatan: normalizeTeacherJabatan(parts[1]),
-          idType: normalizeTeacherIdType(parts[2])
-        };
         classAssigned = parts[0];
         jabatan = normalizeTeacherJabatan(parts[1]);
         idType = normalizeTeacherIdType(parts[2]);
@@ -2335,7 +2330,6 @@
         jabatan = normalizeTeacherJabatan(parts[1]);
         idType = 'NIP';
       }
-      if (parts.length === 2) {
 
       const isWaliKelas = jabatan === 'Wali Kelas' || jabatan === 'Guru Kelas';
       const idNumber = String(teacher?.username || teacher?.nip || '').trim() || '-';
@@ -2413,9 +2407,6 @@
       if (!targetTeacher) {
         const roleTitle = className ? `Wali ${normalizeGradeClass(className)}` : (subject ? `Guru Mapel ${subject}` : 'Wali Kelas');
         return {
-          classAssigned: parts[0],
-          jabatan: normalizeTeacherJabatan(parts[1]),
-          idType: 'NIP'
           name: '(Belum Ditetapkan)',
           roleTitle,
           idType: 'NIP/NUPTK',
@@ -2434,9 +2425,6 @@
       const idLine = hasValidNum ? `${idType}. ${idNum}` : `${idType}: -`;
 
       return {
-        classAssigned: raw || 'Semua Kelas',
-        jabatan: 'Guru Mapel',
-        idType: 'NIP'
         name: targetTeacher.full_name || targetTeacher.username || 'Guru Pengampu',
         roleTitle,
         idType,
@@ -6718,7 +6706,6 @@
       const isNumType = isNumericQuestionType(qType);
       const isMulti = examMeta.isMultiType;
       const showWeightedCol = examMeta.hasWeightedScore;
-      const teacherName = getExamTeacher(exam)?.full_name || '-';
       const examTeacher = getExamTeacher(exam);
       const teacherName = examTeacher?.full_name || '-';
       const classLabel = formatExamClassLabel(exam.class_name);
@@ -6735,11 +6722,6 @@
         ? 'Sebaran / Rata Skor'
         : (isNumType ? 'Rata-rata / Bobot Maks' : (qType === 'BS' ? 'Sebaran Jawaban (B/S)' : 'Sebaran Opsi (A/B/C/D/E)'));
 
-      const printDateStr = new Date().toLocaleDateString('id-ID', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric'
-      });
       const printDateStr = sigConfig.signatureDateStr;
 
       const keyStripHtml = isMulti
@@ -9298,7 +9280,6 @@
         academicSettings: {
           activeAcademicYear: state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR,
           activeSemester: normalizeSemester(state.academicSettings?.activeSemester || DEFAULT_SEMESTER),
-          academicYears: [...(state.academicSettings?.academicYears || DEFAULT_ACADEMIC_YEARS)]
           academicYears: [...(state.academicSettings?.academicYears || DEFAULT_ACADEMIC_YEARS)],
           headmasterName: state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME,
           headmasterNip: state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP,
@@ -9648,11 +9629,9 @@
     }
 
     function getHomeroomTeacherForClass(className) {
-      const norm = String(className || '').trim().toLowerCase();
       const norm = normalizeGradeClass(className).toLowerCase();
       const teacher = (state.teachers || []).find(t => {
         const meta = decodeTeacherMeta(t);
-        return meta.isWaliKelas && String(meta.classAssigned || '').trim().toLowerCase() === norm;
         const isWali = meta.isWaliKelas || meta.jabatan === 'Wali Kelas' || meta.jabatan === 'Guru Kelas';
         const assignedNorm = normalizeGradeClass(meta.classAssigned || '').toLowerCase();
         return isWali && (assignedNorm === norm || String(meta.classAssigned || '').toLowerCase().includes(norm));
@@ -9662,14 +9641,9 @@
         return {
           ...teacher,
           name: teacher.full_name || 'Guru Kelas',
-          nip: meta.idNumber || '-'
           nip: meta.idLine || meta.idNumber || '-'
         };
       }
-      return {
-        name: 'Guru Kelas / Wali Kelas',
-        nip: '-'
-      };
       return null;
     }
 
@@ -10485,8 +10459,6 @@
     function buildStudentReportSheetHtml(student, stats, classExams) {
       const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
       const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
-      const printDateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-      const homeroom = getHomeroomTeacherForClass(student.class_name);
       const sigConfig = getReportSignatureConfig();
       const printDateStr = sigConfig.signatureDateStr;
       const homeroomTeacher = getHomeroomTeacherForClass(student.class_name);
