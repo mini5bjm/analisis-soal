@@ -810,7 +810,7 @@
               <span class="hidden sm:inline" id="sync-status-text">Tersinkron</span>
             </button>
 
-            <div
+            <div id="header-exam-selector-wrap"
               class="hidden md:flex items-center gap-2 bg-slate-100/90 border border-slate-200/80 px-3 py-1.5 rounded-full">
               <i data-lucide="book-open-check" class="w-4 h-4 text-indigo-600 shrink-0"></i>
               <span class="text-xs font-semibold text-slate-500 shrink-0">Ulangan Aktif:</span>
@@ -833,7 +833,7 @@
         </header>
 
         <!-- Mobile Active Exam Selector Bar -->
-        <div
+        <div id="mobile-exam-selector-wrap"
           class="no-print md:hidden px-4 py-2 bg-indigo-50/90 border-b border-indigo-100 flex items-center justify-between gap-2">
           <span class="text-[11px] font-bold text-indigo-800 flex items-center gap-1 shrink-0">
             <i data-lucide="layers" class="w-3.5 h-3.5"></i> Paket:
@@ -1125,6 +1125,7 @@
         students: 1,
         teachers: 1,
         subjects: 1,
+        classes: 1,
         exams: 1,
         inputResults: 1,
         itemAnalysis: 1,
@@ -1138,10 +1139,12 @@
       rekapActiveExamId: null,
       isGuruMenuOpen: true,
       teacherManagementTab: 'mengajar',
+      mapelKelasActiveTab: 'mapel',
       mengajarSelectedClass: 'Kelas 1',
       mengajarSearchQuery: '',
       teachingAssignments: {},
       editingSubjectId: null,
+      editingClassId: null,
       editingStudentId: null,
       editingTeacherId: null,
       editingExamId: null,
@@ -2197,6 +2200,56 @@
       return `55555555-5555-4555-8555-5555555555${String(idx + 1).padStart(2, '0')}`;
     }
 
+    function ensureClassesState() {
+      if (!Array.isArray(state.classes)) state.classes = [];
+      state.classes = state.classes.filter(c => c && c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME);
+
+      const hasOnlyObsolete = state.classes.length > 0 && state.classes.every(c => /^X|^XI|^XII/i.test(c.class_name || ''));
+      if (state.classes.length === 0 || hasOnlyObsolete) {
+        state.classes = GRADE_CLASS_OPTIONS.map((name, idx) => ({
+          id: `22222222-2222-4222-8222-${String(idx + 1).padStart(12, '0')}`,
+          class_name: name,
+          homeroom_teacher: '',
+          student_count: 0
+        }));
+      } else {
+        GRADE_CLASS_OPTIONS.forEach((name, idx) => {
+          if (!state.deletedClassNames?.includes(name) && !state.classes.some(c => (c.class_name || '').toLowerCase() === name.toLowerCase())) {
+            state.classes.push({
+              id: `22222222-2222-4222-8222-${String(idx + 1).padStart(12, '0')}`,
+              class_name: name,
+              homeroom_teacher: '',
+              student_count: 0
+            });
+          }
+        });
+      }
+
+      // Sync homeroom teachers from state.teachers if available
+      if (Array.isArray(state.teachers) && state.teachers.length > 0) {
+        state.classes.forEach(c => {
+          if (!c.homeroom_teacher) {
+            const matchTeacher = state.teachers.find(t => {
+              const meta = decodeTeacherMeta(t);
+              return meta.isWaliKelas && String(meta.assignedGrade || meta.classAssigned || '').trim().toLowerCase() === String(c.class_name || '').trim().toLowerCase();
+            });
+            if (matchTeacher) {
+              c.homeroom_teacher = matchTeacher.full_name || matchTeacher.username || '';
+            }
+          }
+        });
+      }
+    }
+
+    function getAvailableClassNames() {
+      ensureClassesState();
+      const names = (state.classes || [])
+        .filter(c => c && c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME)
+        .map(c => String(c.class_name || '').trim())
+        .filter(Boolean);
+      return sortClassNamesNatural(names.length > 0 ? names : GRADE_CLASS_OPTIONS);
+    }
+
     function normalizeSubjectClasses(rawClasses) {
       let arr = [];
       if (Array.isArray(rawClasses)) {
@@ -2208,17 +2261,18 @@
       if (cleaned.length === 0 || cleaned.some(c => /semua|all/i.test(c))) {
         return ['Semua Kelas'];
       }
+      const availableClasses = getAvailableClassNames();
       const selected = new Set();
       cleaned.forEach(c => {
         const norm = normalizeGradeClass(c);
-        if (GRADE_CLASS_OPTIONS.includes(norm)) {
-          selected.add(norm);
+        if (availableClasses.includes(norm) || availableClasses.includes(c)) {
+          selected.add(availableClasses.find(k => k.toLowerCase() === norm.toLowerCase() || k.toLowerCase() === c.toLowerCase()) || norm);
         }
       });
-      if (selected.size === 0 || selected.size === GRADE_CLASS_OPTIONS.length) {
+      if (selected.size === 0 || selected.size === availableClasses.length) {
         return ['Semua Kelas'];
       }
-      return GRADE_CLASS_OPTIONS.filter(c => selected.has(c));
+      return availableClasses.filter(c => selected.has(c));
     }
 
     /** Gabungkan daftar Mapel Madrasah dari localStorage/tabel DB, beserta informasi kelas dan guru terkait. */
@@ -3889,6 +3943,34 @@
     }
 
     function populateExamSelectors() {
+      const desktopWrap = document.getElementById('header-exam-selector-wrap');
+      const mobileWrap = document.getElementById('mobile-exam-selector-wrap');
+      const isAdmin = isAdminUser();
+
+      if (desktopWrap) {
+        if (isAdmin) {
+          desktopWrap.classList.add('hidden');
+          desktopWrap.classList.remove('md:flex');
+          desktopWrap.style.display = 'none';
+        } else {
+          desktopWrap.classList.remove('hidden');
+          desktopWrap.classList.add('md:flex');
+          desktopWrap.style.display = '';
+        }
+      }
+
+      if (mobileWrap) {
+        if (isAdmin) {
+          mobileWrap.classList.add('hidden');
+          mobileWrap.classList.remove('flex');
+          mobileWrap.style.display = 'none';
+        } else {
+          mobileWrap.classList.remove('hidden');
+          mobileWrap.classList.add('flex');
+          mobileWrap.style.display = '';
+        }
+      }
+
       const desktopSelect = document.getElementById('global-exam-selector');
       const mobileSelect = document.getElementById('mobile-exam-selector');
       const desktopClassEl = document.getElementById('global-exam-class-filter');
@@ -5015,7 +5097,7 @@
         const lockedCls = tRole.assignedGrade;
         classOptions = `<option value="${escapeHtml(lockedCls)}" selected>${escapeHtml(lockedCls)}</option>`;
       } else {
-        const classList = [...GRADE_CLASS_OPTIONS];
+        const classList = [...getAvailableClassNames()];
         if (initClass && !classList.includes(initClass)) classList.unshift(initClass);
         classOptions = `<option value="" ${!initClass ? 'selected' : ''}>-- Pilih Kelas --</option>` + classList.map(cls =>
           `<option value="${escapeHtml(cls)}" ${cls === initClass ? 'selected' : ''}>${escapeHtml(cls)}</option>`
@@ -7680,78 +7762,190 @@
     // ==================== 6. MANAJEMEN MAPEL & KELAS ====================
     function renderManajemenMapelView() {
       if (state.subjects.length === 0) mergeSubjectsState();
+      ensureClassesState();
 
+      const activeTab = state.mapelKelasActiveTab || 'mapel';
       const sortedSubjects = state.subjects.slice();
+      const rawClasses = (state.classes || []).filter(c => c && c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME);
+      const sortedClassNames = sortClassNamesNatural(rawClasses.map(c => c.class_name));
+      const sortedClasses = sortedClassNames.map(name => rawClasses.find(c => c.class_name === name)).filter(Boolean);
+
       const subjPage = paginateItems(sortedSubjects, 'subjects');
+      const clsPage = paginateItems(sortedClasses, 'classes');
 
       return `
       <div class="glass-surface rounded-3xl p-6 md:p-7 space-y-6">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div>
             <div class="flex items-center gap-3 flex-wrap">
               <h3 class="text-lg md:text-xl font-extrabold text-slate-900">Daftar Mapel &amp; Kelas</h3>
               <span class="px-3.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs md:text-sm font-extrabold">${sortedSubjects.length} Mapel</span>
+              <span class="px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs md:text-sm font-extrabold">${sortedClasses.length} Kelas</span>
             </div>
-            <p class="text-xs md:text-sm text-slate-500 mt-1">Kelola daftar mata pelajaran dan penempatan kelasnya (Semua Kelas atau Per Kelas)</p>
+            <p class="text-xs md:text-sm text-slate-500 mt-1">Kelola daftar mata pelajaran madrasah, penempatan kelas, serta manajemen rombel / kelas madrasah</p>
           </div>
 
-          <button type="button" onclick="window.handleOpenAddSubjectModal()"
-            class="px-6 py-3 rounded-full flowora-btn-primary text-white text-sm font-bold flex items-center gap-2 shadow-sm w-fit">
-            <i data-lucide="plus" class="w-[18px] h-[18px]"></i> Tambah Mapel
-          </button>
+          <!-- Segmented Tab Switcher -->
+          <div class="inline-flex p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80 shrink-0">
+            <button type="button" onclick="window.handleSelectMapelKelasTab('mapel')"
+              class="px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${activeTab === 'mapel' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+              <i data-lucide="book-open" class="w-4 h-4"></i>
+              <span>Mata Pelajaran (${sortedSubjects.length})</span>
+            </button>
+            <button type="button" onclick="window.handleSelectMapelKelasTab('kelas')"
+              class="px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${activeTab === 'kelas' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+              <i data-lucide="school" class="w-4 h-4"></i>
+              <span>Daftar Kelas (${sortedClasses.length})</span>
+            </button>
+          </div>
         </div>
 
-        <div class="overflow-x-auto custom-scroll">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="border-b border-slate-200 text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                <th class="py-3.5 px-4 w-16 text-center">No</th>
-                <th class="py-3.5 px-4 text-left">Nama Mata Pelajaran</th>
-                <th class="py-3.5 px-4 text-left">Kelas</th>
-                <th class="py-3.5 px-4 w-32 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 text-sm">
-              ${subjPage.totalItems === 0 ? `
-                <tr><td colspan="4" class="py-14 text-center text-sm text-slate-400">Belum ada mata pelajaran. Klik <strong>+ Tambah Mapel</strong> untuk menambahkan.</td></tr>
-              ` : subjPage.items.map((subj, idx) => {
-        const examCount = state.exams.filter(ex => (ex.subject || '').trim().toLowerCase() === subj.name.toLowerCase()).length;
-        const clsList = normalizeSubjectClasses(subj.classes);
-        const classBadgesHtml = clsList.includes('Semua Kelas')
-          ? `<span class="inline-flex items-center px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-xs font-bold">Semua Kelas (1–6)</span>`
-          : clsList.map(c => `<span class="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold">${escapeHtml(c)}</span>`).join(' ');
+        ${activeTab === 'mapel' ? `
+          <!-- TAB 1: DAFTAR MATA PELAJARAN -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between gap-4">
+              <p class="text-xs md:text-sm text-slate-500">Kelola daftar mata pelajaran dan penempatan kelasnya (Semua Kelas atau Per Kelas)</p>
+              <button type="button" onclick="window.handleOpenAddSubjectModal()"
+                class="px-5 py-2.5 rounded-full flowora-btn-primary text-white text-xs md:text-sm font-bold flex items-center gap-2 shadow-sm shrink-0">
+                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Mapel
+              </button>
+            </div>
 
-        return `
-                <tr class="hover:bg-slate-50/80 transition">
-                  <td class="py-4 px-4 font-bold text-slate-400 text-center text-sm">${subjPage.startIndex + idx + 1}</td>
-                  <td class="py-4 px-4">
-                    <div class="flex items-center gap-2.5 flex-wrap">
-                      <span class="text-[15px] font-extrabold text-slate-900">${escapeHtml(subj.name)}</span>
-                      ${examCount > 0 ? `<span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">${examCount} Paket Ulangan</span>` : ''}
-                    </div>
-                  </td>
-                  <td class="py-4 px-4">
-                    <div class="flex flex-wrap items-center gap-2">${classBadgesHtml}</div>
-                  </td>
-                  <td class="py-4 px-4 text-right whitespace-nowrap">
-                    <div class="inline-flex items-center justify-end gap-1.5">
-                      <button type="button" onclick="window.handleEditSubject('${subj.id}')"
-                        class="p-2 rounded-xl hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit Mapel & Kelas">
-                        <i data-lucide="pencil" class="w-[18px] h-[18px]"></i>
-                      </button>
-                      <button type="button" data-subject="${escapeHtml(subj.name)}" onclick="window.handleDeleteSubject(this.dataset.subject)"
-                        class="p-2 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus Mapel">
-                        <i data-lucide="trash-2" class="w-[18px] h-[18px]"></i>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              `;
-      }).join('')}
-            </tbody>
-          </table>
-        </div>
-        ${renderPaginationBar(subjPage)}
+            <div class="overflow-x-auto custom-scroll">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    <th class="py-3.5 px-4 w-16 text-center">No</th>
+                    <th class="py-3.5 px-4 text-left">Nama Mata Pelajaran</th>
+                    <th class="py-3.5 px-4 text-left">Kelas</th>
+                    <th class="py-3.5 px-4 w-32 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-sm">
+                  ${subjPage.totalItems === 0 ? `
+                    <tr><td colspan="4" class="py-14 text-center text-sm text-slate-400">Belum ada mata pelajaran. Klik <strong>+ Tambah Mapel</strong> untuk menambahkan.</td></tr>
+                  ` : subjPage.items.map((subj, idx) => {
+                    const examCount = state.exams.filter(ex => (ex.subject || '').trim().toLowerCase() === subj.name.toLowerCase()).length;
+                    const clsList = normalizeSubjectClasses(subj.classes);
+                    const classBadgesHtml = clsList.includes('Semua Kelas')
+                      ? `<span class="inline-flex items-center px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-xs font-bold">Semua Kelas</span>`
+                      : clsList.map(c => `<span class="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold">${escapeHtml(c)}</span>`).join(' ');
+
+                    return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                      <td class="py-4 px-4 font-bold text-slate-400 text-center text-sm">${subjPage.startIndex + idx + 1}</td>
+                      <td class="py-4 px-4">
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                          <span class="text-[15px] font-extrabold text-slate-900">${escapeHtml(subj.name)}</span>
+                          ${examCount > 0 ? `<span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">${examCount} Paket Ulangan</span>` : ''}
+                        </div>
+                      </td>
+                      <td class="py-4 px-4">
+                        <div class="flex flex-wrap items-center gap-2">${classBadgesHtml}</div>
+                      </td>
+                      <td class="py-4 px-4 text-right whitespace-nowrap">
+                        <div class="inline-flex items-center justify-end gap-1.5">
+                          <button type="button" onclick="window.handleEditSubject('${subj.id}')"
+                            class="p-2 rounded-xl hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit Mapel & Kelas">
+                            <i data-lucide="pencil" class="w-[18px] h-[18px]"></i>
+                          </button>
+                          <button type="button" data-subject="${escapeHtml(subj.name)}" onclick="window.handleDeleteSubject(this.dataset.subject)"
+                            class="p-2 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus Mapel">
+                            <i data-lucide="trash-2" class="w-[18px] h-[18px]"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+            ${renderPaginationBar(subjPage)}
+          </div>
+        ` : `
+          <!-- TAB 2: DAFTAR KELAS -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between gap-4">
+              <p class="text-xs md:text-sm text-slate-500">Kelola daftar rombongan belajar / kelas madrasah, penetapan wali kelas, serta pantau jumlah siswa &amp; ulangan</p>
+              <button type="button" onclick="window.handleOpenAddClassModal()"
+                class="px-5 py-2.5 rounded-full flowora-btn-primary text-white text-xs md:text-sm font-bold flex items-center gap-2 shadow-sm shrink-0">
+                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Kelas
+              </button>
+            </div>
+
+            <div class="overflow-x-auto custom-scroll">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    <th class="py-3.5 px-4 w-16 text-center">No</th>
+                    <th class="py-3.5 px-4 text-left">Nama Kelas</th>
+                    <th class="py-3.5 px-4 text-left">Wali Kelas</th>
+                    <th class="py-3.5 px-4 text-center">Jumlah Siswa</th>
+                    <th class="py-3.5 px-4 text-center">Paket Ulangan</th>
+                    <th class="py-3.5 px-4 w-32 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-sm">
+                  ${clsPage.totalItems === 0 ? `
+                    <tr><td colspan="6" class="py-14 text-center text-sm text-slate-400">Belum ada kelas. Klik <strong>+ Tambah Kelas</strong> untuk menambahkan rombel baru.</td></tr>
+                  ` : clsPage.items.map((cls, idx) => {
+                    const studentCount = (state.students || []).filter(s => String(s.class_name || '').trim().toLowerCase() === cls.class_name.toLowerCase()).length;
+                    const examCount = (state.exams || []).filter(e => String(e.class_name || '').trim().toLowerCase() === cls.class_name.toLowerCase()).length;
+                    const homeroom = getHomeroomTeacherForClass(cls.class_name);
+                    const homeroomName = homeroom ? (homeroom.full_name || homeroom.username) : (cls.homeroom_teacher || '');
+
+                    return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                      <td class="py-4 px-4 font-bold text-slate-400 text-center text-sm">${clsPage.startIndex + idx + 1}</td>
+                      <td class="py-4 px-4">
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                          <span class="text-[15px] font-extrabold text-slate-900">${escapeHtml(cls.class_name)}</span>
+                        </div>
+                      </td>
+                      <td class="py-4 px-4">
+                        ${homeroomName ? `
+                          <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
+                              ${escapeHtml(homeroomName.charAt(0))}
+                            </span>
+                            <span class="font-bold text-slate-800 text-xs md:text-sm">${escapeHtml(homeroomName)}</span>
+                          </div>
+                        ` : `
+                          <span class="text-xs text-slate-400 italic">Belum ditentukan</span>
+                        `}
+                      </td>
+                      <td class="py-4 px-4 text-center">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold">
+                          ${studentCount} Siswa
+                        </span>
+                      </td>
+                      <td class="py-4 px-4 text-center">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
+                          ${examCount} Ulangan
+                        </span>
+                      </td>
+                      <td class="py-4 px-4 text-right whitespace-nowrap">
+                        <div class="inline-flex items-center justify-end gap-1.5">
+                          <button type="button" onclick="window.handleEditClass('${cls.id}')"
+                            class="p-2 rounded-xl hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit Kelas">
+                            <i data-lucide="pencil" class="w-[18px] h-[18px]"></i>
+                          </button>
+                          <button type="button" data-class-id="${cls.id}" onclick="window.handleDeleteClass(this.dataset.classId)"
+                            class="p-2 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Hapus Kelas">
+                            <i data-lucide="trash-2" class="w-[18px] h-[18px]"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+            ${renderPaginationBar(clsPage)}
+          </div>
+        `}
       </div>
     `;
     }
@@ -7759,6 +7953,7 @@
     function openSubjectFormModal(editingSubject = null) {
       const selectedClasses = editingSubject ? normalizeSubjectClasses(editingSubject.classes) : ['Semua Kelas'];
       const isAllSelected = selectedClasses.includes('Semua Kelas');
+      const availableClasses = getAvailableClassNames();
 
       const bodyHtml = `
         <form onsubmit="window.handleSaveSubject(event)" class="space-y-4">
@@ -7775,13 +7970,13 @@
               <input type="checkbox" id="subj-all-classes" ${isAllSelected ? 'checked' : ''}
                 onchange="window.handleToggleAllSubjectClasses(this.checked)"
                 class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shrink-0" />
-              <span class="text-xs font-extrabold text-indigo-900">Semua Kelas (Kelas 1 – Kelas 6)</span>
+              <span class="text-xs font-extrabold text-indigo-900">Semua Kelas (${availableClasses[0] || 'Kelas 1'} – ${availableClasses[availableClasses.length - 1] || 'Kelas 6'})</span>
             </label>
 
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              ${GRADE_CLASS_OPTIONS.map(cls => {
-        const checked = isAllSelected || selectedClasses.includes(cls);
-        return `
+              ${availableClasses.map(cls => {
+                const checked = isAllSelected || selectedClasses.includes(cls);
+                return `
                 <label class="flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/40 cursor-pointer transition">
                   <input type="checkbox" name="subj-class-chk" value="${escapeHtml(cls)}" ${checked ? 'checked' : ''}
                     onchange="window.handleToggleGradeSubjectClass()"
@@ -7789,7 +7984,7 @@
                   <span class="text-xs font-semibold text-slate-700">${escapeHtml(cls)}</span>
                 </label>
               `;
-      }).join('')}
+              }).join('')}
             </div>
           </div>
 
@@ -7854,13 +8049,14 @@
         return;
       }
 
+      const availableClasses = getAvailableClassNames();
       const isAllChecked = Boolean(document.getElementById('subj-all-classes')?.checked);
       const checkedGrades = Array.from(document.querySelectorAll('input[name="subj-class-chk"]:checked')).map(cb => cb.value);
       if (!isAllChecked && checkedGrades.length === 0) {
         showToast('Pilih minimal satu kelas (atau centang Semua Kelas).', 'warning');
         return;
       }
-      const nextClasses = (isAllChecked || checkedGrades.length === GRADE_CLASS_OPTIONS.length)
+      const nextClasses = (isAllChecked || checkedGrades.length === availableClasses.length)
         ? ['Semua Kelas']
         : normalizeSubjectClasses(checkedGrades);
 
@@ -7967,6 +8163,255 @@
       );
     };
 
+    // ==================== KELAS MANAGEMENT (TAMBAH, EDIT, HAPUS) ====================
+    function openClassFormModal(editingClass = null) {
+      ensureClassesState();
+      const currentTeacher = editingClass ? getHomeroomTeacherForClass(editingClass.class_name) : null;
+      const currentTeacherId = currentTeacher ? currentTeacher.id : '';
+
+      const teacherOptionsHtml = '<option value="">-- Belum Ditentukan / Pilih Nanti --</option>' +
+        (state.teachers || []).map(t => {
+          const isSelected = t.id === currentTeacherId || (editingClass && editingClass.homeroom_teacher && String(t.full_name || '').trim().toLowerCase() === String(editingClass.homeroom_teacher).trim().toLowerCase());
+          const meta = decodeTeacherMeta(t);
+          return `<option value="${t.id}" ${isSelected ? 'selected' : ''}>${escapeHtml(t.full_name)} (${escapeHtml(t.username || '-')}) - ${escapeHtml(meta.jabatan || 'Guru')}</option>`;
+        }).join('');
+
+      const bodyHtml = `
+        <form onsubmit="window.handleSaveClass(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Kelas</label>
+            <input type="text" id="cls-input-name" required placeholder="Contoh: Kelas 1 / Kelas 7 / Kelas 1 A"
+              value="${escapeHtml(editingClass ? editingClass.class_name : '')}"
+              class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <p class="text-[11px] text-slate-400 mt-1">Nama rombongan belajar yang digunakan pada sistem ujian, rekap nilai, dan data siswa.</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Wali Kelas (Opsional)</label>
+            <select id="cls-input-homeroom"
+              class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              ${teacherOptionsHtml}
+            </select>
+            <p class="text-[11px] text-slate-400 mt-1">Guru yang ditetapkan sebagai wali kelas untuk rombel ini.</p>
+          </div>
+
+          <div class="flex items-center gap-2.5 pt-2">
+            <button type="button" onclick="window.closeFormModal()"
+              class="px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition shrink-0">
+              Batal
+            </button>
+            <button type="submit" class="flex-1 py-3 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+              <i data-lucide="save" class="w-4 h-4"></i> ${editingClass ? 'Simpan Perubahan' : 'Simpan Kelas'}
+            </button>
+          </div>
+        </form>
+      `;
+
+      openFormModal({
+        title: editingClass ? 'Edit Kelas' : 'Tambah Kelas',
+        subtitle: editingClass ? 'Perbarui nama rombel dan penetapan wali kelas' : 'Tambahkan rombel/kelas baru madrasah',
+        icon: editingClass ? 'pencil' : 'school',
+        iconClass: editingClass ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600',
+        badgeText: editingClass ? 'Mode Edit' : '',
+        maxWidthClass: 'max-w-md',
+        bodyHtml,
+        focusId: 'cls-input-name'
+      });
+    }
+
+    window.handleOpenAddClassModal = function () {
+      state.editingClassId = null;
+      openClassFormModal(null);
+    };
+
+    window.handleEditClass = function (classId) {
+      ensureClassesState();
+      const target = (state.classes || []).find(c => c.id === classId);
+      if (!target) return;
+      state.editingClassId = classId;
+      openClassFormModal(target);
+    };
+
+    window.handleSaveClass = async function (e) {
+      e.preventDefault();
+      ensureClassesState();
+      const editingId = state.editingClassId;
+      const existingTarget = editingId ? (state.classes || []).find(c => c.id === editingId) : null;
+      const nameInput = document.getElementById('cls-input-name');
+      const cleanName = (nameInput?.value || '').trim();
+
+      if (!cleanName) {
+        showToast('Nama kelas wajib diisi.', 'warning');
+        return;
+      }
+
+      const lower = cleanName.toLowerCase();
+      const duplicate = (state.classes || []).find(c => c && c.class_name && c.class_name.toLowerCase() === lower && (!existingTarget || c.id !== existingTarget.id));
+      if (duplicate) {
+        showToast(`Kelas "${duplicate.class_name}" sudah terdaftar.`, 'warning');
+        return;
+      }
+
+      const teacherSelect = document.getElementById('cls-input-homeroom');
+      const selectedTeacherId = teacherSelect?.value || '';
+      const selectedTeacher = (state.teachers || []).find(t => t.id === selectedTeacherId);
+      const homeroomName = selectedTeacher ? selectedTeacher.full_name : '';
+
+      const submitterBtn = e.submitter || e.target?.querySelector('button[type="submit"]');
+      setButtonLoading(submitterBtn, true, 'Menyimpan...');
+      showActionOverlay({
+        stateType: 'loading',
+        title: existingTarget ? 'Memperbarui Kelas...' : 'Menyimpan Kelas...',
+        subtitle: 'Memperbarui data kelas & sinkronisasi Supabase'
+      });
+
+      try {
+        if (state.deletedClassNames) {
+          state.deletedClassNames = state.deletedClassNames.filter(n => n.toLowerCase() !== cleanName.toLowerCase());
+        }
+        let classRecord;
+        if (existingTarget) {
+          const oldName = existingTarget.class_name;
+          existingTarget.class_name = cleanName;
+          existingTarget.homeroom_teacher = homeroomName;
+          classRecord = existingTarget;
+
+          if (oldName !== cleanName) {
+            // Update referenced students
+            (state.students || []).forEach(s => {
+              if (s.class_name === oldName) {
+                s.class_name = cleanName;
+                if (state.hasStudentsTable === true) {
+                  enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'upsert', record: s });
+                }
+              }
+            });
+            // Update referenced exams
+            (state.exams || []).forEach(ex => {
+              if (ex.class_name === oldName) {
+                ex.class_name = cleanName;
+                enqueuePendingSync({ id: crypto.randomUUID(), table: 'exams', action: 'upsert', record: ex });
+              }
+            });
+            // Update teachers class_assigned
+            (state.teachers || []).forEach(t => {
+              if (t.class_assigned && t.class_assigned.includes(oldName)) {
+                t.class_assigned = t.class_assigned.replace(new RegExp(oldName, 'g'), cleanName);
+                enqueuePendingSync({ id: crypto.randomUUID(), table: 'teachers', action: 'upsert', record: t });
+              }
+            });
+            // Update subjects classes array
+            (state.subjects || []).forEach(subj => {
+              if (Array.isArray(subj.classes)) {
+                subj.classes = subj.classes.map(c => c === oldName ? cleanName : c);
+              }
+            });
+          }
+        } else {
+          classRecord = {
+            id: crypto.randomUUID(),
+            class_name: cleanName,
+            homeroom_teacher: homeroomName,
+            student_count: 0
+          };
+          state.classes.push(classRecord);
+        }
+
+        // If a homeroom teacher was selected, update teacher's role/assignment
+        if (selectedTeacher) {
+          selectedTeacher.jabatan = 'Wali Kelas';
+          const meta = decodeTeacherMeta(selectedTeacher);
+          selectedTeacher.class_assigned = encodeTeacherMeta(cleanName, 'Wali Kelas', meta.idType || 'NIP');
+          enqueuePendingSync({ id: crypto.randomUUID(), table: 'teachers', action: 'upsert', record: selectedTeacher });
+        }
+
+        enqueuePendingSync({ id: crypto.randomUUID(), table: 'classes', action: 'upsert', record: classRecord });
+        saveCacheToStorage();
+        saveSessionToStorage();
+        saveStudentsToStorage();
+        saveSubjectsMetaToStorage();
+
+        updateSyncBadge('syncing');
+        const flushRes = await flushPendingSyncToSupabase();
+        const pendingLeft = getPendingSyncQueue().length;
+        state.lastSyncedAt = new Date();
+        saveCacheToStorage();
+        updateSyncBadge(pendingLeft > 0 ? 'pending' : 'synced');
+
+        state.editingClassId = null;
+        closeFormModal({ resetEditState: false });
+        renderCurrentMenu();
+        showActionOverlay({
+          stateType: 'success',
+          title: existingTarget ? 'Kelas Diperbarui!' : 'Kelas Baru Tersimpan!',
+          subtitle: pendingLeft > 0 ? 'Tersimpan lokal, menunggu sinkronisasi' : 'Tersinkronisasi dengan database Supabase'
+        });
+        await sleep(500);
+        await hideActionOverlay();
+        showToast(existingTarget ? `Kelas "${cleanName}" diperbarui!` : `Kelas "${cleanName}" berhasil ditambahkan!`, 'success');
+      } finally {
+        setButtonLoading(submitterBtn, false);
+      }
+    };
+
+    window.handleDeleteClass = function (classId) {
+      ensureClassesState();
+      const target = (state.classes || []).find(c => c.id === classId);
+      if (!target) return;
+
+      const studentCount = (state.students || []).filter(s => String(s.class_name || '').trim().toLowerCase() === target.class_name.toLowerCase()).length;
+      const examCount = (state.exams || []).filter(e => String(e.class_name || '').trim().toLowerCase() === target.class_name.toLowerCase()).length;
+
+      let warningHtml = `<p>Apakah Anda yakin ingin menghapus kelas <strong>${escapeHtml(target.class_name)}</strong> dari sistem?</p>`;
+      if (studentCount > 0 || examCount > 0) {
+        warningHtml += `
+          <div class="mt-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+            <strong>Perhatian:</strong> Terdapat <strong>${studentCount} data siswa</strong> dan <strong>${examCount} paket ulangan</strong> yang terhubung ke kelas ini.
+          </div>
+        `;
+      }
+
+        openConfirmModal(
+        'Hapus Kelas',
+        warningHtml,
+        async () => {
+          state.deletedClassNames = state.deletedClassNames || [];
+          if (!state.deletedClassNames.includes(target.class_name)) {
+            state.deletedClassNames.push(target.class_name);
+          }
+          if (state.editingClassId === target.id) state.editingClassId = null;
+          state.classes = state.classes.filter(c => c.id !== target.id);
+          enqueuePendingSync({ id: crypto.randomUUID(), table: 'classes', action: 'delete', recordId: target.id });
+          saveCacheToStorage();
+          saveSessionToStorage();
+
+          updateSyncBadge('syncing');
+          const flushRes = await flushPendingSyncToSupabase();
+          state.lastSyncedAt = new Date();
+          saveCacheToStorage();
+          updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+          renderCurrentMenu();
+
+          if (flushRes.fatalError) {
+            showToast('Gagal menghapus di Supabase: ' + flushRes.fatalError.message, 'danger');
+          } else {
+            showToast(`Kelas "${target.class_name}" berhasil dihapus.`, 'info');
+          }
+        },
+        'Ya, Hapus'
+      );
+    };
+
+    window.handleSelectMapelKelasTab = function (tab) {
+      state.mapelKelasActiveTab = tab === 'kelas' ? 'kelas' : 'mapel';
+      renderCurrentMenu();
+    };
+
+    window.navigateMapelKelasSubmenu = function (tab) {
+      state.mapelKelasActiveTab = tab === 'kelas' ? 'kelas' : 'mapel';
+      window.navigateMenu('manajemen_mapel');
+    };
+
     // ==================== 7. MANAJEMEN DATA SISWA ====================
     function renderManajemenSiswaView() {
       const isAdmin = isAdminUser();
@@ -7989,7 +8434,7 @@
       const filterOptionsHtml = isWaliLocked
         ? `<option value="${escapeHtml(tRole.assignedGrade)}" selected>${escapeHtml(tRole.assignedGrade)}</option>`
         : `<option value="ALL" ${classFilter === 'ALL' ? 'selected' : ''}>Semua Kelas</option>` +
-          GRADE_CLASS_OPTIONS.map(c => `<option value="${escapeHtml(c)}" ${classFilter === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+          getAvailableClassNames().map(c => `<option value="${escapeHtml(c)}" ${classFilter === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
 
       const subtitleText = isAdmin
         ? 'Kelola daftar siswa per kelas, NIS/NISN, atau impor massal via Excel (.xlsx)'
@@ -8092,14 +8537,15 @@
     }
 
     function openStudentFormModal(editingStudent = null) {
+      const availableClasses = getAvailableClassNames();
       const teacherGrade = state.currentUser?.role === 'guru' ? decodeTeacherMeta(state.currentUser).classAssigned : '';
-      const defaultStuClass = (state.studentClassFilter && state.studentClassFilter !== 'ALL' && GRADE_CLASS_OPTIONS.includes(state.studentClassFilter))
+      const defaultStuClass = (state.studentClassFilter && state.studentClassFilter !== 'ALL' && availableClasses.includes(state.studentClassFilter))
         ? state.studentClassFilter
-        : (GRADE_CLASS_OPTIONS.includes(teacherGrade) ? teacherGrade : GRADE_CLASS_OPTIONS[0]);
+        : (availableClasses.includes(teacherGrade) ? teacherGrade : (availableClasses[0] || 'Kelas 1'));
       const selectedStuClass = editingStudent ? editingStudent.class_name : defaultStuClass;
-      const stuClassList = selectedStuClass && !GRADE_CLASS_OPTIONS.includes(selectedStuClass)
-        ? [...GRADE_CLASS_OPTIONS, selectedStuClass]
-        : GRADE_CLASS_OPTIONS;
+      const stuClassList = selectedStuClass && !availableClasses.includes(selectedStuClass)
+        ? [...availableClasses, selectedStuClass]
+        : availableClasses;
       const classOptionsHtml = stuClassList.map(c =>
         `<option value="${escapeHtml(c)}" ${c === selectedStuClass ? 'selected' : ''}>${escapeHtml(c)}</option>`
       ).join('');
@@ -8693,7 +9139,7 @@
             <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Kelas</label>
             <select id="mengajar-class-select" onchange="window.handleSelectMengajarClass(this.value)"
               class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-indigo-300 text-xs font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
-              ${GRADE_CLASS_OPTIONS.map(c => `
+              ${getAvailableClassNames().map(c => `
                 <option value="${escapeHtml(c)}" ${c === selectedClass ? 'selected' : ''}>${escapeHtml(c)}</option>
               `).join('')}
             </select>
@@ -10228,7 +10674,23 @@
     }
 
     function getHomeroomTeacherForClass(className) {
+      if (!className) return null;
       const norm = normalizeGradeClass(className).toLowerCase();
+      const rawLower = String(className).trim().toLowerCase();
+
+      const cls = (state.classes || []).find(c => c && (String(c.class_name || '').trim().toLowerCase() === norm || String(c.class_name || '').trim().toLowerCase() === rawLower));
+      if (cls && cls.homeroom_teacher) {
+        const byName = (state.teachers || []).find(t => String(t.full_name || t.username || '').trim().toLowerCase() === String(cls.homeroom_teacher).trim().toLowerCase());
+        if (byName) {
+          const meta = decodeTeacherMeta(byName);
+          return {
+            ...byName,
+            name: byName.full_name || 'Guru Kelas',
+            nip: meta.idLine || meta.idNumber || '-'
+          };
+        }
+      }
+
       const teacher = (state.teachers || []).find(t => {
         const meta = decodeTeacherMeta(t);
         const isWali = meta.isWaliKelas || meta.jabatan === 'Wali Kelas' || meta.jabatan === 'Guru Kelas';
@@ -10254,7 +10716,7 @@
       const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
       const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
 
-      const allAvailableClasses = GRADE_CLASS_OPTIONS;
+      const allAvailableClasses = getAvailableClassNames();
 
       const selectedClass = state.rekapSelectedClass || '';
       const searchQ = (state.rekapSearchQuery || '').trim().toLowerCase();
@@ -10301,7 +10763,7 @@
               </p>
             </div>
             <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
-              ${GRADE_CLASS_OPTIONS.map(c => `
+              ${allAvailableClasses.map(c => `
                 <button type="button" onclick="window.handleRekapSelectClass('${c}')"
                   class="px-4 py-2 rounded-2xl bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 text-xs font-bold transition shadow-sm hover:scale-105 flex items-center gap-1.5">
                   <i data-lucide="folder" class="w-3.5 h-3.5 text-indigo-600"></i> ${escapeHtml(c)}
