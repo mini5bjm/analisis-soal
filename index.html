@@ -2484,17 +2484,50 @@
       return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: 2 };
     }
 
+    function normalizeSubjectKey(name) {
+      let s = String(name || '').toLowerCase().trim();
+      s = s.replace(/[-`']/g, ' ').replace(/\s+/g, ' ');
+      if (s.includes('quran hadis') || s.includes('qur an hadis') || s.includes('al quran') || s.includes('al qur an')) return 'al quran hadis';
+      if (s === 'ski' || s.includes('sejarah kebudayaan islam')) return 'ski';
+      if (s === 'pancasila' || s.includes('pendidikan pancasila') || s.includes('pend pancasila')) return 'pendidikan pancasila';
+      if (s === 'ipas' || s.includes('ilmu pengetahuan alam dan sosial')) return 'ipas';
+      if (s === 'pjok' || s.includes('pendidikan jasmani') || s.includes('penjaskes') || s.includes('penjasorkes')) return 'pjok';
+      if (s === 'sbdp' || s.includes('seni budaya')) return 'sbdp';
+      if (s === 'bahasa inggris' || s === 'b inggris' || s === 'inggris') return 'bahasa inggris';
+      if (s.includes('baca tulis al quran') || s === 'btq' || s === 'bta') return 'baca tulis al quran';
+      if (s.includes('akidah akhlak') || s.includes('aqidah akhlak') || s === 'akidah' || s === 'aqidah') return 'akidah akhlak';
+      if (s === 'fikih' || s === 'fiqih') return 'fikih';
+      if (s === 'bahasa arab' || s === 'b arab') return 'bahasa arab';
+      if (s === 'bahasa indonesia' || s === 'b indonesia') return 'bahasa indonesia';
+      if (s === 'matematika' || s === 'mtk') return 'matematika';
+      return s;
+    }
+
+    function isSameSubject(name1, name2) {
+      if (!name1 || !name2) return false;
+      return normalizeSubjectKey(name1) === normalizeSubjectKey(name2);
+    }
+
     function getTeachingAssignment(className, subjectName) {
       if (!className || !subjectName) return null;
-      const key = `${String(className).trim()}::${String(subjectName).trim()}`;
-      let direct = state.teachingAssignments?.[key];
+      const cleanClass = String(className).trim();
+      const normClass = cleanClass.toLowerCase();
+
+      // 1. Direct key search or alias match in state.teachingAssignments
+      const directKey = `${cleanClass}::${String(subjectName).trim()}`;
+      let direct = state.teachingAssignments?.[directKey];
       if (direct === undefined) {
-        const altSubj = subjectName.includes('-')
-          ? subjectName.replace('Al-Qur', 'Al Qur')
-          : subjectName.replace('Al Qur', 'Al-Qur');
-        const altKey = `${String(className).trim()}::${altSubj.trim()}`;
-        direct = state.teachingAssignments?.[altKey];
+        for (const [k, rec] of Object.entries(state.teachingAssignments || {})) {
+          const parts = k.split('::');
+          if (parts.length >= 2 && parts[0].trim().toLowerCase() === normClass) {
+            if (isSameSubject(parts.slice(1).join('::'), subjectName)) {
+              direct = rec;
+              break;
+            }
+          }
+        }
       }
+
       if (direct !== undefined && direct !== null) {
         if (typeof direct === 'string') {
           if (!direct.trim()) return null;
@@ -2508,40 +2541,55 @@
           const found = state.teachers.find(t => t.id === direct.teacherId);
           if (found) return found;
         }
-        if (direct.teacherName) {
+        if (direct.teacherName && String(direct.teacherName).trim()) {
           const found = state.teachers.find(t => t.full_name.toLowerCase() === String(direct.teacherName).toLowerCase());
           if (found) return found;
           return { id: direct.teacherId || null, full_name: direct.teacherName };
         }
+        return null;
       }
 
-      const lowerClass = String(className).trim().toLowerCase();
-      const normTarget = String(subjectName || '').toLowerCase().replace(/[-`']/g, ' ').replace(/\s+/g, ' ').trim();
+      // 2. Check if this class has any assignments explicitly configured in teachingAssignments
+      const hasClassAssignments = Object.keys(state.teachingAssignments || {}).some(k => {
+        const parts = k.split('::');
+        return parts.length >= 2 && parts[0].trim().toLowerCase() === normClass;
+      });
+      if (hasClassAssignments) {
+        return null;
+      }
 
+      // 3. Lower grade (Kelas 1 or 2) curriculum exclusion for SKI and IPAS
+      const isLowerGrade = /kelas\s*[12]\b/i.test(normClass);
+      const targetKey = normalizeSubjectKey(subjectName);
+      if (isLowerGrade && (targetKey === 'ski' || targetKey === 'ipas')) {
+        return null;
+      }
+
+      // 4. Fallback matching by teacher's class_assigned ('semua kelas' or normClass)
       const matched = state.teachers.find(t => {
         const tClass = String(t.class_assigned || '').trim().toLowerCase();
-        const classMatch = tClass === 'semua kelas' || tClass === lowerClass || tClass.includes(lowerClass);
+        const classMatch = tClass === 'semua kelas' || tClass === normClass || tClass.includes(normClass);
         if (!classMatch) return false;
         const subjects = parseTeacherSubjects(t.subject);
-        return subjects.some(s => String(s || '').toLowerCase().replace(/[-`']/g, ' ').replace(/\s+/g, ' ').trim() === normTarget);
+        return subjects.some(s => isSameSubject(s, subjectName));
       });
       if (matched) return matched;
 
+      // 5. Homeroom teacher fallback
       const homeroom = getHomeroomTeacherForClass(className);
       if (homeroom) {
         const hrSubjects = parseTeacherSubjects(homeroom.subject);
-        if (hrSubjects.some(s => String(s || '').toLowerCase().replace(/[-`']/g, ' ').replace(/\s+/g, ' ').trim() === normTarget)) {
+        if (hrSubjects.some(s => isSameSubject(s, subjectName))) {
           return homeroom;
         }
       }
 
-      return state.teachers.find(t => parseTeacherSubjects(t.subject).some(s => String(s || '').toLowerCase().replace(/[-`']/g, ' ').replace(/\s+/g, ' ').trim() === normTarget)) || null;
+      return null;
     }
 
     function getSubjectTeacher(subjectName, className = '') {
       if (className) {
-        const assigned = getTeachingAssignment(className, subjectName);
-        if (assigned) return assigned;
+        return getTeachingAssignment(className, subjectName);
       }
       const lower = String(subjectName || '').trim().toLowerCase();
       const subj = state.subjects.find(s => s.name.toLowerCase() === lower);
@@ -2549,7 +2597,7 @@
         const found = state.teachers.find(t => t.id === subj.teacher_id);
         if (found) return found;
       }
-      return state.teachers.find(t => parseTeacherSubjects(t.subject).some(n => n.toLowerCase() === lower)) || null;
+      return state.teachers.find(t => parseTeacherSubjects(t.subject).some(n => isSameSubject(n, subjectName))) || null;
     }
 
     function buildTeacherSubjectString(teacherId) {
@@ -5667,7 +5715,7 @@
           if (state.examClassFilter !== 'ALL' && ex.class_name !== state.examClassFilter) return false;
           if (state.examSubjectFilter !== 'ALL' && String(ex.subject || '').toLowerCase() !== state.examSubjectFilter.toLowerCase()) return false;
           if (q) {
-            const teacherObj = state.teachers.find(t => t.id === ex.teacher_id) || getSubjectTeacher(ex.subject);
+            const teacherObj = state.teachers.find(t => t.id === ex.teacher_id) || getSubjectTeacher(ex.subject, ex.class_name);
             const hay = `${ex.title || ''} ${ex.subject || ''} ${ex.class_name || ''} ${teacherObj?.full_name || ''} ${ex.exam_date || ''}`.toLowerCase();
             if (!hay.includes(q)) return false;
           }
@@ -5725,7 +5773,7 @@
             ` : examsPage.items.map(ex => {
         const s = computeExamStatistics(ex);
         const exMeta = s.examMeta || decodeExamMeta(ex);
-        const teacherObj = state.teachers.find(t => t.id === ex.teacher_id) || getSubjectTeacher(ex.subject);
+        const teacherObj = state.teachers.find(t => t.id === ex.teacher_id) || getSubjectTeacher(ex.subject, ex.class_name);
         const isSelected = ex.id === state.activeExamId;
         const isEditingCard = Boolean(editingExam && ex.id === editingExam.id);
         const typeBadgesHtml = exMeta.sections.map(sec => {
@@ -9298,7 +9346,7 @@
 
     window.handleCopyClassAssignments = function (className) {
       const cls = className || state.mengajarSelectedClass || 'Kelas 1';
-      const subjects = getApplicableSubjectsForStudentClass(cls);
+      const subjects = getAllActiveSubjects();
       const rows = [
         `PEMBAGIAN TUGAS GURU MENGAJAR - ${cls.toUpperCase()}`,
         state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME,
@@ -9321,7 +9369,7 @@
 
     window.handlePrintClassAssignments = function (className) {
       const cls = className || state.mengajarSelectedClass || 'Kelas 1';
-      const subjects = getApplicableSubjectsForStudentClass(cls);
+      const subjects = getAllActiveSubjects();
       const year = state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR;
       const sem = state.sessionSemester || DEFAULT_SEMESTER;
       const printWindow = window.open('', '_blank', 'width=850,height=650');
@@ -9389,7 +9437,7 @@
     window.handleExportClassAssignmentsXlsx = function (className) {
       if (!ensureXlsxLoaded()) return;
       const cls = className || state.mengajarSelectedClass || 'Kelas 1';
-      const subjects = getApplicableSubjectsForStudentClass(cls);
+      const subjects = getAllActiveSubjects();
       const activeYear = state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR;
       const activeSem = state.sessionSemester || DEFAULT_SEMESTER;
       const dateStr = new Date().toISOString().slice(0, 10);
@@ -9426,7 +9474,7 @@
 
     function renderPenugasanMengajarHtml() {
       const selectedClass = state.mengajarSelectedClass || 'Kelas 1';
-      const applicableSubjects = getApplicableSubjectsForStudentClass(selectedClass);
+      const applicableSubjects = getAllActiveSubjects();
       const q = String(state.mengajarSearchQuery || '').trim().toLowerCase();
 
       const filteredSubjects = q ? applicableSubjects.filter(subj => {
@@ -10356,45 +10404,6 @@
                     <div id="preview-headmaster-nip" class="text-[11px] text-slate-500">NIP. ${escapeHtml(curHeadmasterNip)}</div>
                   </div>
                   <div class="space-y-1">
-                    <div id="preview-signature-city-date" class="text-slate-500 font-medium">${escapeHtml(curCity)}, ${escapeHtml(formatIndonesianDate(curDate))}</div>
-                    <div class="font-bold text-slate-800">Wali Kelas / Guru Mapel</div>
-                    <div class="h-10"></div>
-                    <div class="font-extrabold text-slate-900 underline">Nama Guru Pengampu</div>
-                    <div class="text-[11px] text-slate-500">Sesuai Jenis ID (NIP / NUPTK / PegID)</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex justify-end pt-2">
-              <button type="submit"
-                class="w-full sm:w-auto py-2.5 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition">
-                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Simpan Pengaturan Identitas &amp; Tanda Tangan
-              </button>
-            </div>
-          </form>
-        </div>
-        `;
-      } else {
-        // activeTab === 'backup'
-        activeContentHtml = `
-        <!-- Card 3: Backup & Restore Data -->
-        <div class="glass-surface rounded-3xl p-6 space-y-5">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="flex items-start gap-3">
-              <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <i data-lucide="database-backup" class="w-5 h-5"></i>
-              </div>
-              <div>
-                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Backup &amp; Restore Data</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Cadangkan seluruh data aplikasi ke file JSON atau pulihkan kembali dari file backup</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
-              <div class="text-xl font-extrabold text-slate-900">${state.teachers.length}</div>
                 <h3 class="text-base md:text-lg font-extrabold text-slate-900">Backup &amp; Restore Data</h3>
                 <p class="text-xs text-slate-500 mt-0.5">Cadangkan seluruh data aplikasi ke file JSON atau pulihkan kembali dari file backup</p>
               </div>
@@ -11359,24 +11368,25 @@
       renderCurrentMenu();
     };
 
-    function getApplicableSubjectsForStudentClass(className) {
-      const deletedSet = new Set((state.deletedSubjectNames || []).map(n => String(n || '').trim().toLowerCase()));
+    const CANONICAL_BASE_SUBJECTS = [
+      "Al Qur'an Hadis",
+      "Akidah Akhlak",
+      "Fikih",
+      "SKI",
+      "Bahasa Arab",
+      "Pend. Pancasila",
+      "Bahasa Indonesia",
+      "Matematika",
+      "IPAS",
+      "PJOK",
+      "SBDP",
+      "Bahasa Inggris",
+      "Baca Tulis Al Qur'an"
+    ];
 
-      const canonicalBase = [
-        "Al Qur'an Hadis",
-        "Akidah Akhlak",
-        "Fikih",
-        "SKI",
-        "Bahasa Arab",
-        "Pend. Pancasila",
-        "Bahasa Indonesia",
-        "Matematika",
-        "IPAS",
-        "PJOK",
-        "SBDP",
-        "Bahasa Inggris",
-        "Baca Tulis Al Qur'an"
-      ];
+    function getAllActiveSubjects() {
+      const deletedSet = new Set((state.deletedSubjectNames || []).map(n => String(n || '').trim().toLowerCase()));
+      const canonicalBase = CANONICAL_BASE_SUBJECTS;
 
       const aliases = {
         "al qur'an hadis": ["al-qur'an hadis", "al qur`an hadis", "al-qur`an hadis", "al quran hadis", "alqur'an hadis"],
@@ -11428,6 +11438,61 @@
       return orderedList;
     }
 
+    function getApplicableSubjectsForStudentClass(className) {
+      const allActive = getAllActiveSubjects();
+      if (!className) return allActive;
+
+      const normClass = String(className).trim().toLowerCase();
+      const isLowerGrade = /kelas\s*[12]\b/i.test(normClass);
+
+      // 1. Ambil ujian yang ada untuk kelas ini
+      const classExams = (state.exams || []).filter(e => {
+        return String(e.class_name || '').trim().toLowerCase() === normClass;
+      });
+
+      // 2. Cek apakah kelas ini sudah dikonfigurasi penugasan mengajarnya
+      const classPrefix = `${normClass}::`;
+      const hasConfiguredAssignments = Object.keys(state.teachingAssignments || {}).some(k => {
+        if (k.toLowerCase().startsWith(classPrefix)) {
+          const rec = state.teachingAssignments[k];
+          return rec && (rec.teacherId || (rec.teacherName && String(rec.teacherName).trim()));
+        }
+        return false;
+      });
+
+      return allActive.filter(subjName => {
+        // A. Jika ada paket ujian tersimpan untuk kelas dan mapel ini, SELALU sertakan
+        const hasExam = classExams.some(e => isSameSubject(e.subject, subjName));
+        if (hasExam) return true;
+
+        // B. Cek penugasan guru mengajar untuk kelas dan mapel ini
+        const assigned = getTeachingAssignment(className, subjName);
+        const hasTeacher = Boolean(assigned && assigned.full_name && String(assigned.full_name).trim() && assigned.full_name !== '-');
+        if (hasTeacher) return true;
+
+        // C. Jika belum ada ujian dan tidak ada guru mengajar:
+        // Jika penugasan mengajar kelas ini sudah diatur oleh admin, maka mapel tanpa guru dikecualikan (tidak dipelajari di kelas ini)
+        if (hasConfiguredAssignments) {
+          return false;
+        }
+
+        // D. Jika penugasan mengajar belum pernah diatur sama sekali:
+        // Hanya mapel kurikulum standar MI yang disertakan secara default (bukan mapel custom SMA tanpa ujian)
+        const isCanonical = CANONICAL_BASE_SUBJECTS.some(c => isSameSubject(c, subjName));
+        if (!isCanonical) return false;
+
+        // Untuk kelas bawah (Kelas 1 & 2), SKI dan IPAS secara kurikulum madrasah (KMA 183/Kurikulum Merdeka) belum diajarkan
+        if (isLowerGrade) {
+          const normKey = normalizeSubjectKey(subjName);
+          if (normKey === 'ski' || normKey === 'ipas') {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
     function buildStudentReportSheetHtml(student, stats, classExams) {
       const activeYear = state.sessionAcademicYear || state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
       const activeSem = normalizeSemester(state.sessionSemester || state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
@@ -11440,7 +11505,7 @@
       // Bagian I: Baris Rekapitulasi Nilai Asesmen & Pemetaan Butir Benar/Salah (10 atau 13 Mapel Sesuai Kelas)
       const examRowsHtml = applicableSubjects.map((subjName, idx) => {
         const summary = stats.examSummaries.find(e =>
-          String(e.exam?.subject || '').trim().toLowerCase() === subjName.toLowerCase()
+          isSameSubject(e.exam?.subject, subjName)
         );
         const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName, student.class_name);
         const teacherName = subjTeacher?.full_name || '-';
@@ -11648,7 +11713,7 @@
 
       applicableSubjects.forEach((subjName, idx) => {
         const summary = stats.examSummaries.find(e =>
-          String(e.exam?.subject || '').trim().toLowerCase() === subjName.toLowerCase()
+          isSameSubject(e.exam?.subject, subjName)
         );
         const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName, stu.class_name);
         const teacherName = subjTeacher?.full_name || '-';
@@ -12029,7 +12094,7 @@
 
       const tableRowsHtml = applicableSubjects.map((subjName, idx) => {
         const summary = stats.examSummaries.find(e =>
-          String(e.exam?.subject || '').trim().toLowerCase() === subjName.toLowerCase()
+          isSameSubject(e.exam?.subject, subjName)
         );
         const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName, stu.class_name);
         const teacherName = subjTeacher?.full_name || '-';
