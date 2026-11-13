@@ -1001,7 +1001,8 @@
       SUBJECTS: 'flowora_subjects_v1',
       STUDENTS: 'flowora_students_v1',
       SETTINGS: 'flowora_academic_settings_v1',
-      LOGIN_LOGS: 'flowora_teacher_login_logs_v1'
+      LOGIN_LOGS: 'flowora_teacher_login_logs_v1',
+      TEACHING_ASSIGNMENTS: 'flowora_teaching_assignments_v1'
     };
 
     const DEFAULT_ACADEMIC_YEAR = '2026/2027';
@@ -1135,6 +1136,10 @@
       rekapSearchQuery: '',
       rekapActiveTab: 'rapor',
       rekapActiveExamId: null,
+      teacherManagementTab: 'mengajar',
+      mengajarSelectedClass: 'Kelas 1',
+      mengajarSearchQuery: '',
+      teachingAssignments: {},
       editingSubjectId: null,
       editingStudentId: null,
       editingTeacherId: null,
@@ -1304,7 +1309,8 @@
           students: state.students,
           deletedSubjectNames: state.deletedSubjectNames,
           activeExamId: state.activeExamId,
-          academicSettings: state.academicSettings
+          academicSettings: state.academicSettings,
+          teachingAssignments: state.teachingAssignments
         }));
       } catch (e) { }
     }
@@ -1323,6 +1329,10 @@
         if (Array.isArray(cached.deletedSubjectNames)) state.deletedSubjectNames = cached.deletedSubjectNames;
         if (cached.activeExamId) state.activeExamId = cached.activeExamId;
         if (cached.academicSettings) applyAcademicSettingsObject(cached.academicSettings, { onlyIfNewer: true, replaceYears: true });
+        if (cached.teachingAssignments && typeof cached.teachingAssignments === 'object') {
+          state.teachingAssignments = { ...state.teachingAssignments, ...cached.teachingAssignments };
+        }
+        loadTeachingAssignmentsFromStorage();
         loadTeacherLoginLogs();
         return true;
       } catch (e) {
@@ -1347,18 +1357,88 @@
     }
 
     // ==================== RIWAYAT LOGIN GURU (REAL-TIME) ====================
+    function sanitizeTeacherLoginLogs(logs = state.teacherLoginLogs) {
+      if (!Array.isArray(logs)) return [];
+      const currentUserId = state.currentUser?.id;
+      const isAdminCurrent = state.currentUser?.role === 'admin';
+      const currentUserUsername = String(state.currentUser?.username || '').trim().toLowerCase();
+
+      let hasChanges = false;
+      const sanitized = logs.map(l => {
+        // Resolve teacher profile from state.teachers
+        const teacherObj = (Array.isArray(state.teachers) && state.teachers.length > 0)
+          ? state.teachers.find(t =>
+            (t.id && l.teacher_id && t.id === l.teacher_id) ||
+            (t.username && l.username && String(t.username).trim().toLowerCase() === String(l.username).trim().toLowerCase()) ||
+            (t.full_name && l.full_name && t.full_name.trim().toLowerCase() === l.full_name.trim().toLowerCase())
+          )
+          : null;
+
+        const effectiveTeacher = teacherObj || {
+          id: l.teacher_id,
+          full_name: l.full_name,
+          username: l.username,
+          class_assigned: l.class_assigned,
+          subject: l.subject
+        };
+
+        const meta = decodeTeacherMeta(effectiveTeacher);
+        let correctedRoleLabel = l.role_label;
+        if (l.role === 'admin' || l.username === 'admin@mini5bjm.sch.id' || l.username === 'admin@sekolah.sch.id') {
+          correctedRoleLabel = 'Administrator';
+        } else if (meta.isWaliKelas) {
+          correctedRoleLabel = meta.assignedGrade ? `Wali ${meta.assignedGrade}` : 'Wali Kelas';
+        } else {
+          correctedRoleLabel = 'Guru Mapel';
+        }
+
+        // Determine real-time ONLINE status:
+        // A session is ONLY "ONLINE" if it corresponds to the currently logged in user!
+        let isOnline = false;
+        if (l.logout_time) {
+          isOnline = false;
+        } else if (isAdminCurrent && (l.role === 'admin' || l.username === 'admin@mini5bjm.sch.id' || (currentUserId && l.teacher_id === currentUserId))) {
+          isOnline = true;
+        } else if (!isAdminCurrent && currentUserId && (l.teacher_id === currentUserId || (l.username && String(l.username).trim().toLowerCase() === currentUserUsername))) {
+          isOnline = true;
+        } else {
+          isOnline = false;
+        }
+
+        const newStatus = isOnline ? 'ONLINE' : 'OFFLINE';
+        if (correctedRoleLabel !== l.role_label || newStatus !== l.status) {
+          hasChanges = true;
+        }
+
+        return {
+          ...l,
+          role_label: correctedRoleLabel,
+          class_assigned: meta.classAssigned || l.class_assigned,
+          subject: effectiveTeacher.subject || l.subject,
+          status: newStatus,
+          logout_time: isOnline ? null : (l.logout_time || new Date().toISOString())
+        };
+      });
+
+      if (hasChanges) {
+        state.teacherLoginLogs = sanitized;
+        saveTeacherLoginLogs();
+      }
+      return sanitized;
+    }
+
     function loadTeacherLoginLogs() {
       try {
         const raw = localStorage.getItem(STORAGE_KEYS.LOGIN_LOGS);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            state.teacherLoginLogs = parsed;
-            return parsed;
+            state.teacherLoginLogs = sanitizeTeacherLoginLogs(parsed);
+            return state.teacherLoginLogs;
           }
         }
       } catch (e) { }
-      const initialLogs = generateInitialLoginLogs();
+      const initialLogs = sanitizeTeacherLoginLogs(generateInitialLoginLogs());
       state.teacherLoginLogs = initialLogs;
       saveTeacherLoginLogs();
       return initialLogs;
@@ -1377,18 +1457,17 @@
       const teachersList = (Array.isArray(state.teachers) && state.teachers.length > 0)
         ? state.teachers
         : [
-          { id: '11111111-1111-4111-8111-111111111101', full_name: 'NUR IKHSANI, S.Pd.I', username: 'nur.ikhsani', class_assigned: 'Kelas 3', subject: 'Pend. Pancasila, Bahasa Indonesia, Matematika' },
+          { id: '11111111-1111-4111-8111-111111111101', full_name: 'NUR IKHSANI, S.Pd.I', username: 'nur.ikhsani', class_assigned: 'Kelas 3', subject: 'Pend. Pancasila, Bahasa Indonesia, Matematika, IPAS, SBDP' },
           { id: '11111111-1111-4111-8111-111111111102', full_name: 'ABDURRAHMAN, S.Pd', username: 'abdurrahman', class_assigned: 'Kelas 6', subject: 'Bahasa Indonesia' },
           { id: '11111111-1111-4111-8111-111111111103', full_name: 'SITI RAHMAH, S.Pd.I', username: 'siti.rahmah', class_assigned: 'Kelas 4', subject: 'Akidah Akhlak, Fikih' },
           { id: '11111111-1111-4111-8111-111111111104', full_name: 'H. AHMAD SYAUQI, S.Pd.I, M.Pd.', username: 'ahmad.syauqi', class_assigned: 'Semua Kelas', subject: 'Al-Qur\'an Hadis' }
         ];
 
       return teachersList.slice(0, 5).map((t, idx) => {
-        const meta = decodeTeacherMeta(t.class_assigned);
-        const roleLabel = meta.isWaliKelas ? `Wali Kelas • ${meta.assignedGrade || 'Kelas'}` : (meta.roleTitle || 'Guru Mapel');
+        const meta = decodeTeacherMeta(t);
+        const roleLabel = meta.isWaliKelas ? (meta.assignedGrade ? `Wali ${meta.assignedGrade}` : 'Wali Kelas') : 'Guru Mapel';
         const minutesAgo = (idx * 14) + 4;
         const loginIso = new Date(now - minutesAgo * 60 * 1000).toISOString();
-        const isOnline = idx < 2;
         return {
           id: `seed-log-${t.id || idx}`,
           teacher_id: t.id,
@@ -1396,13 +1475,13 @@
           username: t.username || 'guru',
           role: 'guru',
           role_label: roleLabel,
-          class_assigned: t.class_assigned || 'Semua Kelas',
+          class_assigned: meta.classAssigned || t.class_assigned || 'Semua Kelas',
           subject: t.subject || 'Semua Mapel',
           academic_year: ay,
           semester: sem,
           login_time: loginIso,
-          logout_time: isOnline ? null : new Date(now - (minutesAgo - 10) * 60 * 1000).toISOString(),
-          status: isOnline ? 'ONLINE' : 'OFFLINE',
+          logout_time: new Date(now - (minutesAgo - 10) * 60 * 1000).toISOString(),
+          status: 'OFFLINE',
           device: idx % 2 === 0 ? 'Desktop • Windows (Chrome)' : 'Mobile • Android (Chrome)'
         };
       });
@@ -1411,10 +1490,10 @@
     function recordTeacherLoginLog(user, selectedAcademicYear, selectedSemester) {
       if (!user) return;
       if (!Array.isArray(state.teacherLoginLogs)) state.teacherLoginLogs = [];
-      const meta = decodeTeacherMeta(user.class_assigned);
+      const meta = decodeTeacherMeta(user);
       const roleLabel = user.role === 'admin'
         ? 'Administrator'
-        : (meta.isWaliKelas ? `Wali Kelas • ${meta.assignedGrade || 'Kelas'}` : (meta.roleTitle || 'Guru Mapel'));
+        : (meta.isWaliKelas ? (meta.assignedGrade ? `Wali ${meta.assignedGrade}` : 'Wali Kelas') : 'Guru Mapel');
 
       const newLog = {
         id: crypto.randomUUID(),
@@ -1423,8 +1502,8 @@
         username: user.username || user.email || 'user',
         role: user.role,
         role_label: roleLabel,
-        class_assigned: user.class_assigned || 'Semua Kelas',
-        subject: user.subject || 'Semua Mapel',
+        class_assigned: meta.classAssigned || user.class_assigned || 'Semua Kelas',
+        subject: user.subject || (user.role === 'admin' ? 'MIS. Nurul Islam Km. 5' : 'Semua Mapel'),
         academic_year: selectedAcademicYear,
         semester: selectedSemester,
         login_time: new Date().toISOString(),
@@ -1433,9 +1512,9 @@
         device: /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile Browser' : 'Desktop (PC / Laptop)'
       };
 
-      // Set previous online log for this user to OFFLINE
+      // Set previous online logs to OFFLINE
       state.teacherLoginLogs.forEach(l => {
-        if (l.teacher_id === user.id && l.status === 'ONLINE') {
+        if (l.status === 'ONLINE') {
           l.status = 'OFFLINE';
           l.logout_time = new Date().toISOString();
         }
@@ -1449,15 +1528,14 @@
     }
 
     function recordTeacherLogoutLog() {
-      if (!state.currentUser || !Array.isArray(state.teacherLoginLogs)) return;
-      const target = state.teacherLoginLogs.find(
-        l => l.teacher_id === state.currentUser?.id && l.status === 'ONLINE'
-      );
-      if (target) {
-        target.status = 'OFFLINE';
-        target.logout_time = new Date().toISOString();
-        saveTeacherLoginLogs();
-      }
+      if (!Array.isArray(state.teacherLoginLogs)) return;
+      state.teacherLoginLogs.forEach(l => {
+        if (!state.currentUser || l.teacher_id === state.currentUser?.id || l.status === 'ONLINE') {
+          l.status = 'OFFLINE';
+          l.logout_time = l.logout_time || new Date().toISOString();
+        }
+      });
+      saveTeacherLoginLogs();
     }
 
     function formatRelativeTime(dateStr) {
@@ -1564,7 +1642,8 @@
           headmasterNip: state.academicSettings.headmasterNip || DEFAULT_HEADMASTER_NIP,
           signatureCity: state.academicSettings.signatureCity || DEFAULT_SIGNATURE_CITY,
           signatureDate: state.academicSettings.signatureDate || '',
-          updatedAt: Number(state.academicSettings.updatedAt || 0)
+          updatedAt: Number(state.academicSettings.updatedAt || 0),
+          teachingAssignments: state.teachingAssignments || {}
         }),
         student_count: 0
       };
@@ -1574,11 +1653,17 @@
       if (!row || typeof row.homeroom_teacher !== 'string') return false;
       try {
         const parsed = JSON.parse(row.homeroom_teacher);
+        let applied = false;
         if (parsed && (parsed.activeAcademicYear || Array.isArray(parsed.academicYears))) {
-          const applied = applyAcademicSettingsObject(parsed, { onlyIfNewer: true, replaceYears: true });
+          applied = applyAcademicSettingsObject(parsed, { onlyIfNewer: true, replaceYears: true });
           if (applied) saveAcademicSettingsToStorage();
-          return applied;
         }
+        if (parsed && parsed.teachingAssignments && typeof parsed.teachingAssignments === 'object') {
+          state.teachingAssignments = { ...parsed.teachingAssignments, ...state.teachingAssignments };
+          saveTeachingAssignmentsToStorage();
+          applied = true;
+        }
+        return applied;
       } catch (e) { }
       return false;
     }
@@ -2217,7 +2302,122 @@
       saveSubjectsMetaToStorage();
     }
 
-    function getSubjectTeacher(subjectName) {
+    function loadTeachingAssignmentsFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.TEACHING_ASSIGNMENTS);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            state.teachingAssignments = { ...state.teachingAssignments, ...parsed };
+          }
+        }
+      } catch (e) { }
+    }
+
+    function saveTeachingAssignmentsToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.TEACHING_ASSIGNMENTS, JSON.stringify(state.teachingAssignments || {}));
+      } catch (e) { }
+    }
+
+    function getSubjectCurriculumMeta(subjName, className = '') {
+      const isLower = /kelas\s*[12]\b/i.test(String(className || ''));
+      const s = String(subjName || '').toLowerCase().trim();
+
+      if (s.includes("qur'an hadis") || s.includes("quran hadits") || s.includes("al-qur'an") || s.includes("quran")) {
+        return { induk: 'PAI', kelompok: 'Umum', jurusan: 'UMUM', jtm: 2 };
+      }
+      if (s.includes('akidah') || s.includes('aqidah')) {
+        return { induk: 'PAI', kelompok: 'Umum', jurusan: 'UMUM', jtm: 2 };
+      }
+      if (s.includes('fikih') || s.includes('fiqih')) {
+        return { induk: 'PAI', kelompok: 'Umum', jurusan: 'UMUM', jtm: 2 };
+      }
+      if (s.includes('ski') || s.includes('sejarah kebudayaan')) {
+        return { induk: 'PAI', kelompok: 'Umum', jurusan: 'UMUM', jtm: isLower ? '-' : 2 };
+      }
+      if (s.includes('bahasa arab') || s.includes('b. arab') || s.includes('arab')) {
+        return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: 2 };
+      }
+      if (s.includes('pancasila') || s.includes('pkn') || s.includes('pend. pancasila') || s.includes('pendidikan pancasila')) {
+        return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: 4 };
+      }
+      if (s.includes('bahasa indonesia') || s.includes('b. indonesia') || s.includes('indonesia')) {
+        return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: isLower ? 7 : 6 };
+      }
+      if (s.includes('matematika') || s.includes('mtk')) {
+        return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: isLower ? 6 : 5 };
+      }
+      if (s.includes('ipas') || s.includes('alam dan sosial') || s.includes('ipa') || s.includes('ips')) {
+        return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: isLower ? '-' : 5 };
+      }
+      if (s.includes('pjok') || s.includes('penjas') || s.includes('jasmani')) {
+        return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: 4 };
+      }
+      if (s.includes('sbdp') || s.includes('seni') || s.includes('budaya')) {
+        return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: 3 };
+      }
+      if (s.includes('inggris')) {
+        return { induk: '-', kelompok: 'Muatan Lokal', jurusan: 'UMUM', jtm: isLower ? '-' : 2 };
+      }
+      if (s.includes('baca tulis') || s.includes('bta')) {
+        return { induk: '-', kelompok: 'Muatan Lokal', jurusan: 'UMUM', jtm: 2 };
+      }
+      return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: 2 };
+    }
+
+    function getTeachingAssignment(className, subjectName) {
+      if (!className || !subjectName) return null;
+      const key = `${String(className).trim()}::${String(subjectName).trim()}`;
+      const direct = state.teachingAssignments?.[key];
+      if (direct !== undefined && direct !== null) {
+        if (typeof direct === 'string') {
+          if (!direct.trim()) return null;
+          const found = state.teachers.find(t => t.id === direct || t.full_name === direct);
+          return found || { id: null, full_name: direct };
+        }
+        if (direct.teacherId === null && (!direct.teacherName || direct.teacherName === '')) {
+          return null;
+        }
+        if (direct.teacherId) {
+          const found = state.teachers.find(t => t.id === direct.teacherId);
+          if (found) return found;
+        }
+        if (direct.teacherName) {
+          const found = state.teachers.find(t => t.full_name.toLowerCase() === String(direct.teacherName).toLowerCase());
+          if (found) return found;
+          return { id: direct.teacherId || null, full_name: direct.teacherName };
+        }
+      }
+
+      const lowerClass = String(className).trim().toLowerCase();
+      const lowerSubj = String(subjectName).trim().toLowerCase();
+
+      const matched = state.teachers.find(t => {
+        const tClass = String(t.class_assigned || '').trim().toLowerCase();
+        const classMatch = tClass === 'semua kelas' || tClass === lowerClass || tClass.includes(lowerClass);
+        if (!classMatch) return false;
+        const subjects = parseTeacherSubjects(t.subject);
+        return subjects.some(s => s.toLowerCase() === lowerSubj);
+      });
+      if (matched) return matched;
+
+      const homeroom = getHomeroomTeacherForClass(className);
+      if (homeroom) {
+        const hrSubjects = parseTeacherSubjects(homeroom.subject);
+        if (hrSubjects.some(s => s.toLowerCase() === lowerSubj)) {
+          return homeroom;
+        }
+      }
+
+      return state.teachers.find(t => parseTeacherSubjects(t.subject).some(s => s.toLowerCase() === lowerSubj)) || null;
+    }
+
+    function getSubjectTeacher(subjectName, className = '') {
+      if (className) {
+        const assigned = getTeachingAssignment(className, subjectName);
+        if (assigned) return assigned;
+      }
       const lower = String(subjectName || '').trim().toLowerCase();
       const subj = state.subjects.find(s => s.name.toLowerCase() === lower);
       if (subj?.teacher_id) {
@@ -2308,7 +2508,7 @@
 
     /** Decode kelas ampuan, jabatan, dan jenis ID dari object guru atau user aktif. */
     function decodeTeacherMeta(teacher) {
-      const raw = String(teacher?.class_assigned || '').trim();
+      const raw = String(typeof teacher === 'string' ? teacher : (teacher?.class_assigned || teacher?.role || '')).trim();
       const parts = raw.split('|').map(p => p.trim()).filter(Boolean);
       let classAssigned = raw || 'Semua Kelas';
       let jabatan = 'Guru Mapel';
@@ -2322,17 +2522,42 @@
         classAssigned = parts[0];
         jabatan = normalizeTeacherJabatan(parts[1]);
         idType = 'NIP';
+      } else {
+        classAssigned = parts[0] || 'Semua Kelas';
+        const normGrade = normalizeGradeClass(classAssigned);
+        const subjStr = String(typeof teacher === 'object' ? (teacher?.subject || '') : '').toLowerCase();
+        const hasThematicSubjects = (subjStr.includes('bahasa indonesia') && subjStr.includes('matematika')) || (subjStr.includes('pancasila') && subjStr.includes('sbdp')) || parseTeacherSubjects(subjStr).length >= 3;
+        const isExplicitWali = /wali|guru kelas/i.test(raw) || /wali|guru kelas/i.test(String(teacher?.role || '')) || /wali|guru kelas/i.test(String(teacher?.jabatan || ''));
+        const hasSpecificGrade = normGrade && GRADE_CLASS_OPTIONS.includes(normGrade);
+
+        if (isExplicitWali || hasSpecificGrade || hasThematicSubjects) {
+          jabatan = 'Wali Kelas';
+        } else {
+          jabatan = 'Guru Mapel';
+        }
+        idType = 'NIP';
       }
 
       const isWaliKelas = jabatan === 'Wali Kelas' || jabatan === 'Guru Kelas';
       const idNumber = String(teacher?.username || teacher?.nip || '').trim() || '-';
+      const cleanClassAssigned = normalizeTeacherClass(classAssigned);
+      let assignedGrade = normalizeGradeClass(cleanClassAssigned) || (GRADE_CLASS_OPTIONS.includes(normalizeGradeClass(classAssigned)) ? normalizeGradeClass(classAssigned) : null);
+
+      if (!assignedGrade && isWaliKelas && Array.isArray(state.classes)) {
+        const teacherName = String(typeof teacher === 'object' ? (teacher?.full_name || teacher?.username || '') : '').trim().toLowerCase();
+        if (teacherName) {
+          const matchCls = state.classes.find(c => c.homeroom_teacher && String(c.homeroom_teacher).trim().toLowerCase() === teacherName);
+          if (matchCls) assignedGrade = normalizeGradeClass(matchCls.class_name);
+        }
+      }
 
       return {
-        classAssigned,
+        classAssigned: cleanClassAssigned,
         jabatan,
         idType,
         idNumber,
-        isWaliKelas
+        isWaliKelas,
+        assignedGrade
       };
     }
 
@@ -4462,9 +4687,11 @@
     }
 
     function renderDashboardLoginHistoryHtml() {
-      const logs = (Array.isArray(state.teacherLoginLogs) && state.teacherLoginLogs.length > 0)
-        ? state.teacherLoginLogs
-        : loadTeacherLoginLogs();
+      const logs = sanitizeTeacherLoginLogs(
+        (Array.isArray(state.teacherLoginLogs) && state.teacherLoginLogs.length > 0)
+          ? state.teacherLoginLogs
+          : loadTeacherLoginLogs()
+      );
 
       const onlineCount = logs.filter(l => l.status === 'ONLINE').length;
       const todayCount = logs.length;
@@ -5005,7 +5232,7 @@
           if (state.examSubjectFilter !== 'ALL' && !subjectList.some(s => s.toLowerCase() === state.examSubjectFilter.toLowerCase())) {
             state.examSubjectFilter = 'ALL';
           }
-          subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>-- Pilih Mapel --</option>` +
+          subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>Semua Mapel</option>` +
             subjectList.map(subj => `<option value="${escapeHtml(subj)}" ${subj.toLowerCase() === state.examSubjectFilter.toLowerCase() ? 'selected' : ''}>${escapeHtml(subj)}</option>`).join('');
         } else {
           const examsForSubjects = state.examClassFilter === 'ALL'
@@ -5016,7 +5243,7 @@
           if (state.examSubjectFilter !== 'ALL' && !subjectChoices.some(s => s.toLowerCase() === state.examSubjectFilter.toLowerCase())) {
             state.examSubjectFilter = 'ALL';
           }
-          subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>-- Pilih Mapel --</option>` +
+          subjectFilterOptionsHtml = `<option value="ALL" ${state.examSubjectFilter === 'ALL' ? 'selected' : ''}>Semua Mapel</option>` +
             subjectChoices.map(subj => `<option value="${escapeHtml(subj)}" ${subj.toLowerCase() === state.examSubjectFilter.toLowerCase() ? 'selected' : ''}>${escapeHtml(subj)}</option>`).join('');
         }
 
@@ -6602,7 +6829,7 @@
 
     function getExamTeacher(exam) {
       if (!exam) return null;
-      return state.teachers.find(t => t.id === exam.teacher_id) || getSubjectTeacher(exam.subject) || null;
+      return state.teachers.find(t => t.id === exam.teacher_id) || getSubjectTeacher(exam.subject, exam.class_name) || null;
     }
 
     function formatWeakQuestionsLabel(exam, examMeta, rawStudentAns) {
@@ -8150,10 +8377,386 @@
       showToast(`Berhasil mengekspor ${list.length} data siswa ke Excel!`, 'success');
     };
 
-    // ==================== 8. MANAJEMEN DATA GURU (KHUSUS ADMIN) ====================
-    function renderManajemenGuruView() {
-      if (state.subjects.length === 0) mergeSubjectsState();
+    // ==================== 8. MANAJEMEN DATA GURU & PEMBAGIAN MENGAJAR (KHUSUS ADMIN) ====================
+    window.switchTeacherTab = function (tab) {
+      state.teacherManagementTab = tab === 'akun' ? 'akun' : 'mengajar';
+      renderCurrentMenu();
+    };
 
+    window.handleSelectMengajarTingkat = function (tingkat) {
+      const map = { 'I': 'Kelas 1', 'II': 'Kelas 2', 'III': 'Kelas 3', 'IV': 'Kelas 4', 'V': 'Kelas 5', 'VI': 'Kelas 6' };
+      state.mengajarSelectedClass = map[tingkat] || 'Kelas 1';
+      renderCurrentMenu();
+    };
+
+    window.handleSelectMengajarClass = function (className) {
+      state.mengajarSelectedClass = className || 'Kelas 1';
+      renderCurrentMenu();
+    };
+
+    window.handleSearchMengajar = function (query) {
+      state.mengajarSearchQuery = query || '';
+      renderCurrentMenu();
+    };
+
+    window.handleAssignTeacherToClassMapel = async function (className, subjectName, teacherIdOrName) {
+      if (!className || !subjectName) return;
+      const key = `${String(className).trim()}::${String(subjectName).trim()}`;
+      if (!teacherIdOrName) {
+        window.handleRemoveTeacherFromClassMapel(className, subjectName);
+        return;
+      }
+      const teacher = state.teachers.find(t => t.id === teacherIdOrName || t.full_name.toLowerCase() === String(teacherIdOrName).toLowerCase());
+      state.teachingAssignments[key] = {
+        teacherId: teacher ? teacher.id : null,
+        teacherName: teacher ? teacher.full_name : teacherIdOrName,
+        updatedAt: Date.now()
+      };
+      saveTeachingAssignmentsToStorage();
+      saveCacheToStorage();
+
+      if (!IS_PREVIEW && supabase) {
+        state.academicSettings.updatedAt = Date.now();
+        saveAcademicSettingsToStorage();
+        enqueuePendingSync({
+          id: crypto.randomUUID(),
+          table: 'classes',
+          action: 'upsert',
+          record: buildAcademicConfigRow()
+        });
+        updateSyncBadge('syncing');
+        flushPendingSyncToSupabase().then(() => {
+          updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+        });
+      }
+
+      showToast(`${teacher ? teacher.full_name : teacherIdOrName} ditetapkan mengajar ${subjectName} (${className}).`, 'success');
+      renderCurrentMenu();
+    };
+
+    window.handleRemoveTeacherFromClassMapel = async function (className, subjectName) {
+      if (!className || !subjectName) return;
+      const key = `${String(className).trim()}::${String(subjectName).trim()}`;
+      state.teachingAssignments[key] = {
+        teacherId: null,
+        teacherName: '',
+        updatedAt: Date.now()
+      };
+      saveTeachingAssignmentsToStorage();
+      saveCacheToStorage();
+
+      if (!IS_PREVIEW && supabase) {
+        state.academicSettings.updatedAt = Date.now();
+        saveAcademicSettingsToStorage();
+        enqueuePendingSync({
+          id: crypto.randomUUID(),
+          table: 'classes',
+          action: 'upsert',
+          record: buildAcademicConfigRow()
+        });
+        updateSyncBadge('syncing');
+        flushPendingSyncToSupabase().then(() => {
+          updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+        });
+      }
+
+      showToast(`Penugasan guru untuk ${subjectName} (${className}) telah dihapus.`, 'info');
+      renderCurrentMenu();
+    };
+
+    window.handleCopyClassAssignments = function (className) {
+      const cls = className || state.mengajarSelectedClass || 'Kelas 1';
+      const subjects = getApplicableSubjectsForStudentClass(cls);
+      const rows = [
+        `PEMBAGIAN TUGAS GURU MENGAJAR - ${cls.toUpperCase()}`,
+        `MIS. NURUL ISLAM KM. 5 BANJARMASIN`,
+        `Tahun Ajaran: ${state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR} • Semester: ${state.sessionSemester || DEFAULT_SEMESTER}`,
+        '',
+        `No\tMata Pelajaran\tInduk\tKelompok\tJurusan\tJTM\tGuru Pengampu`
+      ];
+      subjects.forEach((subj, idx) => {
+        const meta = getSubjectCurriculumMeta(subj, cls);
+        const assigned = getTeachingAssignment(cls, subj);
+        const teacherName = assigned?.full_name || '-';
+        rows.push(`${idx + 1}\t${subj}\t${meta.induk}\t${meta.kelompok}\t${meta.jurusan}\t${meta.jtm}\t${teacherName}`);
+      });
+      navigator.clipboard.writeText(rows.join('\n')).then(() => {
+        showToast(`Tabel penugasan mengajar ${cls} berhasil disalin ke clipboard!`, 'success');
+      }).catch(() => {
+        showToast('Gagal menyalin ke clipboard.', 'warning');
+      });
+    };
+
+    window.handlePrintClassAssignments = function (className) {
+      const cls = className || state.mengajarSelectedClass || 'Kelas 1';
+      const subjects = getApplicableSubjectsForStudentClass(cls);
+      const year = state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const sem = state.sessionSemester || DEFAULT_SEMESTER;
+      const printWindow = window.open('', '_blank', 'width=850,height=650');
+      if (!printWindow) {
+        showToast('Izinkan pop-up peramban untuk mencetak penugasan mengajar.', 'warning');
+        return;
+      }
+      const rowsHtml = subjects.map((subj, idx) => {
+        const meta = getSubjectCurriculumMeta(subj, cls);
+        const assigned = getTeachingAssignment(cls, subj);
+        const teacherName = assigned?.full_name || '-';
+        return `
+          <tr>
+            <td style="text-align:center; padding:6px; border:1px solid #cbd5e1;">${idx + 1}</td>
+            <td style="padding:6px 10px; border:1px solid #cbd5e1; font-weight:600;">${escapeHtml(subj)}</td>
+            <td style="text-align:center; padding:6px; border:1px solid #cbd5e1;">${escapeHtml(meta.induk)}</td>
+            <td style="text-align:center; padding:6px; border:1px solid #cbd5e1;">${escapeHtml(meta.kelompok)}</td>
+            <td style="text-align:center; padding:6px; border:1px solid #cbd5e1;">${escapeHtml(meta.jurusan)}</td>
+            <td style="text-align:center; padding:6px; border:1px solid #cbd5e1;">${meta.jtm}</td>
+            <td style="padding:6px 10px; border:1px solid #cbd5e1;">${escapeHtml(teacherName)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Penugasan Mengajar - ${cls}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #1e293b; padding: 24px; }
+            h2 { margin: 0 0 4px; font-size: 16px; text-transform: uppercase; }
+            p { margin: 2px 0 16px; color: #64748b; font-size: 11px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+            th { background: #f8fafc; font-weight: 700; font-size: 11px; text-transform: uppercase; border: 1px solid #cbd5e1; padding: 8px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h2>Penugasan Guru Mengajar • ${escapeHtml(cls)}</h2>
+          <p>MIS. Nurul Islam Km. 5 Banjarmasin &bull; Tahun Ajaran: ${escapeHtml(year)} &bull; Semester: ${escapeHtml(sem)}</p>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40px;">No</th>
+                <th>Mata Pelajaran</th>
+                <th style="width:60px;">Induk</th>
+                <th style="width:90px;">Kelompok</th>
+                <th style="width:70px;">Jurusan</th>
+                <th style="width:50px;">JTM</th>
+                <th>Guru Pengampu</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <script>
+            window.onload = function() { window.print(); }
+          <\/script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    };
+
+    window.handleExportClassAssignmentsXlsx = function (className) {
+      if (!ensureXlsxLoaded()) return;
+      const cls = className || state.mengajarSelectedClass || 'Kelas 1';
+      const subjects = getApplicableSubjectsForStudentClass(cls);
+      const activeYear = state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = state.sessionSemester || DEFAULT_SEMESTER;
+      const dateStr = new Date().toISOString().slice(0, 10);
+
+      const aoa = [
+        ['PEMBAGIAN TUGAS GURU MENGAJAR'],
+        ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
+        ['Kelas / Tingkat:', cls, 'Tahun Ajaran:', activeYear, 'Semester:', activeSem],
+        [],
+        ['No', 'Mata Pelajaran', 'Induk', 'Kelompok', 'Jurusan', 'JTM', 'Guru Pengampu']
+      ];
+
+      subjects.forEach((subj, idx) => {
+        const meta = getSubjectCurriculumMeta(subj, cls);
+        const assigned = getTeachingAssignment(cls, subj);
+        const teacherName = assigned?.full_name || '-';
+        aoa.push([
+          idx + 1,
+          subj,
+          meta.induk,
+          meta.kelompok,
+          meta.jurusan,
+          meta.jtm,
+          teacherName
+        ]);
+      });
+
+      const cleanClass = cls.replace(/[^a-zA-Z0-9_-]/g, '_');
+      downloadXlsxWorkbook(`Penugasan_Mengajar_${cleanClass}_${dateStr}.xlsx`, [
+        { name: `Mengajar ${cls}`, aoa, colWidths: [6, 28, 12, 16, 12, 8, 30] }
+      ]);
+      showToast(`Berhasil mengekspor penugasan mengajar ${cls} ke Excel!`, 'success');
+    };
+
+    function renderPenugasanMengajarHtml() {
+      const CLASS_TO_ROMAN = { 'Kelas 1': 'I', 'Kelas 2': 'II', 'Kelas 3': 'III', 'Kelas 4': 'IV', 'Kelas 5': 'V', 'Kelas 6': 'VI' };
+      const selectedClass = state.mengajarSelectedClass || 'Kelas 1';
+      const currentTingkat = CLASS_TO_ROMAN[selectedClass] || 'I';
+
+      const applicableSubjects = getApplicableSubjectsForStudentClass(selectedClass);
+      const q = String(state.mengajarSearchQuery || '').trim().toLowerCase();
+
+      const filteredSubjects = q ? applicableSubjects.filter(subj => {
+        const meta = getSubjectCurriculumMeta(subj, selectedClass);
+        const assigned = getTeachingAssignment(selectedClass, subj);
+        const teacherName = assigned?.full_name || '';
+        const hay = `${subj} ${meta.induk} ${meta.kelompok} ${meta.jurusan} ${teacherName}`.toLowerCase();
+        return hay.includes(q);
+      }) : applicableSubjects;
+
+      const totalCount = applicableSubjects.length;
+      const assignedCount = applicableSubjects.filter(s => {
+        const a = getTeachingAssignment(selectedClass, s);
+        return Boolean(a && a.full_name);
+      }).length;
+
+      return `
+      <div class="glass-surface rounded-3xl p-6 space-y-5">
+        <!-- Filter Tingkat & Kelas (Format ARD Kemenag) -->
+        <div class="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Tingkat</label>
+              <select id="mengajar-tingkat-select" onchange="window.handleSelectMengajarTingkat(this.value)"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                <option value="I" ${currentTingkat === 'I' ? 'selected' : ''}>I</option>
+                <option value="II" ${currentTingkat === 'II' ? 'selected' : ''}>II</option>
+                <option value="III" ${currentTingkat === 'III' ? 'selected' : ''}>III</option>
+                <option value="IV" ${currentTingkat === 'IV' ? 'selected' : ''}>IV</option>
+                <option value="V" ${currentTingkat === 'V' ? 'selected' : ''}>V</option>
+                <option value="VI" ${currentTingkat === 'VI' ? 'selected' : ''}>VI</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Kelas</label>
+              <select id="mengajar-class-select" onchange="window.handleSelectMengajarClass(this.value)"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-indigo-300 text-xs font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                ${GRADE_CLASS_OPTIONS.map(c => `
+                  <option value="${escapeHtml(c)}" ${c === selectedClass ? 'selected' : ''}>${escapeHtml(c)}</option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toolbar: Copy, Print, Excel & Search -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="window.handleCopyClassAssignments('${escapeHtml(selectedClass)}')"
+              class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 border border-slate-300 shadow-2xs transition active:scale-95"
+              title="Salin penugasan mengajar ${escapeHtml(selectedClass)} ke clipboard">
+              <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-600"></i> Copy
+            </button>
+            <button type="button" onclick="window.handlePrintClassAssignments('${escapeHtml(selectedClass)}')"
+              class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 border border-slate-300 shadow-2xs transition active:scale-95"
+              title="Cetak lembar pembagian tugas mengajar">
+              <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-600"></i> Print
+            </button>
+            <button type="button" onclick="window.handleExportClassAssignmentsXlsx('${escapeHtml(selectedClass)}')"
+              class="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center gap-1.5 border border-emerald-300 shadow-2xs transition active:scale-95"
+              title="Unduh tabel penugasan mengajar (.xlsx)">
+              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i> Excel
+            </button>
+            <span class="text-xs text-slate-400 font-semibold ml-2">Show ${filteredSubjects.length} entries</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-bold text-slate-500 whitespace-nowrap">Search:</label>
+            <div class="relative">
+              <input type="text" id="mengajar-search" value="${escapeHtml(state.mengajarSearchQuery || '')}"
+                oninput="window.handleSearchMengajar(this.value)"
+                placeholder="Cari mapel atau guru..."
+                class="w-48 sm:w-60 px-3 py-1.5 pr-8 rounded-xl border border-slate-300 bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs" />
+              ${state.mengajarSearchQuery ? `
+                <button type="button" onclick="window.handleSearchMengajar('')" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabel Penugasan Guru Mengajar (Sesuai Format ARD Kemenag) -->
+        <div class="overflow-x-auto custom-scroll border border-slate-200/90 rounded-2xl bg-white shadow-2xs">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 text-center tracking-wider">
+                <th class="py-3.5 px-3 w-12 text-center">No</th>
+                <th class="py-3.5 px-3 text-left">Mata Pelajaran</th>
+                <th class="py-3.5 px-3 w-20 text-center">Induk</th>
+                <th class="py-3.5 px-3 w-28 text-center">Kelompok</th>
+                <th class="py-3.5 px-3 w-24 text-center">Jurusan</th>
+                <th class="py-3.5 px-3 w-16 text-center">JTM</th>
+                <th class="py-3.5 px-3 min-w-[250px] text-left">Guru</th>
+                <th class="py-3.5 px-3 w-28 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-xs">
+              ${filteredSubjects.length === 0 ? `
+                <tr><td colspan="8" class="py-12 text-center text-slate-400">Tidak ada mata pelajaran yang cocok dengan pencarian "<strong>${escapeHtml(state.mengajarSearchQuery)}</strong>".</td></tr>
+              ` : filteredSubjects.map((subjName, idx) => {
+                const meta = getSubjectCurriculumMeta(subjName, selectedClass);
+                const assignedTeacher = getTeachingAssignment(selectedClass, subjName);
+                const isAssigned = Boolean(assignedTeacher && assignedTeacher.full_name);
+                return `
+                  <tr class="hover:bg-indigo-50/30 transition">
+                    <td class="py-3 px-3 text-center font-bold text-slate-400">${idx + 1}</td>
+                    <td class="py-3 px-3 font-bold text-slate-800">${escapeHtml(subjName)}</td>
+                    <td class="py-3 px-3 text-center font-semibold text-slate-500">${escapeHtml(meta.induk)}</td>
+                    <td class="py-3 px-3 text-center text-slate-600 font-medium">${escapeHtml(meta.kelompok)}</td>
+                    <td class="py-3 px-3 text-center text-slate-600 font-medium">${escapeHtml(meta.jurusan)}</td>
+                    <td class="py-3 px-3 text-center font-black text-slate-700">${meta.jtm}</td>
+                    <td class="py-2.5 px-3">
+                      <select onchange="window.handleAssignTeacherToClassMapel('${escapeHtml(selectedClass)}', '${escapeHtml(subjName)}', this.value)"
+                        class="w-full px-3 py-1.5 rounded-xl border ${isAssigned ? 'border-indigo-300 bg-indigo-50/40 text-indigo-950 font-bold' : 'border-slate-300 bg-white text-slate-400 font-medium'} text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                        <option value="">-Pilih Guru-</option>
+                        ${state.teachers.map(t => {
+                          const isSelected = assignedTeacher && (assignedTeacher.id === t.id || assignedTeacher.full_name.toLowerCase() === t.full_name.toLowerCase());
+                          return `<option value="${escapeHtml(t.id)}" ${isSelected ? 'selected' : ''}>${escapeHtml(t.full_name)}</option>`;
+                        }).join('')}
+                      </select>
+                    </td>
+                    <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                      ${isAssigned ? `
+                        <button type="button" onclick="window.handleRemoveTeacherFromClassMapel('${escapeHtml(selectedClass)}', '${escapeHtml(subjName)}')"
+                          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition"
+                          title="Hapus guru dari mata pelajaran ini">
+                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                          <span>Hapus Ajar</span>
+                        </button>
+                      ` : `
+                        <span class="text-[11px] text-slate-300 font-semibold italic">-</span>
+                      `}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Footer Info -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 pt-1">
+          <div>
+            Showing 1 to ${filteredSubjects.length} of ${applicableSubjects.length} entries (${selectedClass})
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="px-3 py-1 rounded-full ${assignedCount === totalCount ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200' : 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200'}">
+              ✓ ${assignedCount} dari ${totalCount} Mapel telah ditentukan guru pengampunya
+            </span>
+          </div>
+        </div>
+      </div>
+      `;
+    }
+
+    function renderDaftarAkunGuruHtml() {
       const teacherPage = paginateItems(state.teachers, 'teachers');
 
       return `
@@ -8248,7 +8851,44 @@
         </div>
         ${renderPaginationBar(teacherPage)}
       </div>
-    `;
+      `;
+    }
+
+    function renderManajemenGuruView() {
+      if (state.subjects.length === 0) mergeSubjectsState();
+
+      return `
+        <div class="space-y-6">
+          <!-- Top Sub-Tab Switcher: Mengajar vs Data Akun Guru -->
+          <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-100">
+                <i data-lucide="book-open-check" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h3 class="text-base md:text-lg font-black text-slate-900 tracking-tight">Manajemen Guru &amp; Pembagian Mengajar</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Atur guru pengampu per mapel dan kelas 1–6 (ARD Kemenag) serta kelola akun login guru</p>
+              </div>
+            </div>
+
+            <!-- Tab Pills -->
+            <div class="inline-flex p-1 bg-slate-100/90 rounded-2xl border border-slate-200 self-start md:self-center shadow-inner">
+              <button type="button" onclick="window.switchTeacherTab('mengajar')"
+                class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${state.teacherManagementTab === 'mengajar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+                <i data-lucide="calendar-days" class="w-4 h-4"></i>
+                <span>Mengajar (Kelas 1–6)</span>
+              </button>
+              <button type="button" onclick="window.switchTeacherTab('akun')"
+                class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${state.teacherManagementTab === 'akun' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>Data Guru (${state.teachers.length})</span>
+              </button>
+            </div>
+          </div>
+
+          ${state.teacherManagementTab === 'mengajar' ? renderPenugasanMengajarHtml() : renderDaftarAkunGuruHtml()}
+        </div>
+      `;
     }
 
     function openTeacherFormModal(editingTeacher = null) {
@@ -9932,7 +10572,7 @@
         const summary = stats.examSummaries.find(e =>
           String(e.exam?.subject || '').trim().toLowerCase() === subjName.toLowerCase()
         );
-        const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName);
+        const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName, student.class_name);
         const teacherName = subjTeacher?.full_name || '-';
         const hasResult = summary && summary.result !== null;
 
@@ -10140,7 +10780,7 @@
         const summary = stats.examSummaries.find(e =>
           String(e.exam?.subject || '').trim().toLowerCase() === subjName.toLowerCase()
         );
-        const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName);
+        const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName, stu.class_name);
         const teacherName = subjTeacher?.full_name || '-';
         const hasResult = summary && summary.result !== null;
 
@@ -10521,7 +11161,7 @@
         const summary = stats.examSummaries.find(e =>
           String(e.exam?.subject || '').trim().toLowerCase() === subjName.toLowerCase()
         );
-        const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName);
+        const subjTeacher = summary?.exam ? getExamTeacher(summary.exam) : getSubjectTeacher(subjName, stu.class_name);
         const teacherName = subjTeacher?.full_name || '-';
         const hasResult = summary && summary.result !== null;
 
