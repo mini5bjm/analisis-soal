@@ -10121,36 +10121,6 @@
         `<option value="${escapeHtml(s)}" ${s === activeSem ? 'selected' : ''}>${escapeHtml(s)}</option>`
       ).join('');
 
-      // Top Tab Navigation Bar
-      const tabBarHtml = `
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          <button type="button" onclick="window.navigatePengaturanSubmenu('periode')"
-            class="px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'periode'
-              ? 'flowora-btn-primary text-white shadow-sm'
-              : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
-            }">
-            <i data-lucide="calendar-range" class="w-4 h-4"></i>
-            <span>Tahun Ajaran &amp; Semester</span>
-          </button>
-          <button type="button" onclick="window.navigatePengaturanSubmenu('kepala_madrasah')"
-            class="px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'kepala_madrasah'
-              ? 'flowora-btn-primary text-white shadow-sm'
-              : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
-            }">
-            <i data-lucide="award" class="w-4 h-4"></i>
-            <span>Kepala Madrasah &amp; Tanda Tangan</span>
-          </button>
-          <button type="button" onclick="window.navigatePengaturanSubmenu('backup')"
-            class="px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'backup'
-              ? 'flowora-btn-primary text-white shadow-sm'
-              : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
-            }">
-            <i data-lucide="database-backup" class="w-4 h-4"></i>
-            <span>Backup &amp; Restore Data</span>
-          </button>
-        </div>
-      `;
-
       let activeContentHtml = '';
 
       if (activeTab === 'periode') {
@@ -10236,7 +10206,7 @@
         const curDate = state.academicSettings?.signatureDate || '';
 
         activeContentHtml = `
-        <!-- Card 2: Pengaturan Kepala Madrasah & Tanda Tangan Dokumen (Khusus Admin) -->
+        <!-- Card 2: Pengaturan Kepala Madrasah & Tanda Tangan Dokumen -->
         <div class="glass-surface rounded-3xl p-6 space-y-5">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div class="flex items-start gap-3">
@@ -10244,17 +10214,9 @@
                 <i data-lucide="award" class="w-5 h-5"></i>
               </div>
               <div>
-                <div class="flex items-center gap-2 flex-wrap">
-                  <h3 class="text-base md:text-lg font-extrabold text-slate-900">Pengaturan Identitas Madrasah, Kepala Madrasah &amp; Tanda Tangan</h3>
-                  <span class="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-extrabold uppercase">Khusus Admin</span>
-                </div>
+                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Pengaturan Identitas Madrasah, Kepala Madrasah &amp; Tanda Tangan</h3>
                 <p class="text-xs text-slate-500 mt-0.5">Kelola data identitas madrasah (KOP laporan), Kepala Madrasah, kota domisili, dan tanggal pengesahan tanda tangan pada seluruh cetak laporan dan rekap nilai</p>
               </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold">
-                ${escapeHtml(curCity)} • ${escapeHtml(formatIndonesianDate(curDate))}
-              </span>
             </div>
           </div>
 
@@ -10416,7 +10378,7 @@
       } else {
         // activeTab === 'backup'
         activeContentHtml = `
-        <!-- Card 3: Backup & Restore Data (Khusus Admin) -->
+        <!-- Card 3: Backup & Restore Data -->
         <div class="glass-surface rounded-3xl p-6 space-y-5">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div class="flex items-start gap-3">
@@ -10424,10 +10386,16 @@
                 <i data-lucide="database-backup" class="w-5 h-5"></i>
               </div>
               <div>
-                <div class="flex items-center gap-2 flex-wrap">
-                  <h3 class="text-base md:text-lg font-extrabold text-slate-900">Backup &amp; Restore Data</h3>
-                  <span class="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-extrabold uppercase">Khusus Admin</span>
-                </div>
+                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Backup &amp; Restore Data</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Cadangkan seluruh data aplikasi ke file JSON atau pulihkan kembali dari file backup</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
+              <div class="text-xl font-extrabold text-slate-900">${state.teachers.length}</div>
+                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Backup &amp; Restore Data</h3>
                 <p class="text-xs text-slate-500 mt-0.5">Cadangkan seluruh data aplikasi ke file JSON atau pulihkan kembali dari file backup</p>
               </div>
             </div>
@@ -10502,7 +10470,6 @@
 
       return `
       <div class="space-y-6">
-        ${tabBarHtml}
         ${activeContentHtml}
       </div>
       `;
