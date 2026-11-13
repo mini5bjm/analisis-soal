@@ -1136,6 +1136,7 @@
       rekapSearchQuery: '',
       rekapActiveTab: 'rapor',
       rekapActiveExamId: null,
+      isGuruMenuOpen: true,
       teacherManagementTab: 'mengajar',
       mengajarSelectedClass: 'Kelas 1',
       mengajarSearchQuery: '',
@@ -3818,7 +3819,7 @@
     const MENU_CONFIG = [
       { id: 'dashboard', label: 'Dashboard', shortLabel: 'Dashboard', icon: 'layout-dashboard', subtitle: 'Ringkasan performa ulangan, ketuntasan KKM, dan grafik klasikal', roles: ['admin', 'guru'] },
       { id: 'manajemen_siswa', label: 'Data Siswa', shortLabel: 'Siswa', icon: 'graduation-cap', subtitle: 'Kelola data siswa per kelas, NIS/NISN, serta template, import & ekspor Excel', roles: ['admin', 'guru'] },
-      { id: 'manajemen_guru', label: 'Data Guru', shortLabel: 'Guru', icon: 'users-round', subtitle: 'Manajemen akun guru, jenis ID, jabatan, kelas ampuan, serta template & ekspor Excel', roles: ['admin'] },
+      { id: 'manajemen_guru', label: 'Guru', shortLabel: 'Guru', icon: 'users-round', subtitle: 'Manajemen akun guru dan pembagian tugas mengajar', roles: ['admin'] },
       { id: 'manajemen_mapel', label: 'Mapel & Kelas', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Kelola daftar mata pelajaran dan pembagian kelas untuk setiap mapel', roles: ['admin'] },
       { id: 'rekap_laporan', label: 'Rekap & Laporan', shortLabel: 'Rekap', icon: 'clipboard-check', subtitle: 'Pantau hasil ulangan, analisis butir, remedial, dan cetak rapor siswa per kelas', roles: ['admin'] },
       { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, jenis soal, KKM, jumlah butir, dan kunci jawaban', roles: ['guru'] },
@@ -4094,6 +4095,9 @@
       }
       closeFormModal({ resetEditState: false });
       state.activeMenu = menuId;
+      if (menuId === 'manajemen_guru') {
+        state.isGuruMenuOpen = true;
+      }
       if (menuId === 'manajemen_ulangan') {
         const isAdmin = isAdminUser();
         const tRole = getCurrentTeacherRoleMeta();
@@ -4113,6 +4117,27 @@
       renderCurrentMenu();
     };
 
+    window.toggleTeacherMenuCollapse = function () {
+      if (state.activeMenu !== 'manajemen_guru') {
+        state.activeMenu = 'manajemen_guru';
+        state.isGuruMenuOpen = true;
+      } else {
+        state.isGuruMenuOpen = !state.isGuruMenuOpen;
+      }
+      saveSessionToStorage();
+      renderNavigationMenus();
+      renderCurrentMenu();
+    };
+
+    window.navigateTeacherSubmenu = function (tab) {
+      state.activeMenu = 'manajemen_guru';
+      state.teacherManagementTab = tab === 'akun' ? 'akun' : 'mengajar';
+      state.isGuruMenuOpen = true;
+      saveSessionToStorage();
+      renderNavigationMenus();
+      renderCurrentMenu();
+    };
+
     function renderNavigationMenus() {
       const role = state.currentUser?.role || 'guru';
       const allowedMenus = MENU_CONFIG.filter(m => m.roles.includes(role));
@@ -4120,6 +4145,46 @@
       // Desktop Sidebar
       const desktopNav = document.getElementById('desktop-nav-list');
       desktopNav.innerHTML = allowedMenus.map(m => {
+        if (role === 'admin' && m.id === 'manajemen_guru') {
+          const isGuruActive = state.activeMenu === 'manajemen_guru';
+          const isDataGuruActive = isGuruActive && state.teacherManagementTab === 'akun';
+          const isMengajarActive = isGuruActive && state.teacherManagementTab === 'mengajar';
+          const isOpen = state.isGuruMenuOpen !== false;
+          return `
+            <div class="space-y-1">
+              <button type="button" onclick="window.toggleTeacherMenuCollapse()"
+                class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isGuruActive
+                  ? 'bg-indigo-50/80 text-indigo-700'
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                }">
+                <div class="flex items-center gap-3.5 truncate">
+                  <i data-lucide="users-round" class="w-[18px] h-[18px] shrink-0"></i>
+                  <span class="truncate">Guru</span>
+                </div>
+                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
+              </button>
+              <div class="pl-7 pr-1 space-y-1 ${isOpen ? 'block' : 'hidden'}">
+                <button type="button" onclick="window.navigateTeacherSubmenu('akun')"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isDataGuruActive
+                    ? 'flowora-btn-primary text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                  }">
+                  <i data-lucide="users" class="w-3.5 h-3.5 shrink-0"></i>
+                  <span class="truncate">Data Guru</span>
+                </button>
+                <button type="button" onclick="window.navigateTeacherSubmenu('mengajar')"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isMengajarActive
+                    ? 'flowora-btn-primary text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                  }">
+                  <i data-lucide="book-open" class="w-3.5 h-3.5 shrink-0"></i>
+                  <span class="truncate">Mengajar</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
         const isActive = state.activeMenu === m.id;
         return `
         <button type="button" onclick="window.navigateMenu('${m.id}')"
@@ -4151,14 +4216,23 @@
 
       const currentMeta = MENU_CONFIG.find(m => m.id === state.activeMenu);
       if (currentMeta) {
+        let label = currentMeta.label;
         let subtitle = currentMeta.subtitle;
-        if (currentMeta.id === 'manajemen_siswa' && role !== 'admin') {
+        if (currentMeta.id === 'manajemen_guru' && role === 'admin') {
+          if (state.teacherManagementTab === 'mengajar') {
+            label = 'Mengajar';
+            subtitle = 'Atur guru pengampu mata pelajaran untuk Kelas 1 s/d Kelas 6';
+          } else {
+            label = 'Data Guru';
+            subtitle = 'Manajemen akun guru, jenis ID, jabatan, kelas ampuan, serta template & ekspor Excel';
+          }
+        } else if (currentMeta.id === 'manajemen_siswa' && role !== 'admin') {
           const tRole = getCurrentTeacherRoleMeta();
           subtitle = (tRole?.isWaliKelas && tRole.assignedGrade)
             ? `Lihat daftar data siswa khusus ${tRole.assignedGrade} dan ekspor Excel`
             : 'Lihat seluruh daftar data siswa sekolah dan ekspor Excel';
         }
-        document.getElementById('page-header-title').textContent = currentMeta.label;
+        document.getElementById('page-header-title').textContent = label;
         document.getElementById('page-header-subtitle').textContent = subtitle;
       }
 
@@ -8594,18 +8668,14 @@
     };
 
     function renderPenugasanMengajarHtml() {
-      const CLASS_TO_ROMAN = { 'Kelas 1': 'I', 'Kelas 2': 'II', 'Kelas 3': 'III', 'Kelas 4': 'IV', 'Kelas 5': 'V', 'Kelas 6': 'VI' };
       const selectedClass = state.mengajarSelectedClass || 'Kelas 1';
-      const currentTingkat = CLASS_TO_ROMAN[selectedClass] || 'I';
-
       const applicableSubjects = getApplicableSubjectsForStudentClass(selectedClass);
       const q = String(state.mengajarSearchQuery || '').trim().toLowerCase();
 
       const filteredSubjects = q ? applicableSubjects.filter(subj => {
-        const meta = getSubjectCurriculumMeta(subj, selectedClass);
         const assigned = getTeachingAssignment(selectedClass, subj);
         const teacherName = assigned?.full_name || '';
-        const hay = `${subj} ${meta.induk} ${meta.kelompok} ${meta.jurusan} ${teacherName}`.toLowerCase();
+        const hay = `${subj} ${teacherName}`.toLowerCase();
         return hay.includes(q);
       }) : applicableSubjects;
 
@@ -8617,64 +8687,26 @@
 
       return `
       <div class="glass-surface rounded-3xl p-6 space-y-5">
-        <!-- Filter Tingkat & Kelas (Format ARD Kemenag) -->
-        <div class="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs">
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Tingkat</label>
-              <select id="mengajar-tingkat-select" onchange="window.handleSelectMengajarTingkat(this.value)"
-                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
-                <option value="I" ${currentTingkat === 'I' ? 'selected' : ''}>I</option>
-                <option value="II" ${currentTingkat === 'II' ? 'selected' : ''}>II</option>
-                <option value="III" ${currentTingkat === 'III' ? 'selected' : ''}>III</option>
-                <option value="IV" ${currentTingkat === 'IV' ? 'selected' : ''}>IV</option>
-                <option value="V" ${currentTingkat === 'V' ? 'selected' : ''}>V</option>
-                <option value="VI" ${currentTingkat === 'VI' ? 'selected' : ''}>VI</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Kelas</label>
-              <select id="mengajar-class-select" onchange="window.handleSelectMengajarClass(this.value)"
-                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-indigo-300 text-xs font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
-                ${GRADE_CLASS_OPTIONS.map(c => `
-                  <option value="${escapeHtml(c)}" ${c === selectedClass ? 'selected' : ''}>${escapeHtml(c)}</option>
-                `).join('')}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <!-- Toolbar: Copy, Print, Excel & Search -->
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <button type="button" onclick="window.handleCopyClassAssignments('${escapeHtml(selectedClass)}')"
-              class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 border border-slate-300 shadow-2xs transition active:scale-95"
-              title="Salin penugasan mengajar ${escapeHtml(selectedClass)} ke clipboard">
-              <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-600"></i> Copy
-            </button>
-            <button type="button" onclick="window.handlePrintClassAssignments('${escapeHtml(selectedClass)}')"
-              class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 border border-slate-300 shadow-2xs transition active:scale-95"
-              title="Cetak lembar pembagian tugas mengajar">
-              <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-600"></i> Print
-            </button>
-            <button type="button" onclick="window.handleExportClassAssignmentsXlsx('${escapeHtml(selectedClass)}')"
-              class="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center gap-1.5 border border-emerald-300 shadow-2xs transition active:scale-95"
-              title="Unduh tabel penugasan mengajar (.xlsx)">
-              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i> Excel
-            </button>
-            <span class="text-xs text-slate-400 font-semibold ml-2">Show ${filteredSubjects.length} entries</span>
+        <!-- Filter Kelas & Search -->
+        <div class="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div class="w-full sm:w-64">
+            <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Kelas</label>
+            <select id="mengajar-class-select" onchange="window.handleSelectMengajarClass(this.value)"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-indigo-300 text-xs font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+              ${GRADE_CLASS_OPTIONS.map(c => `
+                <option value="${escapeHtml(c)}" ${c === selectedClass ? 'selected' : ''}>${escapeHtml(c)}</option>
+              `).join('')}
+            </select>
           </div>
 
-          <div class="flex items-center gap-2">
-            <label class="text-xs font-bold text-slate-500 whitespace-nowrap">Search:</label>
-            <div class="relative">
+          <div class="flex items-center gap-2 self-stretch sm:self-end">
+            <div class="relative w-full sm:w-64">
               <input type="text" id="mengajar-search" value="${escapeHtml(state.mengajarSearchQuery || '')}"
                 oninput="window.handleSearchMengajar(this.value)"
                 placeholder="Cari mapel atau guru..."
-                class="w-48 sm:w-60 px-3 py-1.5 pr-8 rounded-xl border border-slate-300 bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs" />
+                class="w-full px-3.5 py-2.5 pr-8 rounded-xl border border-slate-300 bg-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs" />
               ${state.mengajarSearchQuery ? `
-                <button type="button" onclick="window.handleSearchMengajar('')" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">
+                <button type="button" onclick="window.handleSearchMengajar('')" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">
                   <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 </button>
               ` : ''}
@@ -8682,39 +8714,30 @@
           </div>
         </div>
 
-        <!-- Tabel Penugasan Guru Mengajar (Sesuai Format ARD Kemenag) -->
+        <!-- Tabel Penugasan Guru Mengajar (Hanya Kolom No, Mata Pelajaran, Guru, Aksi) -->
         <div class="overflow-x-auto custom-scroll border border-slate-200/90 rounded-2xl bg-white shadow-2xs">
           <table class="w-full text-left border-collapse">
             <thead>
-              <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 text-center tracking-wider">
-                <th class="py-3.5 px-3 w-12 text-center">No</th>
-                <th class="py-3.5 px-3 text-left">Mata Pelajaran</th>
-                <th class="py-3.5 px-3 w-20 text-center">Induk</th>
-                <th class="py-3.5 px-3 w-28 text-center">Kelompok</th>
-                <th class="py-3.5 px-3 w-24 text-center">Jurusan</th>
-                <th class="py-3.5 px-3 w-16 text-center">JTM</th>
-                <th class="py-3.5 px-3 min-w-[250px] text-left">Guru</th>
-                <th class="py-3.5 px-3 w-28 text-center">Aksi</th>
+              <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">
+                <th class="py-3.5 px-3 w-14 text-center">No</th>
+                <th class="py-3.5 px-4 text-left">Mata Pelajaran</th>
+                <th class="py-3.5 px-4 text-left min-w-[280px]">Guru</th>
+                <th class="py-3.5 px-4 w-32 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-xs">
               ${filteredSubjects.length === 0 ? `
-                <tr><td colspan="8" class="py-12 text-center text-slate-400">Tidak ada mata pelajaran yang cocok dengan pencarian "<strong>${escapeHtml(state.mengajarSearchQuery)}</strong>".</td></tr>
+                <tr><td colspan="4" class="py-12 text-center text-slate-400">Tidak ada mata pelajaran yang cocok dengan pencarian "<strong>${escapeHtml(state.mengajarSearchQuery)}</strong>".</td></tr>
               ` : filteredSubjects.map((subjName, idx) => {
-                const meta = getSubjectCurriculumMeta(subjName, selectedClass);
                 const assignedTeacher = getTeachingAssignment(selectedClass, subjName);
                 const isAssigned = Boolean(assignedTeacher && assignedTeacher.full_name);
                 return `
                   <tr class="hover:bg-indigo-50/30 transition">
                     <td class="py-3 px-3 text-center font-bold text-slate-400">${idx + 1}</td>
-                    <td class="py-3 px-3 font-bold text-slate-800">${escapeHtml(subjName)}</td>
-                    <td class="py-3 px-3 text-center font-semibold text-slate-500">${escapeHtml(meta.induk)}</td>
-                    <td class="py-3 px-3 text-center text-slate-600 font-medium">${escapeHtml(meta.kelompok)}</td>
-                    <td class="py-3 px-3 text-center text-slate-600 font-medium">${escapeHtml(meta.jurusan)}</td>
-                    <td class="py-3 px-3 text-center font-black text-slate-700">${meta.jtm}</td>
-                    <td class="py-2.5 px-3">
+                    <td class="py-3 px-4 font-bold text-slate-800 text-sm">${escapeHtml(subjName)}</td>
+                    <td class="py-2.5 px-4">
                       <select onchange="window.handleAssignTeacherToClassMapel('${escapeHtml(selectedClass)}', '${escapeHtml(subjName)}', this.value)"
-                        class="w-full px-3 py-1.5 rounded-xl border ${isAssigned ? 'border-indigo-300 bg-indigo-50/40 text-indigo-950 font-bold' : 'border-slate-300 bg-white text-slate-400 font-medium'} text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                        class="w-full px-3.5 py-2 rounded-xl border ${isAssigned ? 'border-indigo-300 bg-indigo-50/40 text-indigo-950 font-bold' : 'border-slate-300 bg-white text-slate-400 font-medium'} text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                         <option value="">-Pilih Guru-</option>
                         ${state.teachers.map(t => {
                           const isSelected = assignedTeacher && (assignedTeacher.id === t.id || assignedTeacher.full_name.toLowerCase() === t.full_name.toLowerCase());
@@ -8722,7 +8745,7 @@
                         }).join('')}
                       </select>
                     </td>
-                    <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                    <td class="py-2.5 px-4 text-center whitespace-nowrap">
                       ${isAssigned ? `
                         <button type="button" onclick="window.handleRemoveTeacherFromClassMapel('${escapeHtml(selectedClass)}', '${escapeHtml(subjName)}')"
                           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition"
@@ -8731,7 +8754,7 @@
                           <span>Hapus Ajar</span>
                         </button>
                       ` : `
-                        <span class="text-[11px] text-slate-300 font-semibold italic">-</span>
+                        <span class="text-xs text-slate-300 font-semibold italic">-</span>
                       `}
                     </td>
                   </tr>
@@ -8741,16 +8764,11 @@
           </table>
         </div>
 
-        <!-- Footer Info -->
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 pt-1">
-          <div>
-            Showing 1 to ${filteredSubjects.length} of ${applicableSubjects.length} entries (${selectedClass})
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="px-3 py-1 rounded-full ${assignedCount === totalCount ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200' : 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200'}">
-              ✓ ${assignedCount} dari ${totalCount} Mapel telah ditentukan guru pengampunya
-            </span>
-          </div>
+        <!-- Ringkasan Penugasan -->
+        <div class="flex items-center justify-end pt-1">
+          <span class="px-3.5 py-1.5 rounded-full ${assignedCount === totalCount ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200' : 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200'} text-xs">
+            ✓ ${assignedCount} dari ${totalCount} Mapel telah ditentukan guru pengampunya
+          </span>
         </div>
       </div>
       `;
@@ -8859,26 +8877,30 @@
 
       return `
         <div class="space-y-6">
-          <!-- Top Sub-Tab Switcher: Mengajar vs Data Akun Guru -->
+          <!-- Top Sub-Tab Switcher: Mengajar vs Data Guru -->
           <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div class="flex items-center gap-3">
               <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-100">
-                <i data-lucide="book-open-check" class="w-5 h-5"></i>
+                <i data-lucide="${state.teacherManagementTab === 'mengajar' ? 'book-open' : 'users'}" class="w-5 h-5"></i>
               </div>
               <div>
-                <h3 class="text-base md:text-lg font-black text-slate-900 tracking-tight">Manajemen Guru &amp; Pembagian Mengajar</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Atur guru pengampu per mapel dan kelas 1–6 (ARD Kemenag) serta kelola akun login guru</p>
+                <h3 class="text-base md:text-lg font-black text-slate-900 tracking-tight">
+                  ${state.teacherManagementTab === 'mengajar' ? 'Pembagian Tugas Mengajar' : 'Data Guru'}
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  ${state.teacherManagementTab === 'mengajar' ? 'Atur guru pengampu per mata pelajaran untuk Kelas 1 s/d Kelas 6' : 'Kelola akun login guru, identitas ID, jabatan, dan kelas ampuan'}
+                </p>
               </div>
             </div>
 
             <!-- Tab Pills -->
             <div class="inline-flex p-1 bg-slate-100/90 rounded-2xl border border-slate-200 self-start md:self-center shadow-inner">
-              <button type="button" onclick="window.switchTeacherTab('mengajar')"
+              <button type="button" onclick="window.navigateTeacherSubmenu('mengajar')"
                 class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${state.teacherManagementTab === 'mengajar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
-                <i data-lucide="calendar-days" class="w-4 h-4"></i>
+                <i data-lucide="book-open" class="w-4 h-4"></i>
                 <span>Mengajar (Kelas 1–6)</span>
               </button>
-              <button type="button" onclick="window.switchTeacherTab('akun')"
+              <button type="button" onclick="window.navigateTeacherSubmenu('akun')"
                 class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${state.teacherManagementTab === 'akun' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
                 <i data-lucide="users" class="w-4 h-4"></i>
                 <span>Data Guru (${state.teachers.length})</span>
