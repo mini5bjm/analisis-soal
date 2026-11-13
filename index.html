@@ -1099,8 +1099,7 @@
       "IPAS",
       "PJOK",
       "SBDP",
-      "Bahasa Inggris",
-      "Baca Tulis Al Qur'an"
+      "Bahasa Inggris"
     ];
 
     const state = {
@@ -1114,7 +1113,7 @@
       lastSyncedAt: null,
       hasSubjectsTable: null,
       hasStudentsTable: null,
-      deletedSubjectNames: [],
+      deletedSubjectNames: ["Baca Tulis Al Qur'an"],
       headerExamClassFilter: 'ALL',
       examClassFilter: 'ALL',
       examSubjectFilter: 'ALL',
@@ -1330,7 +1329,12 @@
         if (Array.isArray(cached.examResults)) state.examResults = cached.examResults;
         if (Array.isArray(cached.subjects)) state.subjects = cached.subjects;
         if (Array.isArray(cached.students)) state.students = cached.students;
-        if (Array.isArray(cached.deletedSubjectNames)) state.deletedSubjectNames = cached.deletedSubjectNames;
+        if (Array.isArray(cached.deletedSubjectNames)) {
+          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...cached.deletedSubjectNames]));
+        }
+        if (!state.deletedSubjectNames.some(n => n.toLowerCase() === "baca tulis al qur'an")) {
+          state.deletedSubjectNames.push("Baca Tulis Al Qur'an");
+        }
         if (cached.activeExamId) state.activeExamId = cached.activeExamId;
         if (cached.academicSettings) applyAcademicSettingsObject(cached.academicSettings, { onlyIfNewer: true, replaceYears: true });
         if (cached.teachingAssignments && typeof cached.teachingAssignments === 'object') {
@@ -1647,7 +1651,9 @@
           signatureCity: state.academicSettings.signatureCity || DEFAULT_SIGNATURE_CITY,
           signatureDate: state.academicSettings.signatureDate || '',
           updatedAt: Number(state.academicSettings.updatedAt || 0),
-          teachingAssignments: state.teachingAssignments || {}
+          teachingAssignments: state.teachingAssignments || {},
+          deletedSubjectNames: state.deletedSubjectNames || [],
+          customSubjects: (state.subjects || []).map(s => ({ id: s.id, name: s.name, teacher_id: s.teacher_id, classes: s.classes }))
         }),
         student_count: 0
       };
@@ -1665,6 +1671,23 @@
         if (parsed && parsed.teachingAssignments && typeof parsed.teachingAssignments === 'object') {
           state.teachingAssignments = { ...parsed.teachingAssignments, ...state.teachingAssignments };
           saveTeachingAssignmentsToStorage();
+          applied = true;
+        }
+        if (parsed && Array.isArray(parsed.deletedSubjectNames)) {
+          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...parsed.deletedSubjectNames]));
+          saveSubjectsMetaToStorage();
+          applied = true;
+        }
+        if (parsed && Array.isArray(parsed.customSubjects)) {
+          parsed.customSubjects.forEach(cs => {
+            if (cs && cs.name && !state.deletedSubjectNames.some(d => d.toLowerCase() === cs.name.toLowerCase())) {
+              const existing = state.subjects.find(s => s.name.toLowerCase() === cs.name.toLowerCase());
+              if (!existing) {
+                state.subjects.push(cs);
+              }
+            }
+          });
+          saveSubjectsMetaToStorage();
           applied = true;
         }
         return applied;
@@ -2278,8 +2301,11 @@
     /** Gabungkan daftar Mapel Madrasah dari localStorage/tabel DB, beserta informasi kelas dan guru terkait. */
     function mergeSubjectsState({ dbSubjects = null, teachers = state.teachers, exams = state.exams } = {}) {
       const storedMeta = loadSubjectsMetaFromStorage();
-      if (Array.isArray(storedMeta?.deletedNames) && state.deletedSubjectNames.length === 0) {
-        state.deletedSubjectNames = storedMeta.deletedNames;
+      if (Array.isArray(storedMeta?.deletedNames)) {
+        state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...storedMeta.deletedNames]));
+      }
+      if (!state.deletedSubjectNames.some(n => n.toLowerCase() === "baca tulis al qur'an")) {
+        state.deletedSubjectNames.push("Baca Tulis Al Qur'an");
       }
       const deletedSet = new Set(state.deletedSubjectNames.map(n => n.toLowerCase()));
 
@@ -2353,7 +2379,7 @@
         }
       });
 
-      state.subjects = Array.from(byLowerName.values());
+      state.subjects = Array.from(byLowerName.values()).filter(s => !deletedSet.has(String(s?.name || '').trim().toLowerCase()));
       saveSubjectsMetaToStorage();
     }
 
@@ -8063,6 +8089,17 @@
           state.subjects.push(subjectRecord);
         }
 
+        if (!IS_PREVIEW && supabase) {
+          state.academicSettings.updatedAt = Date.now();
+          saveAcademicSettingsToStorage();
+          enqueuePendingSync({
+            id: crypto.randomUUID(),
+            table: 'classes',
+            action: 'upsert',
+            record: buildAcademicConfigRow()
+          });
+        }
+
         queueSubjectTeacherSync([], subjectRecord, 'upsert');
         saveSessionToStorage();
         updateSyncBadge('syncing');
@@ -8112,6 +8149,31 @@
           }
           if (state.editingSubjectId === target.id) state.editingSubjectId = null;
           state.subjects = state.subjects.filter(s => s.id !== target.id && s.name.toLowerCase() !== target.name.toLowerCase());
+
+          // Clean up teaching assignments for this deleted subject across all classes
+          const lowerName = target.name.toLowerCase();
+          Object.keys(state.teachingAssignments || {}).forEach(k => {
+            const parts = k.split('::');
+            if (parts.length === 2 && parts[1].toLowerCase() === lowerName) {
+              delete state.teachingAssignments[k];
+            }
+          });
+          saveTeachingAssignmentsToStorage();
+          saveSubjectsMetaToStorage();
+          saveSessionToStorage();
+          saveCacheToStorage();
+
+          if (!IS_PREVIEW && supabase) {
+            state.academicSettings.updatedAt = Date.now();
+            saveAcademicSettingsToStorage();
+            enqueuePendingSync({
+              id: crypto.randomUUID(),
+              table: 'classes',
+              action: 'upsert',
+              record: buildAcademicConfigRow()
+            });
+          }
+
           queueSubjectTeacherSync([], target, 'delete');
           saveSessionToStorage();
 
@@ -9151,7 +9213,8 @@
                     <td class="py-3 px-3 text-center font-bold text-slate-400">${idx + 1}</td>
                     <td class="py-3 px-4 font-bold text-slate-800 text-sm">${escapeHtml(subjName)}</td>
                     <td class="py-2.5 px-4">
-                      <select onchange="window.handleAssignTeacherToClassMapel('${escapeHtml(selectedClass)}', '${escapeHtml(subjName)}', this.value)"
+                      <select data-class="${escapeHtml(selectedClass)}" data-subject="${escapeHtml(subjName)}"
+                        onchange="window.handleAssignTeacherToClassMapel(this.dataset.class, this.dataset.subject, this.value)"
                         class="w-full px-3.5 py-2 rounded-xl border ${isAssigned ? 'border-indigo-300 bg-indigo-50/40 text-indigo-950 font-bold' : 'border-slate-300 bg-white text-slate-400 font-medium'} text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                         <option value="">-Pilih Guru-</option>
                         ${state.teachers.map(t => {
@@ -9162,7 +9225,8 @@
                     </td>
                     <td class="py-2.5 px-4 text-center whitespace-nowrap">
                       ${isAssigned ? `
-                        <button type="button" onclick="window.handleRemoveTeacherFromClassMapel('${escapeHtml(selectedClass)}', '${escapeHtml(subjName)}')"
+                        <button type="button" data-class="${escapeHtml(selectedClass)}" data-subject="${escapeHtml(subjName)}"
+                          onclick="window.handleRemoveTeacherFromClassMapel(this.dataset.class, this.dataset.subject)"
                           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition"
                           title="Hapus guru dari mata pelajaran ini">
                           <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
@@ -10395,70 +10459,6 @@
               state.teachers = structuredClone(d.teachers);
               state.classes = structuredClone(classesArr);
               state.students = structuredClone(studentsArr);
-              state.subjects = structuredClone(subjectsArr);
-              state.deletedSubjectNames = structuredClone(deletedSubjArr);
-              state.exams = structuredClone(d.exams);
-              state.examResults = structuredClone(d.examResults);
-              if (parsed.academicSettings) {
-                applyAcademicSettingsObject({
-                  ...parsed.academicSettings,
-                  updatedAt: Date.now()
-                }, { replaceYears: true });
-              }
-              mergeAcademicYearsFromExams();
-              mergeSubjectsState();
-
-              state.sessionAcademicYear = state.academicSettings.activeAcademicYear;
-              state.sessionSemester = state.academicSettings.activeSemester;
-              state.headerExamClassFilter = 'ALL';
-              state.examClassFilter = 'ALL';
-              state.examSubjectFilter = 'ALL';
-              state.activeExamId = null;
-
-              savePendingSyncQueue([]);
-              saveAcademicSettingsToStorage();
-              saveSubjectsMetaToStorage();
-              saveStudentsToStorage();
-              saveCacheToStorage();
-              saveSessionToStorage();
-
-              let syncWarning = '';
-              if (!IS_PREVIEW && supabase) {
-                updateSyncBadge('syncing');
-                const syncSteps = [
-                  upsertTableInBatches('classes', [buildAcademicConfigRow(), ...state.classes]),
-                  upsertTableInBatches('teachers', state.teachers),
-                  upsertTableInBatches('exams', state.exams),
-                  upsertTableInBatches('exam_results', state.examResults)
-                ];
-                if (state.hasSubjectsTable === true && state.subjects.length > 0) {
-                  syncSteps.push(upsertTableInBatches('subjects', state.subjects.map(s => ({
-                    id: s.id,
-                    name: s.name,
-                    teacher_id: s.teacher_id ?? null
-                  }))));
-                }
-                if (state.hasStudentsTable === true && state.students.length > 0) {
-                  syncSteps.push(upsertTableInBatches('students', state.students.map(s => ({
-                    id: s.id,
-                    nis: s.nis,
-                    full_name: s.full_name,
-                    gender: s.gender,
-                    class_name: s.class_name
-                  }))));
-                }
-                const results = await Promise.all(syncSteps);
-                const firstErr = results.find(r => r?.error)?.error;
-                if (firstErr) {
-                  syncWarning = firstErr.message || 'Sebagian data gagal disinkronkan ke Supabase.';
-                  updateSyncBadge('pending');
-                } else {
-                  state.lastSyncedAt = new Date();
-                  updateSyncBadge('synced');
-                }
-              }
-
-              populateLoginAcademicSelectors({ preserveSelection: false });
               updateWorkspacePeriodUI();
               populateExamSelectors();
               renderNavigationMenus();
@@ -10984,10 +10984,13 @@
     };
 
     function getApplicableSubjectsForStudentClass(className) {
-      const isLowerGrade = /kelas\s*[12]\b/i.test(String(className || ''));
+      const cls = String(className || '').toLowerCase();
+      const isLowerGrade = /kelas\s*[12]\b/i.test(cls) || cls === '1' || cls === '2';
       const excludedLower = new Set(['ski', 'sejarah kebudayaan islam', 'ipas', 'ilmu pengetahuan alam dan sosial', 'bahasa inggris', 'b. inggris']);
 
-      const canonical13 = [
+      const deletedSet = new Set((state.deletedSubjectNames || []).map(n => String(n || '').trim().toLowerCase()));
+
+      const canonicalBase = [
         "Al Qur'an Hadis",
         "Akidah Akhlak",
         "Fikih",
@@ -10999,16 +11002,35 @@
         "IPAS",
         "PJOK",
         "SBDP",
-        "Bahasa Inggris",
-        "Baca Tulis Al Qur'an"
+        "Bahasa Inggris"
       ];
 
+      const orderedList = [];
+      const seen = new Set();
+
+      canonicalBase.forEach(name => {
+        const lower = name.toLowerCase();
+        if (!seen.has(lower) && !deletedSet.has(lower)) {
+          if (!state.subjects || state.subjects.length === 0 || state.subjects.some(s => (s.name || '').trim().toLowerCase() === lower)) {
+            orderedList.push(name);
+            seen.add(lower);
+          }
+        }
+      });
+
+      (state.subjects || []).forEach(s => {
+        const cleanName = String(s?.name || '').trim();
+        const lower = cleanName.toLowerCase();
+        if (cleanName && !seen.has(lower) && !deletedSet.has(lower)) {
+          orderedList.push(cleanName);
+          seen.add(lower);
+        }
+      });
+
       if (isLowerGrade) {
-        // Kelas 1 & 2: Tepat 10 Mata Pelajaran (Tanpa SKI, IPAS, Bahasa Inggris)
-        return canonical13.filter(name => !excludedLower.has(name.toLowerCase()));
+        return orderedList.filter(name => !excludedLower.has(name.toLowerCase()));
       }
-      // Kelas 3, 4, 5, 6: Tepat 13 Mata Pelajaran
-      return canonical13;
+      return orderedList;
     }
 
     function buildStudentReportSheetHtml(student, stats, classExams) {
