@@ -744,7 +744,7 @@
                 <div id="sidebar-period-text" class="text-xs font-extrabold text-indigo-950 truncate mt-0.5">2026/2027 • Ganjil</div>
               </div>
             </div>
-            <button type="button" id="btn-sidebar-period-edit" onclick="window.navigateMenu('pengaturan_sistem')"
+            <button type="button" id="btn-sidebar-period-edit" onclick="window.navigatePengaturanSubmenu('periode')"
               class="hidden p-1.5 rounded-xl bg-white hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-200/80 transition shrink-0"
               title="Pengaturan Tahun Ajaran & Semester">
               <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
@@ -1011,6 +1011,11 @@
     const DEFAULT_HEADMASTER_NAME = 'H. Ahmad Syauqi, S.Pd.I, M.Pd.';
     const DEFAULT_HEADMASTER_NIP = '197808152005011004';
     const DEFAULT_SIGNATURE_CITY = 'Banjarmasin';
+    const DEFAULT_SCHOOL_NAME = 'MIS. NURUL ISLAM KM. 5 BANJARMASIN';
+    const DEFAULT_SCHOOL_NSM = '111263710005';
+    const DEFAULT_SCHOOL_NPSN = '60723456';
+    const DEFAULT_SCHOOL_AKREDITASI = 'Terakreditasi B';
+    const DEFAULT_SCHOOL_ADDRESS = 'Jl. Ahmad Yani Km. 5 No. 45, Kec. Banjarmasin Timur, Kota Banjarmasin';
     const SEMESTER_OPTIONS = ['Ganjil', 'Genap'];
     const ACADEMIC_CONFIG_ROW_ID = '00000000-0000-4000-8000-000000000001';
     const ACADEMIC_CONFIG_CLASS_NAME = '__SIHASUL_CONFIG__';
@@ -1141,6 +1146,8 @@
       teacherManagementTab: 'akun',
       isMapelMenuOpen: false,
       mapelKelasActiveTab: 'mapel',
+      isPengaturanMenuOpen: false,
+      pengaturanActiveTab: 'periode', // 'periode' | 'kepala_madrasah' | 'backup'
       mengajarSelectedClass: 'Kelas 1',
       mengajarSearchQuery: '',
       teachingAssignments: {},
@@ -1159,6 +1166,11 @@
         headmasterNip: DEFAULT_HEADMASTER_NIP,
         signatureCity: DEFAULT_SIGNATURE_CITY,
         signatureDate: '',
+        schoolName: DEFAULT_SCHOOL_NAME,
+        schoolNsm: DEFAULT_SCHOOL_NSM,
+        schoolNpsn: DEFAULT_SCHOOL_NPSN,
+        schoolAkreditasi: DEFAULT_SCHOOL_AKREDITASI,
+        schoolAddress: DEFAULT_SCHOOL_ADDRESS,
         updatedAt: 0
       },
       sessionAcademicYear: DEFAULT_ACADEMIC_YEAR,
@@ -1280,6 +1292,9 @@
           currentUser: state.currentUser,
           impersonatedByAdmin: state.impersonatedByAdmin || null,
           activeMenu: state.activeMenu,
+          teacherManagementTab: state.teacherManagementTab,
+          mapelKelasActiveTab: state.mapelKelasActiveTab,
+          pengaturanActiveTab: state.pengaturanActiveTab,
           activeExamId: state.activeExamId,
           sessionAcademicYear: state.sessionAcademicYear,
           sessionSemester: state.sessionSemester,
@@ -1332,7 +1347,7 @@
         if (Array.isArray(cached.subjects)) state.subjects = cached.subjects;
         if (Array.isArray(cached.students)) state.students = cached.students;
         if (Array.isArray(cached.deletedSubjectNames)) {
-          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...cached.deletedSubjectNames])).filter(n => n.toLowerCase() !== "baca tulis al qur'an");
+          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...cached.deletedSubjectNames]));
         }
         if (cached.activeExamId) state.activeExamId = cached.activeExamId;
         if (cached.academicSettings) applyAcademicSettingsObject(cached.academicSettings, { onlyIfNewer: true, replaceYears: true });
@@ -1605,6 +1620,11 @@
       const headmasterNip = String(cfg.headmasterNip !== undefined ? cfg.headmasterNip : (state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP)).trim() || DEFAULT_HEADMASTER_NIP;
       const signatureCity = String(cfg.signatureCity !== undefined ? cfg.signatureCity : (state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY)).trim() || DEFAULT_SIGNATURE_CITY;
       const signatureDate = String(cfg.signatureDate !== undefined ? cfg.signatureDate : (state.academicSettings?.signatureDate || '')).trim();
+      const schoolName = String(cfg.schoolName !== undefined ? cfg.schoolName : (state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME)).trim() || DEFAULT_SCHOOL_NAME;
+      const schoolNsm = String(cfg.schoolNsm !== undefined ? cfg.schoolNsm : (state.academicSettings?.schoolNsm || DEFAULT_SCHOOL_NSM)).trim() || DEFAULT_SCHOOL_NSM;
+      const schoolNpsn = String(cfg.schoolNpsn !== undefined ? cfg.schoolNpsn : (state.academicSettings?.schoolNpsn || DEFAULT_SCHOOL_NPSN)).trim() || DEFAULT_SCHOOL_NPSN;
+      const schoolAkreditasi = String(cfg.schoolAkreditasi !== undefined ? cfg.schoolAkreditasi : (state.academicSettings?.schoolAkreditasi || DEFAULT_SCHOOL_AKREDITASI)).trim() || DEFAULT_SCHOOL_AKREDITASI;
+      const schoolAddress = String(cfg.schoolAddress !== undefined ? cfg.schoolAddress : (state.academicSettings?.schoolAddress || DEFAULT_SCHOOL_ADDRESS)).trim() || DEFAULT_SCHOOL_ADDRESS;
 
       state.academicSettings = {
         activeAcademicYear: activeYear,
@@ -1614,6 +1634,11 @@
         headmasterNip,
         signatureCity,
         signatureDate,
+        schoolName,
+        schoolNsm,
+        schoolNpsn,
+        schoolAkreditasi,
+        schoolAddress,
         updatedAt: Math.max(incomingTs, currentTs)
       };
       return true;
@@ -1649,6 +1674,11 @@
           headmasterNip: state.academicSettings.headmasterNip || DEFAULT_HEADMASTER_NIP,
           signatureCity: state.academicSettings.signatureCity || DEFAULT_SIGNATURE_CITY,
           signatureDate: state.academicSettings.signatureDate || '',
+          schoolName: state.academicSettings.schoolName || DEFAULT_SCHOOL_NAME,
+          schoolNsm: state.academicSettings.schoolNsm || DEFAULT_SCHOOL_NSM,
+          schoolNpsn: state.academicSettings.schoolNpsn || DEFAULT_SCHOOL_NPSN,
+          schoolAkreditasi: state.academicSettings.schoolAkreditasi || DEFAULT_SCHOOL_AKREDITASI,
+          schoolAddress: state.academicSettings.schoolAddress || DEFAULT_SCHOOL_ADDRESS,
           updatedAt: Number(state.academicSettings.updatedAt || 0),
           teachingAssignments: state.teachingAssignments || {},
           deletedSubjectNames: state.deletedSubjectNames || [],
@@ -1673,7 +1703,7 @@
           applied = true;
         }
         if (parsed && Array.isArray(parsed.deletedSubjectNames)) {
-          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...parsed.deletedSubjectNames])).filter(n => n.toLowerCase() !== "baca tulis al qur'an");
+          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...parsed.deletedSubjectNames]));
           saveSubjectsMetaToStorage();
           applied = true;
         }
@@ -2301,7 +2331,7 @@
     function mergeSubjectsState({ dbSubjects = null, teachers = state.teachers, exams = state.exams } = {}) {
       const storedMeta = loadSubjectsMetaFromStorage();
       if (Array.isArray(storedMeta?.deletedNames)) {
-        state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...storedMeta.deletedNames])).filter(n => n.toLowerCase() !== "baca tulis al qur'an");
+        state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...storedMeta.deletedNames]));
       }
       const deletedSet = new Set(state.deletedSubjectNames.map(n => n.toLowerCase()));
 
@@ -2362,10 +2392,12 @@
 
       if (Array.isArray(dbSubjects) && dbSubjects.length > 0) {
         dbSubjects.forEach(s => registerSubject(s, true));
-      } else if (Array.isArray(state.subjects) && state.subjects.length > 0) {
-        state.subjects.forEach(s => registerSubject(s, true));
-      } else if (Array.isArray(storedMeta?.subjects) && storedMeta.subjects.length > 0) {
+      }
+      if (Array.isArray(storedMeta?.subjects) && storedMeta.subjects.length > 0) {
         storedMeta.subjects.forEach(s => registerSubject(s, true));
+      }
+      if (Array.isArray(state.subjects) && state.subjects.length > 0) {
+        state.subjects.forEach(s => registerSubject(s, true));
       }
 
       DEFAULT_SUBJECTS.forEach((name, idx) => {
@@ -3904,6 +3936,7 @@
       populateExamSelectors();
       state.isGuruMenuOpen = state.activeMenu === 'manajemen_guru';
       state.isMapelMenuOpen = state.activeMenu === 'manajemen_mapel';
+      state.isPengaturanMenuOpen = state.activeMenu === 'pengaturan_sistem';
       renderNavigationMenus();
       renderCurrentMenu();
       updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : (state.isSyncing ? 'syncing' : 'synced'));
@@ -3920,7 +3953,7 @@
       { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban PG, Benar Salah, Isian, dan Uraian', roles: ['guru'] },
       { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Tingkat kesukaran (P), capaian penguasaan siswa, dan tindak lanjut pembelajaran', roles: ['guru'] },
       { id: 'remedial_pengayaan', label: 'Remedial & Pengayaan', shortLabel: 'Remedial', icon: 'award', subtitle: 'Pemetaan otomatis ketuntasan siswa, tindak lanjut, dan cetak laporan', roles: ['guru'] },
-      { id: 'pengaturan_sistem', label: 'Pengaturan & Backup', shortLabel: 'Pengaturan', icon: 'settings', subtitle: 'Atur Tahun Ajaran & Semester aktif serta Backup & Restore data aplikasi', roles: ['admin'] }
+      { id: 'pengaturan_sistem', label: 'Pengaturan', shortLabel: 'Pengaturan', icon: 'settings', subtitle: 'Atur Tahun Ajaran, Identitas Madrasah, Kepala Madrasah, serta Backup & Restore data', roles: ['admin'] }
     ];
 
     function sortClassNamesNatural(classList) {
@@ -4219,11 +4252,15 @@
       state.activeMenu = menuId;
       state.isGuruMenuOpen = menuId === 'manajemen_guru';
       state.isMapelMenuOpen = menuId === 'manajemen_mapel';
+      state.isPengaturanMenuOpen = menuId === 'pengaturan_sistem';
       if (menuId !== 'manajemen_guru') {
         state.teacherManagementTab = 'akun';
       }
       if (menuId !== 'manajemen_mapel') {
         state.mapelKelasActiveTab = 'mapel';
+      }
+      if (menuId !== 'pengaturan_sistem') {
+        state.pengaturanActiveTab = 'periode';
       }
       if (menuId === 'manajemen_ulangan') {
         const isAdmin = isAdminUser();
@@ -4249,11 +4286,13 @@
         state.activeMenu = 'manajemen_guru';
         state.isGuruMenuOpen = true;
         state.isMapelMenuOpen = false;
+        state.isPengaturanMenuOpen = false;
         state.teacherManagementTab = 'akun';
       } else {
         state.isGuruMenuOpen = !state.isGuruMenuOpen;
         if (state.isGuruMenuOpen) {
           state.isMapelMenuOpen = false;
+          state.isPengaturanMenuOpen = false;
         }
       }
       saveSessionToStorage();
@@ -4266,6 +4305,7 @@
       state.teacherManagementTab = tab === 'mengajar' ? 'mengajar' : 'akun';
       state.isGuruMenuOpen = true;
       state.isMapelMenuOpen = false;
+      state.isPengaturanMenuOpen = false;
       saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -4276,11 +4316,13 @@
         state.activeMenu = 'manajemen_mapel';
         state.isMapelMenuOpen = true;
         state.isGuruMenuOpen = false;
+        state.isPengaturanMenuOpen = false;
         state.mapelKelasActiveTab = 'mapel';
       } else {
         state.isMapelMenuOpen = !state.isMapelMenuOpen;
         if (state.isMapelMenuOpen) {
           state.isGuruMenuOpen = false;
+          state.isPengaturanMenuOpen = false;
         }
       }
       saveSessionToStorage();
@@ -4293,6 +4335,37 @@
       state.mapelKelasActiveTab = tab === 'kelas' ? 'kelas' : 'mapel';
       state.isMapelMenuOpen = true;
       state.isGuruMenuOpen = false;
+      state.isPengaturanMenuOpen = false;
+      saveSessionToStorage();
+      renderNavigationMenus();
+      renderCurrentMenu();
+    };
+
+    window.togglePengaturanMenuCollapse = function () {
+      if (state.activeMenu !== 'pengaturan_sistem') {
+        state.activeMenu = 'pengaturan_sistem';
+        state.isPengaturanMenuOpen = true;
+        state.isGuruMenuOpen = false;
+        state.isMapelMenuOpen = false;
+        state.pengaturanActiveTab = 'periode';
+      } else {
+        state.isPengaturanMenuOpen = !state.isPengaturanMenuOpen;
+        if (state.isPengaturanMenuOpen) {
+          state.isGuruMenuOpen = false;
+          state.isMapelMenuOpen = false;
+        }
+      }
+      saveSessionToStorage();
+      renderNavigationMenus();
+      renderCurrentMenu();
+    };
+
+    window.navigatePengaturanSubmenu = function (tab) {
+      state.activeMenu = 'pengaturan_sistem';
+      state.pengaturanActiveTab = ['periode', 'kepala_madrasah', 'backup'].includes(tab) ? tab : 'periode';
+      state.isPengaturanMenuOpen = true;
+      state.isGuruMenuOpen = false;
+      state.isMapelMenuOpen = false;
       saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -4385,6 +4458,55 @@
           `;
         }
 
+        if (role === 'admin' && m.id === 'pengaturan_sistem') {
+          const isPengaturanActive = state.activeMenu === 'pengaturan_sistem';
+          const isPeriodeActive = isPengaturanActive && (!state.pengaturanActiveTab || state.pengaturanActiveTab === 'periode');
+          const isKepalaActive = isPengaturanActive && state.pengaturanActiveTab === 'kepala_madrasah';
+          const isBackupActive = isPengaturanActive && state.pengaturanActiveTab === 'backup';
+          const isOpen = Boolean(state.isPengaturanMenuOpen);
+          return `
+            <div class="space-y-1">
+              <button type="button" onclick="window.togglePengaturanMenuCollapse()"
+                class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isPengaturanActive
+                  ? 'bg-indigo-50/80 text-indigo-700'
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                }">
+                <div class="flex items-center gap-3.5 truncate">
+                  <i data-lucide="settings" class="w-[18px] h-[18px] shrink-0"></i>
+                  <span class="truncate">Pengaturan</span>
+                </div>
+                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
+              </button>
+              <div class="pl-7 pr-1 space-y-1 ${isOpen ? 'block' : 'hidden'}">
+                <button type="button" onclick="window.navigatePengaturanSubmenu('periode')"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isPeriodeActive
+                    ? 'flowora-btn-primary text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                  }">
+                  <i data-lucide="calendar-range" class="w-3.5 h-3.5 shrink-0"></i>
+                  <span class="truncate">Pengaturan Tahun Ajaran &amp; Semester</span>
+                </button>
+                <button type="button" onclick="window.navigatePengaturanSubmenu('kepala_madrasah')"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isKepalaActive
+                    ? 'flowora-btn-primary text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                  }">
+                  <i data-lucide="award" class="w-3.5 h-3.5 shrink-0"></i>
+                  <span class="truncate">Pengaturan Kepala Madrasah &amp; Tanda Tangan</span>
+                </button>
+                <button type="button" onclick="window.navigatePengaturanSubmenu('backup')"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isBackupActive
+                    ? 'flowora-btn-primary text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                  }">
+                  <i data-lucide="database-backup" class="w-3.5 h-3.5 shrink-0"></i>
+                  <span class="truncate">Backup &amp; Restore Data</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
         const isActive = state.activeMenu === m.id;
         return `
         <button type="button" onclick="window.navigateMenu('${m.id}')"
@@ -4433,6 +4555,17 @@
           } else {
             label = 'Mata Pelajaran';
             subtitle = 'Kelola daftar mata pelajaran madrasah dan atur urutan tampilan';
+          }
+        } else if (currentMeta.id === 'pengaturan_sistem' && role === 'admin') {
+          if (state.pengaturanActiveTab === 'kepala_madrasah') {
+            label = 'Pengaturan Kepala Madrasah & Tanda Tangan';
+            subtitle = 'Kelola identitas madrasah (KOP), Kepala Madrasah, kota domisili, dan titimangsa tanda tangan dokumen';
+          } else if (state.pengaturanActiveTab === 'backup') {
+            label = 'Backup & Restore Data';
+            subtitle = 'Cadangkan seluruh data aplikasi ke file JSON atau pulihkan kembali dari file backup';
+          } else {
+            label = 'Pengaturan Tahun Ajaran & Semester';
+            subtitle = 'Atur periode aktif sekolah untuk halaman login Guru & Admin';
           }
         } else if (currentMeta.id === 'manajemen_siswa' && role !== 'admin') {
           const tRole = getCurrentTeacherRoleMeta();
@@ -4734,7 +4867,7 @@
               <i data-lucide="graduation-cap" class="w-4 h-4"></i> Kelola Data Siswa
             </button>
             <button type="button" onclick="window.navigateMenu('pengaturan_sistem')" class="px-5 py-3 rounded-full bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-bold flex items-center gap-2 shadow-sm transition">
-              <i data-lucide="settings" class="w-4 h-4 text-indigo-600"></i> Pengaturan &amp; Backup
+              <i data-lucide="settings" class="w-4 h-4 text-indigo-600"></i> Pengaturan
             </button>
           ` : `
             <button type="button" onclick="window.navigateMenu('analisis_butir')" class="px-5 py-3 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-2">
@@ -7309,7 +7442,7 @@
       const reportHeaderHtml = `
         <div class="pr-kop">
           <div>
-            <div class="pr-kop-school">SIHASUL • MIS. Nurul Islam Km. 5 • TA ${escapeHtml(examMeta.academicYear || state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR)} (${escapeHtml(examMeta.semester || state.sessionSemester || DEFAULT_SEMESTER)})</div>
+            <div class="pr-kop-school">SIHASUL • ${escapeHtml(state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME)} • TA ${escapeHtml(examMeta.academicYear || state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR)} (${escapeHtml(examMeta.semester || state.sessionSemester || DEFAULT_SEMESTER)})</div>
             <div class="pr-kop-title">LAPORAN REKAP JAWABAN SISWA, ANALISIS BUTIR SOAL, REMEDIAL &amp; PENGAYAAN</div>
           </div>
           <div class="pr-kop-date">
@@ -7346,7 +7479,7 @@
       const renderSectionKopHtml = subTitle => `
         <div class="pr-kop" style="margin-bottom:8px;">
           <div>
-            <div class="pr-kop-school">SIHASUL • MIS. Nurul Islam Km. 5</div>
+            <div class="pr-kop-school">SIHASUL • ${escapeHtml(state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME)}</div>
             <div class="pr-kop-title">${subTitle}</div>
           </div>
           <div class="pr-kop-date">
@@ -8210,9 +8343,14 @@
       const prevDeletedNames = [...state.deletedSubjectNames];
 
       try {
-        state.deletedSubjectNames = state.deletedSubjectNames.filter(n => n.toLowerCase() !== lower);
-        let subjectRecord;
+        const subjectAliases = {
+          "al qur'an hadis": ["al-qur'an hadis", "al qur`an hadis", "al-qur`an hadis", "al quran hadis", "alqur'an hadis"],
+          "baca tulis al qur'an": ["btq", "baca tulis al-qur'an", "baca tulis al quran"]
+        };
+        const removeVariants = new Set([lower, ...(subjectAliases[lower] || [])]);
+        state.deletedSubjectNames = (state.deletedSubjectNames || []).filter(n => !removeVariants.has(String(n || '').trim().toLowerCase()));
 
+        let subjectRecord;
         if (existingTarget) {
           if (existingTarget.name.toLowerCase() !== lower && !state.deletedSubjectNames.some(n => n.toLowerCase() === existingTarget.name.toLowerCase())) {
             state.deletedSubjectNames.push(existingTarget.name);
@@ -8224,6 +8362,10 @@
           subjectRecord = { id: crypto.randomUUID(), name: cleanName, teacher_id: null, classes: nextClasses };
           state.subjects.push(subjectRecord);
         }
+
+        saveSubjectsMetaToStorage();
+        saveCacheToStorage();
+        saveSessionToStorage();
 
         if (!IS_PREVIEW && supabase) {
           state.academicSettings.updatedAt = Date.now();
@@ -8247,13 +8389,7 @@
         updateSyncBadge(pendingLeft > 0 ? 'pending' : 'synced');
 
         if (flushRes.fatalError) {
-          state.subjects = prevSubjectsSnapshot;
-          state.deletedSubjectNames = prevDeletedNames;
-          saveSubjectsMetaToStorage();
-          saveCacheToStorage();
-          await hideActionOverlay();
-          showToast('Gagal sinkron ke Supabase: ' + flushRes.fatalError.message, 'danger');
-          return;
+          console.warn('Sync notice for subject:', flushRes.fatalError);
         }
 
         state.editingSubjectId = null;
@@ -9165,7 +9301,7 @@
       const subjects = getApplicableSubjectsForStudentClass(cls);
       const rows = [
         `PEMBAGIAN TUGAS GURU MENGAJAR - ${cls.toUpperCase()}`,
-        `MIS. NURUL ISLAM KM. 5 BANJARMASIN`,
+        state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME,
         `Tahun Ajaran: ${state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR} • Semester: ${state.sessionSemester || DEFAULT_SEMESTER}`,
         '',
         `No\tMata Pelajaran\tInduk\tKelompok\tJurusan\tJTM\tGuru Pengampu`
@@ -9225,7 +9361,7 @@
         </head>
         <body>
           <h2>Penugasan Guru Mengajar • ${escapeHtml(cls)}</h2>
-          <p>MIS. Nurul Islam Km. 5 Banjarmasin &bull; Tahun Ajaran: ${escapeHtml(year)} &bull; Semester: ${escapeHtml(sem)}</p>
+          <p>${escapeHtml(state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME)} &bull; Tahun Ajaran: ${escapeHtml(year)} &bull; Semester: ${escapeHtml(sem)}</p>
           <table>
             <thead>
               <tr>
@@ -9260,7 +9396,7 @@
 
       const aoa = [
         ['PEMBAGIAN TUGAS GURU MENGAJAR'],
-        ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
+        [state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME],
         ['Kelas / Tingkat:', cls, 'Tahun Ajaran:', activeYear, 'Semester:', activeSem],
         [],
         ['No', 'Mata Pelajaran', 'Induk', 'Kelompok', 'Jurusan', 'JTM', 'Guru Pengampu']
@@ -9976,6 +10112,7 @@
       const activeYear = state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
       const activeSem = normalizeSemester(state.academicSettings?.activeSemester || DEFAULT_SEMESTER);
       const suggestedNextYear = getNextSuggestedAcademicYear();
+      const activeTab = state.pengaturanActiveTab || 'periode';
 
       const yearOptions = years.map(yr =>
         `<option value="${escapeHtml(yr)}" ${yr === activeYear ? 'selected' : ''}>${escapeHtml(yr)}</option>`
@@ -9984,8 +10121,40 @@
         `<option value="${escapeHtml(s)}" ${s === activeSem ? 'selected' : ''}>${escapeHtml(s)}</option>`
       ).join('');
 
-      return `
-      <div class="space-y-6">
+      // Top Tab Navigation Bar
+      const tabBarHtml = `
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <button type="button" onclick="window.navigatePengaturanSubmenu('periode')"
+            class="px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'periode'
+              ? 'flowora-btn-primary text-white shadow-sm'
+              : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+            }">
+            <i data-lucide="calendar-range" class="w-4 h-4"></i>
+            <span>Tahun Ajaran &amp; Semester</span>
+          </button>
+          <button type="button" onclick="window.navigatePengaturanSubmenu('kepala_madrasah')"
+            class="px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'kepala_madrasah'
+              ? 'flowora-btn-primary text-white shadow-sm'
+              : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+            }">
+            <i data-lucide="award" class="w-4 h-4"></i>
+            <span>Kepala Madrasah &amp; Tanda Tangan</span>
+          </button>
+          <button type="button" onclick="window.navigatePengaturanSubmenu('backup')"
+            class="px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'backup'
+              ? 'flowora-btn-primary text-white shadow-sm'
+              : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+            }">
+            <i data-lucide="database-backup" class="w-4 h-4"></i>
+            <span>Backup &amp; Restore Data</span>
+          </button>
+        </div>
+      `;
+
+      let activeContentHtml = '';
+
+      if (activeTab === 'periode') {
+        activeContentHtml = `
         <!-- Card 1: Pengaturan Tahun Ajaran & Semester -->
         <div class="glass-surface rounded-3xl p-6 space-y-5">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -10054,8 +10223,19 @@
             </div>
           </form>
         </div>
+        `;
+      } else if (activeTab === 'kepala_madrasah') {
+        const curSchoolName = state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME;
+        const curSchoolNsm = state.academicSettings?.schoolNsm || DEFAULT_SCHOOL_NSM;
+        const curSchoolNpsn = state.academicSettings?.schoolNpsn || DEFAULT_SCHOOL_NPSN;
+        const curSchoolAkreditasi = state.academicSettings?.schoolAkreditasi || DEFAULT_SCHOOL_AKREDITASI;
+        const curSchoolAddress = state.academicSettings?.schoolAddress || DEFAULT_SCHOOL_ADDRESS;
+        const curHeadmasterName = state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME;
+        const curHeadmasterNip = state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP;
+        const curCity = state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY;
+        const curDate = state.academicSettings?.signatureDate || '';
 
-        <!-- Card 2: Backup & Restore Data (Khusus Admin) -->
+        activeContentHtml = `
         <!-- Card 2: Pengaturan Kepala Madrasah & Tanda Tangan Dokumen (Khusus Admin) -->
         <div class="glass-surface rounded-3xl p-6 space-y-5">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -10065,82 +10245,161 @@
               </div>
               <div>
                 <div class="flex items-center gap-2 flex-wrap">
-                  <h3 class="text-base md:text-lg font-extrabold text-slate-900">Pengaturan Kepala Madrasah &amp; Tanda Tangan</h3>
+                  <h3 class="text-base md:text-lg font-extrabold text-slate-900">Pengaturan Identitas Madrasah, Kepala Madrasah &amp; Tanda Tangan</h3>
                   <span class="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-extrabold uppercase">Khusus Admin</span>
                 </div>
-                <p class="text-xs text-slate-500 mt-0.5">Kelola identitas Kepala Madrasah, kota domisili, dan tanggal pengesahan tanda tangan pada seluruh cetak laporan dan rekapitulasi nilai</p>
+                <p class="text-xs text-slate-500 mt-0.5">Kelola data identitas madrasah (KOP laporan), Kepala Madrasah, kota domisili, dan tanggal pengesahan tanda tangan pada seluruh cetak laporan dan rekap nilai</p>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <span class="px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold">
-                ${escapeHtml(state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY)} • ${escapeHtml(formatIndonesianDate(state.academicSettings?.signatureDate))}
+                ${escapeHtml(curCity)} • ${escapeHtml(formatIndonesianDate(curDate))}
               </span>
             </div>
           </div>
 
-          <form onsubmit="window.handleSaveSignatureSettings(event)" oninput="window.updateSignatureLivePreview()" class="p-5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-4">
-            <div>
-              <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-700">Form Identitas &amp; Pengesahan Tanda Tangan</h4>
-              <p class="text-[11px] text-slate-500 mt-0.5">Pengaturan ini akan langsung diterapkan pada Lembar Rekap Hasil Ulangan Siswa, Laporan Kelas, dan Analisis Butir Soal.</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap &amp; Gelar Kepala Madrasah</label>
-                <input type="text" id="set-headmaster-name" required
-                  placeholder="Contoh: H. Ahmad Syauqi, S.Pd.I, M.Pd."
-                  value="${escapeHtml(state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME)}"
-                  class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                <p class="text-[11px] text-slate-400 mt-1">Dicantumkan pada bagian "Mengetahui, Kepala Madrasah".</p>
+          <form onsubmit="window.handleSaveSignatureSettings(event)" oninput="window.updateSignatureLivePreview()" class="p-5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-6">
+            <!-- Bagian 1: Identitas Madrasah untuk KOP Laporan & Rekap -->
+            <div class="space-y-4">
+              <div class="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-indigo-900 border-b border-slate-200/80 pb-2">
+                <i data-lucide="building-2" class="w-4 h-4 text-indigo-600"></i>
+                <span>Bagian 1: Identitas Madrasah (KOP Laporan &amp; Cetak Rekap)</span>
               </div>
-
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">NIP Kepala Madrasah</label>
-                <input type="text" id="set-headmaster-nip" required
-                  placeholder="Contoh: 197808152005011004"
-                  value="${escapeHtml(state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP)}"
-                  class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                <p class="text-[11px] text-slate-400 mt-1">Nomor Induk Pegawai Kepala Madrasah (18 digit angka atau strip jika belum ada).</p>
-              </div>
-
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Kota Lokasi Tanda Tangan</label>
-                <input type="text" id="set-signature-city" required
-                  placeholder="Contoh: Banjarmasin"
-                  value="${escapeHtml(state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY)}"
-                  class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                <p class="text-[11px] text-slate-400 mt-1">Kota domisili penerbitan dokumen laporan (misal: Banjarmasin).</p>
-              </div>
-
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal Pengesahan (Opsional)</label>
-                <input type="date" id="set-signature-date"
-                  value="${escapeHtml(state.academicSettings?.signatureDate || '')}"
-                  class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                <p class="text-[11px] text-slate-400 mt-1">Kosongkan agar tanggal tanda tangan otomatis mengikuti tanggal saat ini ketika mencetak.</p>
-              </div>
-            </div>
-
-            <!-- Preview Format Tanda Tangan -->
-            <div class="p-4 rounded-2xl bg-white border border-slate-200/90 space-y-2">
-              <div class="flex items-center justify-between text-xs font-bold text-slate-600">
-                <span class="flex items-center gap-1.5"><i data-lucide="eye" class="w-3.5 h-3.5 text-indigo-500"></i> Pratinjau Format Tanda Tangan Dokumen:</span>
-                <span class="text-[11px] text-indigo-600 font-semibold">Dinamis Otomatis Sesuai Jabatan &amp; Mapel Guru</span>
-              </div>
-              <div class="grid grid-cols-2 gap-4 text-center py-3 px-4 bg-slate-50/60 rounded-xl border border-slate-200/70 text-xs">
-                <div class="space-y-1">
-                  <div class="text-slate-500 font-medium">Mengetahui,</div>
-                  <div class="font-bold text-slate-800">Kepala Madrasah</div>
-                  <div class="h-10"></div>
-                  <div id="preview-headmaster-name" class="font-extrabold text-slate-900 underline">${escapeHtml(state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME)}</div>
-                  <div id="preview-headmaster-nip" class="text-[11px] text-slate-500">NIP. ${escapeHtml(state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP)}</div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Madrasah / Sekolah</label>
+                  <input type="text" id="set-school-name" required
+                    placeholder="Contoh: MIS. NURUL ISLAM KM. 5 BANJARMASIN"
+                    value="${escapeHtml(curSchoolName)}"
+                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p class="text-[11px] text-slate-400 mt-1">Nama madrasah yang dicantumkan pada judul utama KOP Laporan &amp; Rekapitulasi Nilai.</p>
                 </div>
-                <div class="space-y-1">
-                  <div id="preview-signature-city-date" class="text-slate-500 font-medium">${escapeHtml(state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY)}, ${escapeHtml(formatIndonesianDate(state.academicSettings?.signatureDate))}</div>
-                  <div class="font-bold text-slate-800">Wali Kelas / Guru Mapel</div>
-                  <div class="h-10"></div>
-                  <div class="font-extrabold text-slate-900 underline">Nama Guru Pengampu</div>
-                  <div class="text-[11px] text-slate-500">Sesuai Jenis ID (NIP / NUPTK / PegID)</div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">NSM (Nomor Statistik Madrasah)</label>
+                  <input type="text" id="set-school-nsm" required
+                    placeholder="Contoh: 111263710005"
+                    value="${escapeHtml(curSchoolNsm)}"
+                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p class="text-[11px] text-slate-400 mt-1">12 digit Nomor Statistik Madrasah resmi Kemenag.</p>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">NPSN (Nomor Pokok Sekolah Nasional)</label>
+                  <input type="text" id="set-school-npsn" required
+                    placeholder="Contoh: 60723456"
+                    value="${escapeHtml(curSchoolNpsn)}"
+                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p class="text-[11px] text-slate-400 mt-1">8 digit NPSN Kemendikbud/Kemenag.</p>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Status Akreditasi</label>
+                  <input type="text" id="set-school-akreditasi" required
+                    placeholder="Contoh: Terakreditasi B"
+                    value="${escapeHtml(curSchoolAkreditasi)}"
+                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p class="text-[11px] text-slate-400 mt-1">Status akreditasi madrasah (misal: Terakreditasi A / B).</p>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Alamat Lengkap Madrasah</label>
+                  <input type="text" id="set-school-address" required
+                    placeholder="Contoh: Jl. Ahmad Yani Km. 5 No. 45, Kec. Banjarmasin Timur, Kota Banjarmasin"
+                    value="${escapeHtml(curSchoolAddress)}"
+                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p class="text-[11px] text-slate-400 mt-1">Jalan, nomor, kelurahan/kecamatan, dan kota domisili madrasah.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bagian 2: Kepala Madrasah & Titimangsa Dokumen -->
+            <div class="space-y-4 pt-3 border-t border-slate-200/80">
+              <div class="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-indigo-900 border-b border-slate-200/80 pb-2">
+                <i data-lucide="pen-tool" class="w-4 h-4 text-indigo-600"></i>
+                <span>Bagian 2: Pengesahan Kepala Madrasah &amp; Titimangsa Dokumen</span>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap &amp; Gelar Kepala Madrasah</label>
+                  <input type="text" id="set-headmaster-name" required
+                    placeholder="Contoh: H. Ahmad Syauqi, S.Pd.I, M.Pd."
+                    value="${escapeHtml(curHeadmasterName)}"
+                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p class="text-[11px] text-slate-400 mt-1">Dicantumkan pada bagian "Mengetahui, Kepala Madrasah".</p>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">NIP / NPK Kepala Madrasah</label>
+                  <input type="text" id="set-headmaster-nip" required
+                    placeholder="Contoh: 197808152005011004"
+                    value="${escapeHtml(curHeadmasterNip)}"
+                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p class="text-[11px] text-slate-400 mt-1">Nomor Induk Pegawai Kepala Madrasah (18 digit angka atau strip jika belum ada).</p>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Kota Lokasi Tanda Tangan</label>
+                  <input type="text" id="set-signature-city" required
+                    placeholder="Contoh: Banjarmasin"
+                    value="${escapeHtml(curCity)}"
+                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p class="text-[11px] text-slate-400 mt-1">Kota domisili penerbitan dokumen laporan (misal: Banjarmasin).</p>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal Pengesahan (Opsional)</label>
+                  <input type="date" id="set-signature-date"
+                    value="${escapeHtml(curDate)}"
+                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p class="text-[11px] text-slate-400 mt-1">Kosongkan agar tanggal tanda tangan otomatis mengikuti tanggal saat ini ketika mencetak.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Preview KOP & Preview Format Tanda Tangan -->
+            <div class="space-y-4 pt-2">
+              <!-- Pratinjau KOP Laporan -->
+              <div class="p-4 rounded-2xl bg-white border border-slate-200/90 space-y-3">
+                <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span class="flex items-center gap-1.5"><i data-lucide="file-text" class="w-3.5 h-3.5 text-indigo-500"></i> Pratinjau KOP Dokumen Laporan &amp; Rekapitulasi:</span>
+                  <span class="text-[11px] text-indigo-600 font-semibold">Tampil pada KOP Cetak PDF &amp; Rekap Nilai</span>
+                </div>
+                <div class="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80 text-center space-y-1">
+                  <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">KEMENTERIAN AGAMA REPUBLIK INDONESIA</div>
+                  <div id="preview-school-name" class="text-sm font-black text-slate-900 tracking-wide">${escapeHtml(curSchoolName)}</div>
+                  <div id="preview-school-meta" class="text-[10.5px] font-semibold text-slate-600">
+                    NSM: ${escapeHtml(curSchoolNsm)} • NPSN: ${escapeHtml(curSchoolNpsn)} • ${escapeHtml(curSchoolAkreditasi)}
+                  </div>
+                  <div id="preview-school-address" class="text-[10px] text-slate-500">
+                    ${escapeHtml(curSchoolAddress)}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pratinjau Format Tanda Tangan Dokumen -->
+              <div class="p-4 rounded-2xl bg-white border border-slate-200/90 space-y-2">
+                <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span class="flex items-center gap-1.5"><i data-lucide="eye" class="w-3.5 h-3.5 text-indigo-500"></i> Pratinjau Format Tanda Tangan Dokumen:</span>
+                  <span class="text-[11px] text-indigo-600 font-semibold">Dinamis Otomatis Sesuai Jabatan &amp; Mapel Guru</span>
+                </div>
+                <div class="grid grid-cols-2 gap-4 text-center py-3 px-4 bg-slate-50/60 rounded-xl border border-slate-200/70 text-xs">
+                  <div class="space-y-1">
+                    <div class="text-slate-500 font-medium">Mengetahui,</div>
+                    <div class="font-bold text-slate-800">Kepala Madrasah</div>
+                    <div class="h-10"></div>
+                    <div id="preview-headmaster-name" class="font-extrabold text-slate-900 underline">${escapeHtml(curHeadmasterName)}</div>
+                    <div id="preview-headmaster-nip" class="text-[11px] text-slate-500">NIP. ${escapeHtml(curHeadmasterNip)}</div>
+                  </div>
+                  <div class="space-y-1">
+                    <div id="preview-signature-city-date" class="text-slate-500 font-medium">${escapeHtml(curCity)}, ${escapeHtml(formatIndonesianDate(curDate))}</div>
+                    <div class="font-bold text-slate-800">Wali Kelas / Guru Mapel</div>
+                    <div class="h-10"></div>
+                    <div class="font-extrabold text-slate-900 underline">Nama Guru Pengampu</div>
+                    <div class="text-[11px] text-slate-500">Sesuai Jenis ID (NIP / NUPTK / PegID)</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -10148,12 +10407,15 @@
             <div class="flex justify-end pt-2">
               <button type="submit"
                 class="w-full sm:w-auto py-2.5 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition">
-                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Simpan Pengaturan Tanda Tangan
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Simpan Pengaturan Identitas &amp; Tanda Tangan
               </button>
             </div>
           </form>
         </div>
-
+        `;
+      } else {
+        // activeTab === 'backup'
+        activeContentHtml = `
         <!-- Card 3: Backup & Restore Data (Khusus Admin) -->
         <div class="glass-surface rounded-3xl p-6 space-y-5">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -10206,7 +10468,7 @@
                   Backup Data Lengkap (.json)
                 </div>
                 <p class="text-xs text-emerald-800/80 leading-relaxed">
-                  Mengunduh salinan lengkap seluruh akun Guru, Data Siswa, Mapel &amp; Kelas, Paket Ulangan, Kunci Jawaban, Hasil Nilai dari semua Tahun Ajaran &amp; Semester, serta pengaturan periode aktif.
+                  Mengunduh salinan lengkap seluruh akun Guru, Data Siswa, Mapel &amp; Kelas, Paket Ulangan, Kunci Jawaban, Hasil Nilai dari semua Tahun Ajaran &amp; Semester, serta pengaturan identitas sekolah &amp; periode aktif.
                 </p>
               </div>
               <button type="button" onclick="window.handleBackupAllDataJson()"
@@ -10235,6 +10497,13 @@
             </div>
           </div>
         </div>
+        `;
+      }
+
+      return `
+      <div class="space-y-6">
+        ${tabBarHtml}
+        ${activeContentHtml}
       </div>
       `;
     }
@@ -10308,14 +10577,28 @@
     };
 
     window.updateSignatureLivePreview = function () {
+      const schoolNameVal = document.getElementById('set-school-name')?.value.trim() || DEFAULT_SCHOOL_NAME;
+      const schoolNsmVal = document.getElementById('set-school-nsm')?.value.trim() || DEFAULT_SCHOOL_NSM;
+      const schoolNpsnVal = document.getElementById('set-school-npsn')?.value.trim() || DEFAULT_SCHOOL_NPSN;
+      const schoolAkreditasiVal = document.getElementById('set-school-akreditasi')?.value.trim() || DEFAULT_SCHOOL_AKREDITASI;
+      const schoolAddressVal = document.getElementById('set-school-address')?.value.trim() || DEFAULT_SCHOOL_ADDRESS;
+
       const nameVal = document.getElementById('set-headmaster-name')?.value.trim() || DEFAULT_HEADMASTER_NAME;
       const nipVal = document.getElementById('set-headmaster-nip')?.value.trim() || DEFAULT_HEADMASTER_NIP;
       const cityVal = document.getElementById('set-signature-city')?.value.trim() || DEFAULT_SIGNATURE_CITY;
       const dateVal = document.getElementById('set-signature-date')?.value.trim() || '';
 
+      const schoolNameEl = document.getElementById('preview-school-name');
+      const schoolMetaEl = document.getElementById('preview-school-meta');
+      const schoolAddressEl = document.getElementById('preview-school-address');
+
       const nameEl = document.getElementById('preview-headmaster-name');
       const nipEl = document.getElementById('preview-headmaster-nip');
       const cityDateEl = document.getElementById('preview-signature-city-date');
+
+      if (schoolNameEl) schoolNameEl.textContent = schoolNameVal;
+      if (schoolMetaEl) schoolMetaEl.textContent = `NSM: ${schoolNsmVal} • NPSN: ${schoolNpsnVal} • ${schoolAkreditasiVal}`;
+      if (schoolAddressEl) schoolAddressEl.textContent = schoolAddressVal;
 
       if (nameEl) nameEl.textContent = nameVal;
       if (nipEl) nipEl.textContent = `NIP. ${nipVal}`;
@@ -10325,9 +10608,15 @@
     window.handleSaveSignatureSettings = async function (e) {
       e.preventDefault();
       if (!isAdminUser()) {
-        showToast('Pengaturan tanda tangan khusus untuk Administrator.', 'warning');
+        showToast('Pengaturan identitas dan tanda tangan khusus untuk Administrator.', 'warning');
         return;
       }
+      const schoolNameVal = String(document.getElementById('set-school-name')?.value || '').trim() || DEFAULT_SCHOOL_NAME;
+      const schoolNsmVal = String(document.getElementById('set-school-nsm')?.value || '').trim() || DEFAULT_SCHOOL_NSM;
+      const schoolNpsnVal = String(document.getElementById('set-school-npsn')?.value || '').trim() || DEFAULT_SCHOOL_NPSN;
+      const schoolAkreditasiVal = String(document.getElementById('set-school-akreditasi')?.value || '').trim() || DEFAULT_SCHOOL_AKREDITASI;
+      const schoolAddressVal = String(document.getElementById('set-school-address')?.value || '').trim() || DEFAULT_SCHOOL_ADDRESS;
+
       const nameVal = String(document.getElementById('set-headmaster-name')?.value || '').trim() || DEFAULT_HEADMASTER_NAME;
       const nipVal = String(document.getElementById('set-headmaster-nip')?.value || '').trim() || DEFAULT_HEADMASTER_NIP;
       const cityVal = String(document.getElementById('set-signature-city')?.value || '').trim() || DEFAULT_SIGNATURE_CITY;
@@ -10339,6 +10628,11 @@
       try {
         applyAcademicSettingsObject({
           ...state.academicSettings,
+          schoolName: schoolNameVal,
+          schoolNsm: schoolNsmVal,
+          schoolNpsn: schoolNpsnVal,
+          schoolAkreditasi: schoolAkreditasiVal,
+          schoolAddress: schoolAddressVal,
           headmasterName: nameVal,
           headmasterNip: nipVal,
           signatureCity: cityVal,
@@ -10362,10 +10656,10 @@
         }
 
         renderCurrentMenu();
-        showToast('Pengaturan Kepala Madrasah & Tanda Tangan berhasil disimpan!', 'success');
+        showToast('Pengaturan Identitas Madrasah & Tanda Tangan berhasil disimpan!', 'success');
       } catch (err) {
         console.error('Save signature settings error:', err);
-        showToast('Gagal menyimpan pengaturan tanda tangan: ' + err.message, 'danger');
+        showToast('Gagal menyimpan pengaturan: ' + err.message, 'danger');
       } finally {
         setButtonLoading(submitterBtn, false);
       }
@@ -10466,17 +10760,50 @@
       state.examSubjectFilter = 'ALL';
       state.activeExamId = null;
       state.editingExamId = null;
-      state.editingResultId = null;
-      saveSessionToStorage();
       updateWorkspacePeriodUI();
       populateExamSelectors();
       renderCurrentMenu();
       showToast(`Tahun Ajaran aktif diubah ke ${nextYear} (${nextSem}).`, 'success');
     };
 
-    window.handleRestoreBackupJson = async function (e) {
-      renderCurrentMenu();
-      showToast(`Tahun Ajaran aktif diubah ke ${nextYear} (${nextSem}).`, 'success');
+    window.handleBackupAllDataJson = function () {
+      if (!isAdminUser()) {
+        showToast('Backup data khusus untuk Administrator.', 'warning');
+        return;
+      }
+      try {
+        const payload = {
+          app: 'SIHASUL',
+          version: '1.0',
+          exportedAt: new Date().toISOString(),
+          data: {
+            teachers: state.teachers || [],
+            classes: (state.classes || []).filter(c => c && c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME),
+            subjects: state.subjects || [],
+            deletedSubjectNames: state.deletedSubjectNames || [],
+            students: state.students || [],
+            exams: state.exams || [],
+            examResults: state.examResults || [],
+            academicSettings: state.academicSettings || {},
+            teachingAssignments: state.teachingAssignments || {}
+          }
+        };
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const fileName = `SIHASUL_BACKUP_${dateStr}.json`;
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('File backup SIHASUL (.json) berhasil diunduh!', 'success');
+      } catch (err) {
+        console.error('Backup error:', err);
+        showToast('Gagal membuat backup data: ' + err.message, 'danger');
+      }
     };
 
     window.handleRestoreBackupJson = async function (e) {
@@ -11101,20 +11428,18 @@
       if (Array.isArray(state.subjects) && state.subjects.length > 0) {
         state.subjects.forEach(s => {
           const cleanName = String(s?.name || '').trim();
+          if (!cleanName || cleanName === '-') return;
           let lower = cleanName.toLowerCase();
           if (lower === 'pai' || lower === 'pendidikan agama islam') return;
           if (lower === "al-qur'an hadis" || lower === "al qur`an hadis" || lower === "al-qur`an hadis" || lower === "al quran hadis") {
             lower = "al qur'an hadis";
           }
-          const aliasList = aliases[lower] || [];
-          const allVariants = [lower, ...aliasList];
-          if (allVariants.some(v => deletedSet.has(v))) return;
-
-          if (!seen.has(lower) && !deletedSet.has(lower)) {
+          if (!seen.has(lower)) {
             const displayName = (lower === "al qur'an hadis") ? "Al Qur'an Hadis" : cleanName;
             orderedList.push(displayName);
             seen.add(lower);
-            allVariants.forEach(v => seen.add(v));
+            const aliasList = aliases[lower] || [];
+            aliasList.forEach(v => seen.add(v));
           }
         });
       }
@@ -11209,9 +11534,9 @@
         <div class="pr-kop">
           <div>
             <div class="pr-kop-school">KEMENTERIAN AGAMA REPUBLIK INDONESIA</div>
-            <div class="pr-kop-title">MIS. NURUL ISLAM KM. 5 BANJARMASIN</div>
-            <div style="font-size:10px; color:#475569; margin-top:2px;">NSM: 111263710005 • NPSN: 60723456 • Terakreditasi B</div>
-            <div style="font-size:9.5px; color:#64748b;">Jl. Ahmad Yani Km. 5 No. 45, Kec. Banjarmasin Timur, Kota Banjarmasin</div>
+            <div class="pr-kop-title">${escapeHtml(state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME)}</div>
+            <div style="font-size:10px; color:#475569; margin-top:2px;">NSM: ${escapeHtml(state.academicSettings?.schoolNsm || DEFAULT_SCHOOL_NSM)} • NPSN: ${escapeHtml(state.academicSettings?.schoolNpsn || DEFAULT_SCHOOL_NPSN)} • ${escapeHtml(state.academicSettings?.schoolAkreditasi || DEFAULT_SCHOOL_AKREDITASI)}</div>
+            <div style="font-size:9.5px; color:#64748b;">${escapeHtml(state.academicSettings?.schoolAddress || DEFAULT_SCHOOL_ADDRESS)}</div>
           </div>
           <div class="pr-kop-date">
             <div><strong>Tahun Ajaran:</strong> ${escapeHtml(activeYear)}</div>
@@ -11345,7 +11670,7 @@
       const applicableSubjects = getApplicableSubjectsForStudentClass(stu.class_name);
       const aoaSheet1 = [
         ['LEMBAR REKAP ANALISIS HASIL ULANGAN'],
-        ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
+        [state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME],
         ['Tahun Ajaran:', activeYear, 'Semester:', activeSem, 'Tanggal Ekspor:', dateStr],
         [],
         ['Nama Siswa:', stu.full_name, 'NIS/NISN:', stu.nis || '-'],
@@ -11421,7 +11746,7 @@
       // Sheet 2: Rekap Lembar Jawaban Siswa per Butir
       const aoaSheet2 = [
         ['REKAP HASIL INPUT JAWABAN SISWA PER BUTIR SOAL'],
-        ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
+        [state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME],
         ['Nama Siswa:', stu.full_name, 'NIS:', stu.nis || '-', 'Kelas:', stu.class_name],
         ['Tahun Ajaran:', activeYear, 'Semester:', activeSem, 'Tanggal Ekspor:', dateStr],
         [],
@@ -11452,7 +11777,7 @@
       // Sheet 3: Analisis Butir & Program Remedial
       const aoaSheet3 = [
         ['ANALISIS BUTIR SOAL & PROGRAM TINDAK LANJUT REMEDIAL'],
-        ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
+        [state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME],
         ['Nama Siswa:', stu.full_name, 'NIS:', stu.nis || '-', 'Kelas:', stu.class_name],
         [],
         ['No', 'Mata Pelajaran', 'Judul Ulangan', 'KKM', 'Nilai Siswa', 'Status', 'Diagnosis Butir Belum Tuntas', 'Rekomendasi Tindak Lanjut Guru']
@@ -11534,9 +11859,9 @@
         <div class="pr-kop">
           <div>
             <div class="pr-kop-school">KEMENTERIAN AGAMA REPUBLIK INDONESIA</div>
-            <div class="pr-kop-title">MIS. NURUL ISLAM KM. 5 BANJARMASIN</div>
-            <div style="font-size:10px; color:#475569; margin-top:2px;">NSM: 111263710005 • NPSN: 60723456 • Terakreditasi B</div>
-            <div style="font-size:9.5px; color:#64748b;">Jl. Ahmad Yani Km. 5 No. 45, Kec. Banjarmasin Timur, Kota Banjarmasin</div>
+            <div class="pr-kop-title">${escapeHtml(state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME)}</div>
+            <div style="font-size:10px; color:#475569; margin-top:2px;">NSM: ${escapeHtml(state.academicSettings?.schoolNsm || DEFAULT_SCHOOL_NSM)} • NPSN: ${escapeHtml(state.academicSettings?.schoolNpsn || DEFAULT_SCHOOL_NPSN)} • ${escapeHtml(state.academicSettings?.schoolAkreditasi || DEFAULT_SCHOOL_AKREDITASI)}</div>
+            <div style="font-size:9.5px; color:#64748b;">${escapeHtml(state.academicSettings?.schoolAddress || DEFAULT_SCHOOL_ADDRESS)}</div>
           </div>
           <div class="pr-kop-date">
             <div><strong>Tahun Ajaran:</strong> ${escapeHtml(activeYear)}</div>
@@ -11669,7 +11994,7 @@
 
       const aoa = [
         [`REKAPITULASI HASIL ULANGAN & KETUNTASAN KELAS ${targetClass.toUpperCase()}`],
-        ['MIS. NURUL ISLAM KM. 5 BANJARMASIN'],
+        [state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME],
         ['Tahun Ajaran:', activeYear, 'Semester:', activeSem, 'Tanggal Ekspor:', dateStr],
         [],
         headers
@@ -11981,6 +12306,9 @@
         state.currentUser = savedSession.currentUser;
         state.impersonatedByAdmin = savedSession.impersonatedByAdmin || null;
         state.activeMenu = savedSession.activeMenu || 'dashboard';
+        if (savedSession.teacherManagementTab) state.teacherManagementTab = savedSession.teacherManagementTab;
+        if (savedSession.mapelKelasActiveTab) state.mapelKelasActiveTab = savedSession.mapelKelasActiveTab;
+        if (savedSession.pengaturanActiveTab) state.pengaturanActiveTab = savedSession.pengaturanActiveTab;
         state.sessionAcademicYear = savedSession.sessionAcademicYear || state.academicSettings.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
         state.sessionSemester = normalizeSemester(savedSession.sessionSemester || state.academicSettings.activeSemester || DEFAULT_SEMESTER);
         if (savedSession.activeExamId) state.activeExamId = savedSession.activeExamId;
