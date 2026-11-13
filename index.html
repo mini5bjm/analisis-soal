@@ -1703,16 +1703,38 @@
           applied = true;
         }
         if (parsed && Array.isArray(parsed.deletedSubjectNames)) {
-          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...parsed.deletedSubjectNames]));
+          // Jangan pernah mengizinkan remote deletedSubjectNames menghapus mapel yang aktif di lokal atau punya guru
+          const activeKeys = new Set([
+            ...(state.subjects || []).map(s => normalizeSubjectKey(s?.name)),
+            ...Object.keys(state.teachingAssignments || {}).map(k => {
+              const parts = k.split('::');
+              const rec = state.teachingAssignments[k];
+              return (rec && (rec.teacherId || (rec.teacherName && String(rec.teacherName).trim() && rec.teacherName !== '-')))
+                ? normalizeSubjectKey(parts.slice(1).join('::'))
+                : null;
+            })
+          ].filter(Boolean));
+
+          const safeDeleted = parsed.deletedSubjectNames.filter(n => {
+            const k = normalizeSubjectKey(n);
+            return k && !activeKeys.has(k);
+          });
+          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...safeDeleted]));
           saveSubjectsMetaToStorage();
           applied = true;
         }
         if (parsed && Array.isArray(parsed.customSubjects)) {
+          const currentDeletedKeys = new Set(state.deletedSubjectNames.map(n => normalizeSubjectKey(n)).filter(Boolean));
           parsed.customSubjects.forEach(cs => {
-            if (cs && cs.name && !state.deletedSubjectNames.some(d => d.toLowerCase() === cs.name.toLowerCase())) {
-              const existing = state.subjects.find(s => s.name.toLowerCase() === cs.name.toLowerCase());
-              if (!existing) {
-                state.subjects.push(cs);
+            if (cs && cs.name) {
+              const csKey = normalizeSubjectKey(cs.name);
+              if (!currentDeletedKeys.has(csKey)) {
+                const existing = state.subjects.find(s => isSameSubject(s.name, cs.name));
+                if (!existing) {
+                  state.subjects.push(cs);
+                } else if (cs.classes && (!existing.classes || existing.classes[0] === 'Semua Kelas')) {
+                  existing.classes = normalizeSubjectClasses(cs.classes);
+                }
               }
             }
           });
@@ -2333,7 +2355,30 @@
       if (Array.isArray(storedMeta?.deletedNames)) {
         state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...storedMeta.deletedNames]));
       }
-      const deletedSet = new Set(state.deletedSubjectNames.map(n => n.toLowerCase()));
+
+      // Pastikan semua mapel aktif di state.subjects, storedMeta.subjects, atau memiliki penugasan guru TIDAK PERNAH terhapus
+      const activeKeys = new Set([
+        ...(state.subjects || []).map(s => normalizeSubjectKey(s?.name)),
+        ...(storedMeta?.subjects || []).map(s => normalizeSubjectKey(s?.name))
+      ].filter(Boolean));
+
+      // Jika ada penugasan guru di teachingAssignments, mapel tersebut pasti aktif
+      Object.keys(state.teachingAssignments || {}).forEach(k => {
+        const parts = k.split('::');
+        if (parts.length >= 2) {
+          const rec = state.teachingAssignments[k];
+          if (rec && (rec.teacherId || (rec.teacherName && String(rec.teacherName).trim() && rec.teacherName !== '-'))) {
+            activeKeys.add(normalizeSubjectKey(parts.slice(1).join('::')));
+          }
+        }
+      });
+
+      // Filter state.deletedSubjectNames agar tidak menghapus mapel aktif
+      state.deletedSubjectNames = (state.deletedSubjectNames || []).filter(n => {
+        const k = normalizeSubjectKey(n);
+        return k && !activeKeys.has(k);
+      });
+      const deletedKeySet = new Set(state.deletedSubjectNames.map(n => normalizeSubjectKey(n)).filter(Boolean));
 
       const savedClassesByLower = new Map();
       const savedClassesById = new Map();
@@ -2348,11 +2393,8 @@
       const teacherBySubjectLower = new Map();
       (teachers || []).forEach(t => {
         parseTeacherSubjects(t.subject).forEach(subName => {
-          let sLow = subName.toLowerCase();
-          if (sLow === "al-qur'an hadis" || sLow === "al qur`an hadis" || sLow === "al-qur`an hadis" || sLow === "al quran hadis") {
-            sLow = "al qur'an hadis";
-          }
-          teacherBySubjectLower.set(sLow, t.id);
+          const k = normalizeSubjectKey(subName);
+          teacherBySubjectLower.set(k, t.id);
         });
       });
 
@@ -2360,16 +2402,21 @@
       const registerSubject = (item, allowTeacherOverwrite = true) => {
         const cleanName = String(item?.name || '').trim();
         if (!cleanName || cleanName === '-') return;
+        const subKey = normalizeSubjectKey(cleanName);
+        if (deletedKeySet.has(subKey)) return;
+
         let lower = cleanName.toLowerCase();
         let displayName = cleanName;
-        if (lower === "al-qur'an hadis" || lower === "al qur`an hadis" || lower === "al-qur`an hadis" || lower === "al quran hadis") {
+        if (subKey === "al quran hadis") {
           lower = "al qur'an hadis";
           displayName = "Al Qur'an Hadis";
+        } else if (subKey === "baca tulis al quran") {
+          lower = "baca tulis al qur'an";
+          displayName = "Baca Tulis Al Qur'an";
         }
-        if (deletedSet.has(lower)) return;
 
-        const existing = byLowerName.get(lower);
-        const teacherFromDb = teacherBySubjectLower.get(lower) || null;
+        const existing = byLowerName.get(lower) || Array.from(byLowerName.values()).find(s => isSameSubject(s.name, cleanName));
+        const teacherFromDb = teacherBySubjectLower.get(subKey) || null;
         const resolvedClasses = item.classes
           ? normalizeSubjectClasses(item.classes)
           : (savedClassesById.get(item.id) || savedClassesByLower.get(lower) || ['Semua Kelas']);
@@ -2411,12 +2458,12 @@
       });
 
       (exams || []).forEach(ex => {
-        if (ex.subject && !deletedSet.has(ex.subject.trim().toLowerCase())) {
+        if (ex.subject && !deletedKeySet.has(normalizeSubjectKey(ex.subject))) {
           registerSubject({ id: crypto.randomUUID(), name: ex.subject.trim(), teacher_id: ex.teacher_id || null }, true);
         }
       });
 
-      state.subjects = Array.from(byLowerName.values()).filter(s => !deletedSet.has(String(s?.name || '').trim().toLowerCase()));
+      state.subjects = Array.from(byLowerName.values()).filter(s => !deletedKeySet.has(normalizeSubjectKey(s?.name)));
       saveSubjectsMetaToStorage();
     }
 
@@ -2487,14 +2534,14 @@
     function normalizeSubjectKey(name) {
       let s = String(name || '').toLowerCase().trim();
       s = s.replace(/[-`']/g, ' ').replace(/\s+/g, ' ');
-      if (s.includes('quran hadis') || s.includes('qur an hadis') || s.includes('al quran') || s.includes('al qur an')) return 'al quran hadis';
+      if (s.includes('baca tulis') || s === 'btq' || s === 'bta') return 'baca tulis al quran';
+      if (s.includes('quran hadis') || s.includes('qur an hadis') || (s.includes('hadis') && s.includes('qur')) || s === 'al quran hadis' || s === 'quran hadis') return 'al quran hadis';
       if (s === 'ski' || s.includes('sejarah kebudayaan islam')) return 'ski';
       if (s === 'pancasila' || s.includes('pendidikan pancasila') || s.includes('pend pancasila')) return 'pendidikan pancasila';
       if (s === 'ipas' || s.includes('ilmu pengetahuan alam dan sosial')) return 'ipas';
       if (s === 'pjok' || s.includes('pendidikan jasmani') || s.includes('penjaskes') || s.includes('penjasorkes')) return 'pjok';
       if (s === 'sbdp' || s.includes('seni budaya')) return 'sbdp';
       if (s === 'bahasa inggris' || s === 'b inggris' || s === 'inggris') return 'bahasa inggris';
-      if (s.includes('baca tulis al quran') || s === 'btq' || s === 'bta') return 'baca tulis al quran';
       if (s.includes('akidah akhlak') || s.includes('aqidah akhlak') || s === 'akidah' || s === 'aqidah') return 'akidah akhlak';
       if (s === 'fikih' || s === 'fiqih') return 'fikih';
       if (s === 'bahasa arab' || s === 'b arab') return 'bahasa arab';
@@ -3320,7 +3367,21 @@
         await fetchAllSupabaseData();
         state.lastSyncedAt = new Date();
         saveCacheToStorage();
+        saveSubjectsMetaToStorage();
         updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+
+        // Pastikan konfigurasi mapel dan pembersihan deletedSubjectNames langsung tersinkron ke Supabase
+        if (!IS_PREVIEW && supabase && state.currentUser?.role === 'admin') {
+          enqueuePendingSync({
+            id: crypto.randomUUID(),
+            table: 'classes',
+            action: 'upsert',
+            record: buildAcademicConfigRow()
+          });
+          flushPendingSyncToSupabase().then(() => {
+            updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+          });
+        }
       } catch (err) {
         console.error('Supabase AutoSetup Error:', err);
         ensureStudentsLoadedFromLocal();
@@ -8373,7 +8434,8 @@
         : (existingTarget?.classes && existingTarget.classes.length > 0 ? existingTarget.classes : ['Semua Kelas']);
 
       const lower = cleanName.toLowerCase();
-      const duplicate = state.subjects.find(s => s.name.toLowerCase() === lower && (!existingTarget || s.id !== existingTarget.id));
+      const inputKey = normalizeSubjectKey(cleanName);
+      const duplicate = state.subjects.find(s => normalizeSubjectKey(s.name) === inputKey && (!existingTarget || s.id !== existingTarget.id));
       if (duplicate) {
         showToast(`Mata pelajaran "${duplicate.name}" sudah ada di daftar.`, 'warning');
         return;
@@ -8391,25 +8453,29 @@
       const prevDeletedNames = [...state.deletedSubjectNames];
 
       try {
-        const subjectAliases = {
-          "al qur'an hadis": ["al-qur'an hadis", "al qur`an hadis", "al-qur`an hadis", "al quran hadis", "alqur'an hadis"],
-          "baca tulis al qur'an": ["btq", "baca tulis al-qur'an", "baca tulis al quran"]
-        };
-        const removeVariants = new Set([lower, ...(subjectAliases[lower] || [])]);
-        state.deletedSubjectNames = (state.deletedSubjectNames || []).filter(n => !removeVariants.has(String(n || '').trim().toLowerCase()));
+        // Hapus dari deletedSubjectNames menggunakan normalizeSubjectKey
+        state.deletedSubjectNames = (state.deletedSubjectNames || []).filter(n => normalizeSubjectKey(n) !== inputKey);
 
         let subjectRecord;
         if (existingTarget) {
-          if (existingTarget.name.toLowerCase() !== lower && !state.deletedSubjectNames.some(n => n.toLowerCase() === existingTarget.name.toLowerCase())) {
+          const oldKey = normalizeSubjectKey(existingTarget.name);
+          if (oldKey !== inputKey && !state.deletedSubjectNames.some(n => normalizeSubjectKey(n) === oldKey)) {
             state.deletedSubjectNames.push(existingTarget.name);
           }
           existingTarget.name = cleanName;
           existingTarget.classes = nextClasses;
           subjectRecord = existingTarget;
         } else {
-          subjectRecord = { id: crypto.randomUUID(), name: cleanName, teacher_id: null, classes: nextClasses };
+          let displayName = cleanName;
+          if (inputKey === 'al quran hadis') displayName = "Al Qur'an Hadis";
+          else if (inputKey === 'baca tulis al quran') displayName = "Baca Tulis Al Qur'an";
+          subjectRecord = { id: crypto.randomUUID(), name: displayName, teacher_id: null, classes: nextClasses };
           state.subjects.push(subjectRecord);
         }
+
+        // Pastikan deletedSubjectNames tidak mengandung mapel aktif
+        const activeKeys = new Set((state.subjects || []).map(s => normalizeSubjectKey(s?.name)).filter(Boolean));
+        state.deletedSubjectNames = (state.deletedSubjectNames || []).filter(n => !activeKeys.has(normalizeSubjectKey(n)));
 
         saveSubjectsMetaToStorage();
         saveCacheToStorage();
@@ -8457,24 +8523,24 @@
     };
 
     window.handleDeleteSubject = function (subjectName) {
-      const target = state.subjects.find(s => s.name.toLowerCase() === String(subjectName || '').trim().toLowerCase());
+      const target = state.subjects.find(s => isSameSubject(s.name, subjectName));
       if (!target) return;
 
       openConfirmModal(
         'Hapus Mata Pelajaran',
         `<p>Apakah Anda yakin ingin menghapus mata pelajaran <strong>${escapeHtml(target.name)}</strong> dari daftar pilihan?</p>`,
         async () => {
-          if (!state.deletedSubjectNames.some(n => n.toLowerCase() === target.name.toLowerCase())) {
+          const targetKey = normalizeSubjectKey(target.name);
+          if (!state.deletedSubjectNames.some(n => normalizeSubjectKey(n) === targetKey)) {
             state.deletedSubjectNames.push(target.name);
           }
           if (state.editingSubjectId === target.id) state.editingSubjectId = null;
-          state.subjects = state.subjects.filter(s => s.id !== target.id && s.name.toLowerCase() !== target.name.toLowerCase());
+          state.subjects = state.subjects.filter(s => s.id !== target.id && !isSameSubject(s.name, target.name));
 
           // Clean up teaching assignments for this deleted subject across all classes
-          const lowerName = target.name.toLowerCase();
           Object.keys(state.teachingAssignments || {}).forEach(k => {
             const parts = k.split('::');
-            if (parts.length === 2 && parts[1].toLowerCase() === lowerName) {
+            if (parts.length >= 2 && normalizeSubjectKey(parts.slice(1).join('::')) === targetKey) {
               delete state.teachingAssignments[k];
             }
           });
@@ -10363,57 +10429,6 @@
                   <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal Pengesahan (Opsional)</label>
                   <input type="date" id="set-signature-date"
                     value="${escapeHtml(curDate)}"
-                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  <p class="text-[11px] text-slate-400 mt-1">Kosongkan agar tanggal tanda tangan otomatis mengikuti tanggal saat ini ketika mencetak.</p>
-                </div>
-              </div>
-            </div>
-
-            <button type="submit"
-              class="w-full py-3 px-5 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition">
-              <i data-lucide="check-circle-2" class="w-4 h-4"></i> Simpan Pengaturan Identitas &amp; Tanda Tangan
-            </button>
-          </form>
-        </div>
-        `;
-      } else if (activeTab === 'backup') {
-        activeContentHtml = `
-        <!-- Card 3: Backup & Restore Data -->
-        <div class="glass-surface rounded-3xl p-6 space-y-5">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="flex items-start gap-3">
-              <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <i data-lucide="database" class="w-5 h-5"></i>
-              </div>
-              <div>
-                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Backup &amp; Restore Data</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Cadangkan seluruh data aplikasi ke file JSON atau pulihkan kembali dari file backup</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
-              <div class="text-xl font-extrabold text-slate-900">${state.teachers.length}</div>
-              <div class="text-[11px] font-bold text-slate-500">Data Guru</div>
-            </div>
-            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
-              <div class="text-xl font-extrabold text-slate-900">${state.students.length}</div>
-              <div class="text-[11px] font-bold text-slate-500">Data Siswa</div>
-            </div>
-            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
-              <div class="text-xl font-extrabold text-slate-900">${state.subjects.length}</div>
-              <div class="text-[11px] font-bold text-slate-500">Mapel</div>
-            </div>
-            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
-              <div class="text-xl font-extrabold text-indigo-700">${state.exams.length}</div>
-              <div class="text-[11px] font-bold text-slate-500">Total Paket</div>
-            </div>
-            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
-              <div class="text-xl font-extrabold text-emerald-700">${state.examResults.length}</div>
-              <div class="text-[11px] font-bold text-slate-500">Hasil Nilai</div>
-            </div>
-            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center">
               <div class="text-xl font-extrabold text-purple-700">${years.length}</div>
               <div class="text-[11px] font-bold text-slate-500">Tahun Ajaran</div>
             </div>
@@ -11367,53 +11382,39 @@
     ];
 
     function getAllActiveSubjects() {
-      const deletedSet = new Set((state.deletedSubjectNames || []).map(n => String(n || '').trim().toLowerCase()));
+      const activeKeys = new Set((state.subjects || []).map(s => normalizeSubjectKey(s?.name)).filter(Boolean));
+      const deletedKeySet = new Set((state.deletedSubjectNames || [])
+        .map(n => normalizeSubjectKey(n))
+        .filter(k => k && !activeKeys.has(k)));
       const canonicalBase = CANONICAL_BASE_SUBJECTS;
 
-      const aliases = {
-        "al qur'an hadis": ["al-qur'an hadis", "al qur`an hadis", "al-qur`an hadis", "al quran hadis", "alqur'an hadis"],
-        "ski": ["sejarah kebudayaan islam"],
-        "pend. pancasila": ["pendidikan pancasila", "pancasila"],
-        "ipas": ["ilmu pengetahuan alam dan sosial", "ipa", "ips"],
-        "pjok": ["pendidikan jasmani, olahraga dan kesehatan", "penjaskes", "penjasorkes"],
-        "sbdp": ["seni budaya dan prakarya", "seni budaya"],
-        "bahasa inggris": ["b. inggris", "b inggris"],
-        "baca tulis al qur'an": ["btq", "baca tulis al-qur'an", "baca tulis al quran"]
-      };
-
       const orderedList = [];
-      const seen = new Set();
+      const seenKeys = new Set();
 
       if (Array.isArray(state.subjects) && state.subjects.length > 0) {
         state.subjects.forEach(s => {
           const cleanName = String(s?.name || '').trim();
           if (!cleanName || cleanName === '-') return;
-          let lower = cleanName.toLowerCase();
-          if (lower === 'pai' || lower === 'pendidikan agama islam') return;
-          if (lower === "al-qur'an hadis" || lower === "al qur`an hadis" || lower === "al-qur`an hadis" || lower === "al quran hadis") {
-            lower = "al qur'an hadis";
-          }
-          if (!seen.has(lower)) {
-            const displayName = (lower === "al qur'an hadis") ? "Al Qur'an Hadis" : cleanName;
+          const k = normalizeSubjectKey(cleanName);
+          if (k === 'pai' || k === 'pendidikan agama islam') return;
+          if (deletedKeySet.has(k)) return;
+          if (!seenKeys.has(k)) {
+            let displayName = cleanName;
+            if (k === 'al quran hadis') displayName = "Al Qur'an Hadis";
+            else if (k === 'baca tulis al quran') displayName = "Baca Tulis Al Qur'an";
             orderedList.push(displayName);
-            seen.add(lower);
-            const aliasList = aliases[lower] || [];
-            aliasList.forEach(v => seen.add(v));
+            seenKeys.add(k);
           }
         });
       }
 
       canonicalBase.forEach(name => {
-        const lower = name.toLowerCase();
-        const aliasList = aliases[lower] || [];
-        const allVariants = [lower, ...aliasList];
+        const k = normalizeSubjectKey(name);
+        if (deletedKeySet.has(k)) return;
 
-        if (allVariants.some(v => deletedSet.has(v))) return;
-
-        if (!seen.has(lower) && !deletedSet.has(lower)) {
+        if (!seenKeys.has(k)) {
           orderedList.push(name);
-          seen.add(lower);
-          allVariants.forEach(v => seen.add(v));
+          seenKeys.add(k);
         }
       });
 
