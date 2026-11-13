@@ -3903,6 +3903,7 @@
       mergeSubjectsState();
       populateExamSelectors();
       state.isGuruMenuOpen = state.activeMenu === 'manajemen_guru';
+      state.isMapelMenuOpen = state.activeMenu === 'manajemen_mapel';
       renderNavigationMenus();
       renderCurrentMenu();
       updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : (state.isSyncing ? 'syncing' : 'synced'));
@@ -4216,18 +4217,12 @@
       }
       closeFormModal({ resetEditState: false });
       state.activeMenu = menuId;
-      if (menuId === 'manajemen_guru') {
-        state.isGuruMenuOpen = true;
-        state.teacherManagementTab = 'akun';
-      } else {
-        state.isGuruMenuOpen = false;
+      state.isGuruMenuOpen = menuId === 'manajemen_guru';
+      state.isMapelMenuOpen = menuId === 'manajemen_mapel';
+      if (menuId !== 'manajemen_guru') {
         state.teacherManagementTab = 'akun';
       }
-      if (menuId === 'manajemen_mapel') {
-        state.isMapelMenuOpen = true;
-        state.mapelKelasActiveTab = 'mapel';
-      } else {
-        state.isMapelMenuOpen = false;
+      if (menuId !== 'manajemen_mapel') {
         state.mapelKelasActiveTab = 'mapel';
       }
       if (menuId === 'manajemen_ulangan') {
@@ -4253,9 +4248,13 @@
       if (state.activeMenu !== 'manajemen_guru') {
         state.activeMenu = 'manajemen_guru';
         state.isGuruMenuOpen = true;
+        state.isMapelMenuOpen = false;
         state.teacherManagementTab = 'akun';
       } else {
         state.isGuruMenuOpen = !state.isGuruMenuOpen;
+        if (state.isGuruMenuOpen) {
+          state.isMapelMenuOpen = false;
+        }
       }
       saveSessionToStorage();
       renderNavigationMenus();
@@ -4266,6 +4265,7 @@
       state.activeMenu = 'manajemen_guru';
       state.teacherManagementTab = tab === 'mengajar' ? 'mengajar' : 'akun';
       state.isGuruMenuOpen = true;
+      state.isMapelMenuOpen = false;
       saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -4275,9 +4275,13 @@
       if (state.activeMenu !== 'manajemen_mapel') {
         state.activeMenu = 'manajemen_mapel';
         state.isMapelMenuOpen = true;
+        state.isGuruMenuOpen = false;
         state.mapelKelasActiveTab = 'mapel';
       } else {
         state.isMapelMenuOpen = !state.isMapelMenuOpen;
+        if (state.isMapelMenuOpen) {
+          state.isGuruMenuOpen = false;
+        }
       }
       saveSessionToStorage();
       renderNavigationMenus();
@@ -4288,6 +4292,7 @@
       state.activeMenu = 'manajemen_mapel';
       state.mapelKelasActiveTab = tab === 'kelas' ? 'kelas' : 'mapel';
       state.isMapelMenuOpen = true;
+      state.isGuruMenuOpen = false;
       saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -4304,7 +4309,7 @@
           const isGuruActive = state.activeMenu === 'manajemen_guru';
           const isDataGuruActive = isGuruActive && state.teacherManagementTab === 'akun';
           const isMengajarActive = isGuruActive && state.teacherManagementTab === 'mengajar';
-          const isOpen = state.isGuruMenuOpen !== false;
+          const isOpen = Boolean(state.isGuruMenuOpen);
           return `
             <div class="space-y-1">
               <button type="button" onclick="window.toggleTeacherMenuCollapse()"
@@ -4344,7 +4349,7 @@
           const isMapelActive = state.activeMenu === 'manajemen_mapel';
           const isSubjActive = isMapelActive && state.mapelKelasActiveTab !== 'kelas';
           const isClassActive = isMapelActive && state.mapelKelasActiveTab === 'kelas';
-          const isOpen = state.isMapelMenuOpen !== false;
+          const isOpen = Boolean(state.isMapelMenuOpen);
           return `
             <div class="space-y-1">
               <button type="button" onclick="window.toggleMapelMenuCollapse()"
