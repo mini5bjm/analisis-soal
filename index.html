@@ -10404,6 +10404,33 @@
                     <div id="preview-headmaster-nip" class="text-[11px] text-slate-500">NIP. ${escapeHtml(curHeadmasterNip)}</div>
                   </div>
                   <div class="space-y-1">
+                    <div id="preview-signature-city-date" class="text-slate-500 font-medium">${escapeHtml(curCity)}, ${formatIndonesianDate(curDate)}</div>
+                    <div class="font-bold text-slate-800">Guru Mata Pelajaran / Wali Kelas</div>
+                    <div class="h-10"></div>
+                    <div class="font-extrabold text-slate-900 underline">[Nama Guru / Wali Kelas]</div>
+                    <div class="text-[11px] text-slate-500">NIP / NUPTK / NPK Guru</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit"
+              class="w-full py-3 px-5 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition">
+              <i data-lucide="check-circle-2" class="w-4 h-4"></i> Simpan Pengaturan Identitas &amp; Tanda Tangan
+            </button>
+          </form>
+        </div>
+        `;
+      } else if (activeTab === 'backup') {
+        activeContentHtml = `
+        <!-- Card 3: Backup & Restore Data -->
+        <div class="glass-surface rounded-3xl p-6 space-y-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <i data-lucide="database" class="w-5 h-5"></i>
+              </div>
+              <div>
                 <h3 class="text-base md:text-lg font-extrabold text-slate-900">Backup &amp; Restore Data</h3>
                 <p class="text-xs text-slate-500 mt-0.5">Cadangkan seluruh data aplikasi ke file JSON atau pulihkan kembali dari file backup</p>
               </div>
