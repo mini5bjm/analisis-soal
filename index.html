@@ -746,7 +746,7 @@
             </div>
             <button type="button" id="btn-sidebar-period-edit" onclick="window.navigatePengaturanSubmenu('periode')"
               class="hidden p-1.5 rounded-xl bg-white hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-200/80 transition shrink-0"
-              title="Pengaturan Tahun Ajaran & Semester">
+              title="Tahun Ajaran & Semester">
               <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -4530,23 +4530,23 @@
                   class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isPeriodeActive
                     ? 'flowora-btn-primary text-white shadow-sm'
                     : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
-                  }">
+                  }" title="Tahun Ajaran &amp; Semester">
                   <i data-lucide="calendar-range" class="w-3.5 h-3.5 shrink-0"></i>
-                  <span class="truncate">Pengaturan Tahun Ajaran &amp; Semester</span>
+                  <span class="truncate">Tahun Ajaran &amp; Semester</span>
                 </button>
                 <button type="button" onclick="window.navigatePengaturanSubmenu('kepala_madrasah')"
                   class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isKepalaActive
                     ? 'flowora-btn-primary text-white shadow-sm'
                     : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
-                  }">
+                  }" title="Kepala Madrasah &amp; Tanda Tangan">
                   <i data-lucide="award" class="w-3.5 h-3.5 shrink-0"></i>
-                  <span class="truncate">Pengaturan Kepala Madrasah &amp; Tanda Tangan</span>
+                  <span class="truncate">Kepala Madrasah &amp; Tanda Tangan</span>
                 </button>
                 <button type="button" onclick="window.navigatePengaturanSubmenu('backup')"
                   class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isBackupActive
                     ? 'flowora-btn-primary text-white shadow-sm'
                     : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
-                  }">
+                  }" title="Backup &amp; Restore Data">
                   <i data-lucide="database-backup" class="w-3.5 h-3.5 shrink-0"></i>
                   <span class="truncate">Backup &amp; Restore Data</span>
                 </button>
@@ -4606,13 +4606,13 @@
           }
         } else if (currentMeta.id === 'pengaturan_sistem' && role === 'admin') {
           if (state.pengaturanActiveTab === 'kepala_madrasah') {
-            label = 'Pengaturan Kepala Madrasah & Tanda Tangan';
+            label = 'Kepala Madrasah & Tanda Tangan';
             subtitle = 'Kelola identitas madrasah (KOP), Kepala Madrasah, kota domisili, dan titimangsa tanda tangan dokumen';
           } else if (state.pengaturanActiveTab === 'backup') {
             label = 'Backup & Restore Data';
             subtitle = 'Cadangkan seluruh data aplikasi ke file JSON atau pulihkan kembali dari file backup';
           } else {
-            label = 'Pengaturan Tahun Ajaran & Semester';
+            label = 'Tahun Ajaran & Semester';
             subtitle = 'Atur periode aktif sekolah untuk halaman login Guru & Admin';
           }
         } else if (currentMeta.id === 'manajemen_siswa' && role !== 'admin') {
@@ -10181,7 +10181,7 @@
                 <i data-lucide="calendar-range" class="w-5 h-5"></i>
               </div>
               <div>
-                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Pengaturan Tahun Ajaran &amp; Semester</h3>
+                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Tahun Ajaran &amp; Semester</h3>
                 <p class="text-xs text-slate-500 mt-0.5">Atur periode aktif sekolah untuk halaman login Guru &amp; Admin</p>
               </div>
             </div>
@@ -10262,7 +10262,7 @@
                 <i data-lucide="award" class="w-5 h-5"></i>
               </div>
               <div>
-                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Pengaturan Identitas Madrasah, Kepala Madrasah &amp; Tanda Tangan</h3>
+                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Kepala Madrasah &amp; Tanda Tangan</h3>
                 <p class="text-xs text-slate-500 mt-0.5">Kelola data identitas madrasah (KOP laporan), Kepala Madrasah, kota domisili, dan tanggal pengesahan tanda tangan pada seluruh cetak laporan dan rekap nilai</p>
               </div>
             </div>
