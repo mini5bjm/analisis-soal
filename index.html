@@ -1099,7 +1099,8 @@
       "IPAS",
       "PJOK",
       "SBDP",
-      "Bahasa Inggris"
+      "Bahasa Inggris",
+      "Baca Tulis Al Qur'an"
     ];
 
     const state = {
@@ -1113,7 +1114,7 @@
       lastSyncedAt: null,
       hasSubjectsTable: null,
       hasStudentsTable: null,
-      deletedSubjectNames: ["Baca Tulis Al Qur'an"],
+      deletedSubjectNames: [],
       headerExamClassFilter: 'ALL',
       examClassFilter: 'ALL',
       examSubjectFilter: 'ALL',
@@ -1330,10 +1331,7 @@
         if (Array.isArray(cached.subjects)) state.subjects = cached.subjects;
         if (Array.isArray(cached.students)) state.students = cached.students;
         if (Array.isArray(cached.deletedSubjectNames)) {
-          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...cached.deletedSubjectNames]));
-        }
-        if (!state.deletedSubjectNames.some(n => n.toLowerCase() === "baca tulis al qur'an")) {
-          state.deletedSubjectNames.push("Baca Tulis Al Qur'an");
+          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...cached.deletedSubjectNames])).filter(n => n.toLowerCase() !== "baca tulis al qur'an");
         }
         if (cached.activeExamId) state.activeExamId = cached.activeExamId;
         if (cached.academicSettings) applyAcademicSettingsObject(cached.academicSettings, { onlyIfNewer: true, replaceYears: true });
@@ -1674,7 +1672,7 @@
           applied = true;
         }
         if (parsed && Array.isArray(parsed.deletedSubjectNames)) {
-          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...parsed.deletedSubjectNames]));
+          state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...parsed.deletedSubjectNames])).filter(n => n.toLowerCase() !== "baca tulis al qur'an");
           saveSubjectsMetaToStorage();
           applied = true;
         }
@@ -2302,10 +2300,7 @@
     function mergeSubjectsState({ dbSubjects = null, teachers = state.teachers, exams = state.exams } = {}) {
       const storedMeta = loadSubjectsMetaFromStorage();
       if (Array.isArray(storedMeta?.deletedNames)) {
-        state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...storedMeta.deletedNames]));
-      }
-      if (!state.deletedSubjectNames.some(n => n.toLowerCase() === "baca tulis al qur'an")) {
-        state.deletedSubjectNames.push("Baca Tulis Al Qur'an");
+        state.deletedSubjectNames = Array.from(new Set([...state.deletedSubjectNames, ...storedMeta.deletedNames])).filter(n => n.toLowerCase() !== "baca tulis al qur'an");
       }
       const deletedSet = new Set(state.deletedSubjectNames.map(n => n.toLowerCase()));
 
@@ -2322,7 +2317,11 @@
       const teacherBySubjectLower = new Map();
       (teachers || []).forEach(t => {
         parseTeacherSubjects(t.subject).forEach(subName => {
-          teacherBySubjectLower.set(subName.toLowerCase(), t.id);
+          let sLow = subName.toLowerCase();
+          if (sLow === "al-qur'an hadis" || sLow === "al qur`an hadis" || sLow === "al-qur`an hadis" || sLow === "al quran hadis") {
+            sLow = "al qur'an hadis";
+          }
+          teacherBySubjectLower.set(sLow, t.id);
         });
       });
 
@@ -2330,7 +2329,12 @@
       const registerSubject = (item, allowTeacherOverwrite = true) => {
         const cleanName = String(item?.name || '').trim();
         if (!cleanName || cleanName === '-') return;
-        const lower = cleanName.toLowerCase();
+        let lower = cleanName.toLowerCase();
+        let displayName = cleanName;
+        if (lower === "al-qur'an hadis" || lower === "al qur`an hadis" || lower === "al-qur`an hadis" || lower === "al quran hadis") {
+          lower = "al qur'an hadis";
+          displayName = "Al Qur'an Hadis";
+        }
         if (deletedSet.has(lower)) return;
 
         const existing = byLowerName.get(lower);
@@ -2341,7 +2345,7 @@
         if (!existing) {
           byLowerName.set(lower, {
             id: item.id || crypto.randomUUID(),
-            name: cleanName,
+            name: displayName,
             teacher_id: allowTeacherOverwrite && teacherFromDb !== null ? teacherFromDb : (item.teacher_id || teacherFromDb || null),
             classes: resolvedClasses
           });
@@ -2415,7 +2419,7 @@
         return { induk: 'PAI', kelompok: 'Umum', jurusan: 'UMUM', jtm: 2 };
       }
       if (s.includes('ski') || s.includes('sejarah kebudayaan')) {
-        return { induk: 'PAI', kelompok: 'Umum', jurusan: 'UMUM', jtm: isLower ? '-' : 2 };
+        return { induk: 'PAI', kelompok: 'Umum', jurusan: 'UMUM', jtm: 2 };
       }
       if (s.includes('bahasa arab') || s.includes('b. arab') || s.includes('arab')) {
         return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: 2 };
@@ -2430,7 +2434,7 @@
         return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: isLower ? 6 : 5 };
       }
       if (s.includes('ipas') || s.includes('alam dan sosial') || s.includes('ipa') || s.includes('ips')) {
-        return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: isLower ? '-' : 5 };
+        return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: 5 };
       }
       if (s.includes('pjok') || s.includes('penjas') || s.includes('jasmani')) {
         return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: 4 };
@@ -2439,7 +2443,7 @@
         return { induk: '-', kelompok: 'Umum', jurusan: 'UMUM', jtm: 3 };
       }
       if (s.includes('inggris')) {
-        return { induk: '-', kelompok: 'Muatan Lokal', jurusan: 'UMUM', jtm: isLower ? '-' : 2 };
+        return { induk: '-', kelompok: 'Muatan Lokal', jurusan: 'UMUM', jtm: 2 };
       }
       if (s.includes('baca tulis') || s.includes('bta')) {
         return { induk: '-', kelompok: 'Muatan Lokal', jurusan: 'UMUM', jtm: 2 };
@@ -2450,7 +2454,14 @@
     function getTeachingAssignment(className, subjectName) {
       if (!className || !subjectName) return null;
       const key = `${String(className).trim()}::${String(subjectName).trim()}`;
-      const direct = state.teachingAssignments?.[key];
+      let direct = state.teachingAssignments?.[key];
+      if (direct === undefined) {
+        const altSubj = subjectName.includes('-')
+          ? subjectName.replace('Al-Qur', 'Al Qur')
+          : subjectName.replace('Al Qur', 'Al-Qur');
+        const altKey = `${String(className).trim()}::${altSubj.trim()}`;
+        direct = state.teachingAssignments?.[altKey];
+      }
       if (direct !== undefined && direct !== null) {
         if (typeof direct === 'string') {
           if (!direct.trim()) return null;
@@ -2472,26 +2483,26 @@
       }
 
       const lowerClass = String(className).trim().toLowerCase();
-      const lowerSubj = String(subjectName).trim().toLowerCase();
+      const normTarget = String(subjectName || '').toLowerCase().replace(/[-`']/g, ' ').replace(/\s+/g, ' ').trim();
 
       const matched = state.teachers.find(t => {
         const tClass = String(t.class_assigned || '').trim().toLowerCase();
         const classMatch = tClass === 'semua kelas' || tClass === lowerClass || tClass.includes(lowerClass);
         if (!classMatch) return false;
         const subjects = parseTeacherSubjects(t.subject);
-        return subjects.some(s => s.toLowerCase() === lowerSubj);
+        return subjects.some(s => String(s || '').toLowerCase().replace(/[-`']/g, ' ').replace(/\s+/g, ' ').trim() === normTarget);
       });
       if (matched) return matched;
 
       const homeroom = getHomeroomTeacherForClass(className);
       if (homeroom) {
         const hrSubjects = parseTeacherSubjects(homeroom.subject);
-        if (hrSubjects.some(s => s.toLowerCase() === lowerSubj)) {
+        if (hrSubjects.some(s => String(s || '').toLowerCase().replace(/[-`']/g, ' ').replace(/\s+/g, ' ').trim() === normTarget)) {
           return homeroom;
         }
       }
 
-      return state.teachers.find(t => parseTeacherSubjects(t.subject).some(s => s.toLowerCase() === lowerSubj)) || null;
+      return state.teachers.find(t => parseTeacherSubjects(t.subject).some(s => String(s || '').toLowerCase().replace(/[-`']/g, ' ').replace(/\s+/g, ' ').trim() === normTarget)) || null;
     }
 
     function getSubjectTeacher(subjectName, className = '') {
@@ -7852,17 +7863,11 @@
                 <tbody class="divide-y divide-slate-100 text-sm">
                   ${subjPage.totalItems === 0 ? `
                     <tr><td colspan="3" class="py-14 text-center text-sm text-slate-400">Belum ada mata pelajaran. Klik <strong>+ Tambah Mapel</strong> untuk menambahkan.</td></tr>
-                  ` : subjPage.items.map((subj, idx) => {
-                    const examCount = state.exams.filter(ex => (ex.subject || '').trim().toLowerCase() === subj.name.toLowerCase()).length;
-
-                    return `
+                  ` : subjPage.items.map((subj, idx) => `
                     <tr class="hover:bg-slate-50/80 transition">
                       <td class="py-4 px-4 font-bold text-slate-400 text-center text-sm">${subjPage.startIndex + idx + 1}</td>
                       <td class="py-4 px-4">
-                        <div class="flex items-center gap-2.5 flex-wrap">
-                          <span class="text-[15px] font-extrabold text-slate-900">${escapeHtml(subj.name)}</span>
-                          ${examCount > 0 ? `<span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">${examCount} Paket Ulangan</span>` : ''}
-                        </div>
+                        <span class="text-[15px] font-extrabold text-slate-900">${escapeHtml(subj.name)}</span>
                       </td>
                       <td class="py-4 px-4 text-right whitespace-nowrap">
                         <div class="inline-flex items-center justify-end gap-1.5">
@@ -7877,8 +7882,7 @@
                         </div>
                       </td>
                     </tr>
-                  `;
-                  }).join('')}
+                  `).join('')}
                 </tbody>
               </table>
             </div>
@@ -8958,11 +8962,18 @@
         return;
       }
       const teacher = state.teachers.find(t => t.id === teacherIdOrName || t.full_name.toLowerCase() === String(teacherIdOrName).toLowerCase());
-      state.teachingAssignments[key] = {
+      const record = {
         teacherId: teacher ? teacher.id : null,
         teacherName: teacher ? teacher.full_name : teacherIdOrName,
         updatedAt: Date.now()
       };
+      state.teachingAssignments[key] = record;
+      if (subjectName.includes('Al-Qur') || subjectName.includes('Al Qur')) {
+        const altSubj = subjectName.includes('-')
+          ? subjectName.replace('Al-Qur', 'Al Qur')
+          : subjectName.replace('Al Qur', 'Al-Qur');
+        state.teachingAssignments[`${String(className).trim()}::${altSubj.trim()}`] = record;
+      }
       saveTeachingAssignmentsToStorage();
       saveCacheToStorage();
 
@@ -8988,11 +8999,18 @@
     window.handleRemoveTeacherFromClassMapel = async function (className, subjectName) {
       if (!className || !subjectName) return;
       const key = `${String(className).trim()}::${String(subjectName).trim()}`;
-      state.teachingAssignments[key] = {
+      const record = {
         teacherId: null,
         teacherName: '',
         updatedAt: Date.now()
       };
+      state.teachingAssignments[key] = record;
+      if (subjectName.includes('Al-Qur') || subjectName.includes('Al Qur')) {
+        const altSubj = subjectName.includes('-')
+          ? subjectName.replace('Al-Qur', 'Al Qur')
+          : subjectName.replace('Al Qur', 'Al-Qur');
+        state.teachingAssignments[`${String(className).trim()}::${altSubj.trim()}`] = record;
+      }
       saveTeachingAssignmentsToStorage();
       saveCacheToStorage();
 
@@ -10439,38 +10457,6 @@
               <p>Data aplikasi saat ini akan dipulihkan menggunakan file backup tanggal <strong>${escapeHtml(exportedDateText)}</strong>:</p>
               <div class="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700">
                 <div>Guru: <strong>${d.teachers.length}</strong></div>
-                <div>Siswa: <strong>${studentsArr.length}</strong></div>
-                <div>Mapel: <strong>${subjectsArr.length}</strong></div>
-                <div>Paket Ulangan: <strong>${d.exams.length}</strong></div>
-                <div>Hasil Nilai: <strong>${d.examResults.length}</strong></div>
-                <div>Tahun Aktif: <strong>${escapeHtml(parsed.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR)}</strong></div>
-              </div>
-              <p class="text-amber-700 font-semibold">Pastikan file backup ini benar sebelum melanjutkan.</p>
-            </div>
-          `,
-          async () => {
-            showActionOverlay({
-              stateType: 'loading',
-              title: 'Memulihkan Data Backup...',
-              subtitle: 'Menerapkan data & menyinkronkan ke Supabase'
-            });
-
-            try {
-              state.teachers = structuredClone(d.teachers);
-              state.classes = structuredClone(classesArr);
-              state.students = structuredClone(studentsArr);
-              updateWorkspacePeriodUI();
-              populateExamSelectors();
-              renderNavigationMenus();
-              renderCurrentMenu();
-
-              showActionOverlay({
-                stateType: 'success',
-                title: 'Restore Data Selesai!',
-                subtitle: syncWarning ? 'Dipulihkan lokal (cek sinkronisasi Supabase)' : 'Seluruh data berhasil dipulihkan & tersinkron'
-              });
-              await sleep(550);
-              await hideActionOverlay();
               showToast(
                 syncWarning
                   ? `Data dipulihkan secara lokal, namun sinkronisasi Supabase bermasalah: ${syncWarning}`
@@ -10984,10 +10970,6 @@
     };
 
     function getApplicableSubjectsForStudentClass(className) {
-      const cls = String(className || '').toLowerCase();
-      const isLowerGrade = /kelas\s*[12]\b/i.test(cls) || cls === '1' || cls === '2';
-      const excludedLower = new Set(['ski', 'sejarah kebudayaan islam', 'ipas', 'ilmu pengetahuan alam dan sosial', 'bahasa inggris', 'b. inggris']);
-
       const deletedSet = new Set((state.deletedSubjectNames || []).map(n => String(n || '').trim().toLowerCase()));
 
       const canonicalBase = [
@@ -11002,34 +10984,53 @@
         "IPAS",
         "PJOK",
         "SBDP",
-        "Bahasa Inggris"
+        "Bahasa Inggris",
+        "Baca Tulis Al Qur'an"
       ];
+
+      const aliases = {
+        "al qur'an hadis": ["al-qur'an hadis", "al qur`an hadis", "al-qur`an hadis", "al quran hadis", "alqur'an hadis"],
+        "ski": ["sejarah kebudayaan islam"],
+        "pend. pancasila": ["pendidikan pancasila", "pancasila"],
+        "ipas": ["ilmu pengetahuan alam dan sosial", "ipa", "ips"],
+        "pjok": ["pendidikan jasmani, olahraga dan kesehatan", "penjaskes", "penjasorkes"],
+        "sbdp": ["seni budaya dan prakarya", "seni budaya"],
+        "bahasa inggris": ["b. inggris", "b inggris"],
+        "baca tulis al qur'an": ["btq", "baca tulis al-qur'an", "baca tulis al quran"]
+      };
 
       const orderedList = [];
       const seen = new Set();
 
       canonicalBase.forEach(name => {
         const lower = name.toLowerCase();
-        if (!seen.has(lower) && !deletedSet.has(lower)) {
-          if (!state.subjects || state.subjects.length === 0 || state.subjects.some(s => (s.name || '').trim().toLowerCase() === lower)) {
-            orderedList.push(name);
-            seen.add(lower);
-          }
-        }
+        const aliasList = aliases[lower] || [];
+        const allVariants = [lower, ...aliasList];
+
+        if (allVariants.some(v => deletedSet.has(v))) return;
+
+        const matchedSubject = (state.subjects || []).find(s => {
+          const sLow = String(s?.name || '').trim().toLowerCase();
+          return allVariants.includes(sLow);
+        });
+
+        const displayName = (lower === "al qur'an hadis") ? "Al Qur'an Hadis" : (matchedSubject?.name || name);
+        orderedList.push(displayName);
+        seen.add(lower);
+        allVariants.forEach(v => seen.add(v));
+        if (matchedSubject) seen.add(String(matchedSubject.name || '').trim().toLowerCase());
       });
 
       (state.subjects || []).forEach(s => {
         const cleanName = String(s?.name || '').trim();
         const lower = cleanName.toLowerCase();
+        if (lower === 'pai' || lower === 'pendidikan agama islam') return;
         if (cleanName && !seen.has(lower) && !deletedSet.has(lower)) {
           orderedList.push(cleanName);
           seen.add(lower);
         }
       });
 
-      if (isLowerGrade) {
-        return orderedList.filter(name => !excludedLower.has(name.toLowerCase()));
-      }
       return orderedList;
     }
 
