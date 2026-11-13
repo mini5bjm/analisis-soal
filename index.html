@@ -9115,13 +9115,12 @@
               ${rowsHtml}
             </tbody>
           </table>
-          <script>
-            window.onload = function() { window.print(); }
-          <\/script>
         </body>
         </html>
       `);
       printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
     };
 
     window.handleExportClassAssignmentsXlsx = function (className) {
@@ -10457,6 +10456,46 @@
               <p>Data aplikasi saat ini akan dipulihkan menggunakan file backup tanggal <strong>${escapeHtml(exportedDateText)}</strong>:</p>
               <div class="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700">
                 <div>Guru: <strong>${d.teachers.length}</strong></div>
+                <div>Kelas: <strong>${classesArr.length}</strong></div>
+                <div>Mata Pelajaran: <strong>${subjectsArr.length}</strong></div>
+                <div>Siswa: <strong>${studentsArr.length}</strong></div>
+                <div>Paket Ulangan: <strong>${d.exams.length}</strong></div>
+                <div>Hasil Ulangan: <strong>${d.examResults.length}</strong></div>
+              </div>
+              <p class="text-rose-600 font-bold">Peringatan: Seluruh data lokal dan database Supabase saat ini akan digantikan oleh isi file cadangan ini.</p>
+            </div>
+          `,
+          async () => {
+            try {
+              showActionOverlay('Memulihkan data backup ke sistem...', 'Mohon tunggu sejenak...');
+              state.teachers = d.teachers;
+              state.classes = classesArr;
+              state.subjects = subjectsArr;
+              state.deletedSubjectNames = deletedSubjArr;
+              state.students = studentsArr;
+              state.exams = d.exams;
+              state.examResults = d.examResults;
+              if (d.academicSettings) {
+                applyAcademicSettingsObject(d.academicSettings, { onlyIfNewer: false, replaceYears: true });
+              }
+              if (d.teachingAssignments) {
+                state.teachingAssignments = { ...d.teachingAssignments };
+                saveTeachingAssignmentsToStorage();
+              }
+              saveSubjectsMetaToStorage();
+              saveCacheToStorage();
+
+              let syncWarning = null;
+              if (!IS_PREVIEW && supabase) {
+                try {
+                  await syncAllDataToSupabase();
+                } catch (syncErr) {
+                  syncWarning = syncErr?.message || 'Gagal menyinkronkan ke Supabase.';
+                }
+              }
+
+              await hideActionOverlay();
+              renderCurrentMenu();
               showToast(
                 syncWarning
                   ? `Data dipulihkan secara lokal, namun sinkronisasi Supabase bermasalah: ${syncWarning}`
