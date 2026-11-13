@@ -8569,11 +8569,6 @@
       renderCurrentMenu();
     };
 
-    window.navigateMapelKelasSubmenu = function (tab) {
-      state.mapelKelasActiveTab = tab === 'kelas' ? 'kelas' : 'mapel';
-      window.navigateMenu('manajemen_mapel');
-    };
-
     // ==================== 7. MANAJEMEN DATA SISWA ====================
     function renderManajemenSiswaView() {
       const isAdmin = isAdminUser();
@@ -10470,6 +10465,49 @@
       saveSessionToStorage();
       updateWorkspacePeriodUI();
       populateExamSelectors();
+      renderCurrentMenu();
+      showToast(`Tahun Ajaran aktif diubah ke ${nextYear} (${nextSem}).`, 'success');
+    };
+
+    window.handleRestoreBackupJson = async function (e) {
+      renderCurrentMenu();
+      showToast(`Tahun Ajaran aktif diubah ke ${nextYear} (${nextSem}).`, 'success');
+    };
+
+    window.handleRestoreBackupJson = async function (e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      e.target.value = '';
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed || parsed.app !== 'SIHASUL' || !parsed.data || typeof parsed.data !== 'object') {
+          showToast('File bukan backup SIHASUL yang valid.', 'danger');
+          return;
+        }
+        const d = parsed.data;
+        if (!Array.isArray(d.teachers) || !Array.isArray(d.exams) || !Array.isArray(d.examResults)) {
+          showToast('Struktur data di dalam file backup tidak lengkap.', 'danger');
+          return;
+        }
+
+        const studentsArr = Array.isArray(d.students) ? d.students : [];
+        const subjectsArr = Array.isArray(d.subjects) ? d.subjects : [];
+        const classesArr = Array.isArray(d.classes)
+          ? d.classes.filter(c => c && c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME)
+          : [];
+        const deletedSubjArr = Array.isArray(d.deletedSubjectNames) ? d.deletedSubjectNames : [];
+        const exportedDateText = parsed.exportedAt
+          ? new Date(parsed.exportedAt).toLocaleString('id-ID')
+          : '-';
+
+        openConfirmModal(
+          'Konfirmasi Restore Backup Data',
+          `
+            <div class="space-y-3 text-xs">
+              <p>Data aplikasi saat ini akan dipulihkan menggunakan file backup tanggal <strong>${escapeHtml(exportedDateText)}</strong>:</p>
+              <div class="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700">
+                <div>Guru: <strong>${d.teachers.length}</strong></div>
                 <div>Kelas: <strong>${classesArr.length}</strong></div>
                 <div>Mata Pelajaran: <strong>${subjectsArr.length}</strong></div>
                 <div>Siswa: <strong>${studentsArr.length}</strong></div>
