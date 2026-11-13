@@ -825,13 +825,6 @@
               </select>
             </div>
 
-            <button type="button" id="btn-return-admin-header" onclick="window.handleReturnToAdmin()"
-              class="hidden items-center gap-1.5 px-3 py-2 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-[11px] font-bold transition shrink-0"
-              title="Kembali ke akun Administrator">
-              <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i>
-              <span class="hidden sm:inline">Kembali ke Admin</span>
-            </button>
-
             <button type="button" id="btn-logout-mobile" onclick="window.handleLogout()"
               class="lg:hidden p-2.5 rounded-full bg-slate-100 text-slate-600 hover:text-rose-600 transition" title="Keluar">
               <i data-lucide="log-out" class="w-4 h-4"></i>
@@ -3410,15 +3403,10 @@
     function updateImpersonationUI() {
       const isSwitched = Boolean(state.impersonatedByAdmin && state.currentUser?.role === 'guru');
       const desktopBtn = document.getElementById('btn-return-admin-desktop');
-      const headerBtn = document.getElementById('btn-return-admin-header');
 
       if (desktopBtn) {
         desktopBtn.classList.toggle('hidden', !isSwitched);
         desktopBtn.classList.toggle('flex', isSwitched);
-      }
-      if (headerBtn) {
-        headerBtn.classList.toggle('hidden', !isSwitched);
-        headerBtn.classList.toggle('inline-flex', isSwitched);
       }
     }
 
