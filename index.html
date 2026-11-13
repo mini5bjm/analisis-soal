@@ -1138,7 +1138,8 @@
       rekapActiveTab: 'rapor',
       rekapActiveExamId: null,
       isGuruMenuOpen: false,
-      teacherManagementTab: 'mengajar',
+      teacherManagementTab: 'akun',
+      isMapelMenuOpen: false,
       mapelKelasActiveTab: 'mapel',
       mengajarSelectedClass: 'Kelas 1',
       mengajarSearchQuery: '',
@@ -4217,8 +4218,17 @@
       state.activeMenu = menuId;
       if (menuId === 'manajemen_guru') {
         state.isGuruMenuOpen = true;
+        state.teacherManagementTab = 'akun';
       } else {
         state.isGuruMenuOpen = false;
+        state.teacherManagementTab = 'akun';
+      }
+      if (menuId === 'manajemen_mapel') {
+        state.isMapelMenuOpen = true;
+        state.mapelKelasActiveTab = 'mapel';
+      } else {
+        state.isMapelMenuOpen = false;
+        state.mapelKelasActiveTab = 'mapel';
       }
       if (menuId === 'manajemen_ulangan') {
         const isAdmin = isAdminUser();
@@ -4243,6 +4253,7 @@
       if (state.activeMenu !== 'manajemen_guru') {
         state.activeMenu = 'manajemen_guru';
         state.isGuruMenuOpen = true;
+        state.teacherManagementTab = 'akun';
       } else {
         state.isGuruMenuOpen = !state.isGuruMenuOpen;
       }
@@ -4253,8 +4264,30 @@
 
     window.navigateTeacherSubmenu = function (tab) {
       state.activeMenu = 'manajemen_guru';
-      state.teacherManagementTab = tab === 'akun' ? 'akun' : 'mengajar';
+      state.teacherManagementTab = tab === 'mengajar' ? 'mengajar' : 'akun';
       state.isGuruMenuOpen = true;
+      saveSessionToStorage();
+      renderNavigationMenus();
+      renderCurrentMenu();
+    };
+
+    window.toggleMapelMenuCollapse = function () {
+      if (state.activeMenu !== 'manajemen_mapel') {
+        state.activeMenu = 'manajemen_mapel';
+        state.isMapelMenuOpen = true;
+        state.mapelKelasActiveTab = 'mapel';
+      } else {
+        state.isMapelMenuOpen = !state.isMapelMenuOpen;
+      }
+      saveSessionToStorage();
+      renderNavigationMenus();
+      renderCurrentMenu();
+    };
+
+    window.navigateMapelKelasSubmenu = function (tab) {
+      state.activeMenu = 'manajemen_mapel';
+      state.mapelKelasActiveTab = tab === 'kelas' ? 'kelas' : 'mapel';
+      state.isMapelMenuOpen = true;
       saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -4307,6 +4340,46 @@
           `;
         }
 
+        if (role === 'admin' && m.id === 'manajemen_mapel') {
+          const isMapelActive = state.activeMenu === 'manajemen_mapel';
+          const isSubjActive = isMapelActive && state.mapelKelasActiveTab !== 'kelas';
+          const isClassActive = isMapelActive && state.mapelKelasActiveTab === 'kelas';
+          const isOpen = state.isMapelMenuOpen !== false;
+          return `
+            <div class="space-y-1">
+              <button type="button" onclick="window.toggleMapelMenuCollapse()"
+                class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isMapelActive
+                  ? 'bg-indigo-50/80 text-indigo-700'
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                }">
+                <div class="flex items-center gap-3.5 truncate">
+                  <i data-lucide="book-open" class="w-[18px] h-[18px] shrink-0"></i>
+                  <span class="truncate">Mapel &amp; Kelas</span>
+                </div>
+                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
+              </button>
+              <div class="pl-7 pr-1 space-y-1 ${isOpen ? 'block' : 'hidden'}">
+                <button type="button" onclick="window.navigateMapelKelasSubmenu('mapel')"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isSubjActive
+                    ? 'flowora-btn-primary text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                  }">
+                  <i data-lucide="book-marked" class="w-3.5 h-3.5 shrink-0"></i>
+                  <span class="truncate">Mata Pelajaran</span>
+                </button>
+                <button type="button" onclick="window.navigateMapelKelasSubmenu('kelas')"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isClassActive
+                    ? 'flowora-btn-primary text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                  }">
+                  <i data-lucide="layout-grid" class="w-3.5 h-3.5 shrink-0"></i>
+                  <span class="truncate">Daftar Kelas</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
         const isActive = state.activeMenu === m.id;
         return `
         <button type="button" onclick="window.navigateMenu('${m.id}')"
@@ -4347,6 +4420,14 @@
           } else {
             label = 'Data Guru';
             subtitle = 'Manajemen akun guru, jenis ID, jabatan, kelas ampuan, serta template & ekspor Excel';
+          }
+        } else if (currentMeta.id === 'manajemen_mapel' && role === 'admin') {
+          if (state.mapelKelasActiveTab === 'kelas') {
+            label = 'Daftar Kelas';
+            subtitle = 'Kelola daftar rombongan belajar / kelas madrasah dan wali kelas';
+          } else {
+            label = 'Mata Pelajaran';
+            subtitle = 'Kelola daftar mata pelajaran madrasah dan atur urutan tampilan';
           }
         } else if (currentMeta.id === 'manajemen_siswa' && role !== 'admin') {
           const tRole = getCurrentTeacherRoleMeta();
@@ -7810,7 +7891,7 @@
       const sortedClassNames = sortClassNamesNatural(rawClasses.map(c => c.class_name));
       const sortedClasses = sortedClassNames.map(name => rawClasses.find(c => c.class_name === name)).filter(Boolean);
 
-      const subjPage = paginateItems(sortedSubjects, 'subjects');
+      const subjPage = paginateItems(sortedSubjects, 'subjects', 50);
       const clsPage = paginateItems(sortedClasses, 'classes');
 
       return `
@@ -7818,25 +7899,18 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div>
             <div class="flex items-center gap-3 flex-wrap">
-              <h3 class="text-lg md:text-xl font-extrabold text-slate-900">Daftar Mapel &amp; Kelas</h3>
-              <span class="px-3.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs md:text-sm font-extrabold">${sortedSubjects.length} Mapel</span>
-              <span class="px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs md:text-sm font-extrabold">${sortedClasses.length} Kelas</span>
+              <h3 class="text-lg md:text-xl font-extrabold text-slate-900">${activeTab === 'kelas' ? 'Daftar Kelas' : 'Daftar Mata Pelajaran'}</h3>
+              ${activeTab === 'kelas'
+                ? `<span class="px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs md:text-sm font-extrabold">${sortedClasses.length} Kelas</span>`
+                : `<span class="px-3.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs md:text-sm font-extrabold">${sortedSubjects.length} Mapel</span>`
+              }
             </div>
-            <p class="text-xs md:text-sm text-slate-500 mt-1">Kelola daftar mata pelajaran madrasah, penempatan kelas, serta manajemen rombel / kelas madrasah</p>
-          </div>
-
-          <!-- Segmented Tab Switcher -->
-          <div class="inline-flex p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80 shrink-0">
-            <button type="button" onclick="window.handleSelectMapelKelasTab('mapel')"
-              class="px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${activeTab === 'mapel' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
-              <i data-lucide="book-open" class="w-4 h-4"></i>
-              <span>Mata Pelajaran (${sortedSubjects.length})</span>
-            </button>
-            <button type="button" onclick="window.handleSelectMapelKelasTab('kelas')"
-              class="px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${activeTab === 'kelas' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
-              <i data-lucide="school" class="w-4 h-4"></i>
-              <span>Daftar Kelas (${sortedClasses.length})</span>
-            </button>
+            <p class="text-xs md:text-sm text-slate-500 mt-1">
+              ${activeTab === 'kelas'
+                ? 'Kelola daftar rombongan belajar / kelas madrasah, penetapan wali kelas, serta pantau jumlah siswa &amp; ulangan'
+                : 'Kelola daftar mata pelajaran madrasah dan atur urutan tampilan'
+              }
+            </p>
           </div>
         </div>
 
@@ -7857,20 +7931,36 @@
                   <tr class="border-b border-slate-200 text-xs font-extrabold uppercase tracking-wider text-slate-400">
                     <th class="py-3.5 px-4 w-16 text-center">No</th>
                     <th class="py-3.5 px-4 text-left">Nama Mata Pelajaran</th>
-                    <th class="py-3.5 px-4 w-32 text-right">Aksi</th>
+                    <th class="py-3.5 px-4 w-44 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-sm">
                   ${subjPage.totalItems === 0 ? `
                     <tr><td colspan="3" class="py-14 text-center text-sm text-slate-400">Belum ada mata pelajaran. Klik <strong>+ Tambah Mapel</strong> untuk menambahkan.</td></tr>
-                  ` : subjPage.items.map((subj, idx) => `
+                  ` : subjPage.items.map((subj, idx) => {
+                    const globalIdx = subjPage.startIndex + idx;
+                    const isFirst = globalIdx === 0;
+                    const isLast = globalIdx === sortedSubjects.length - 1;
+                    return `
                     <tr class="hover:bg-slate-50/80 transition">
-                      <td class="py-4 px-4 font-bold text-slate-400 text-center text-sm">${subjPage.startIndex + idx + 1}</td>
+                      <td class="py-4 px-4 font-bold text-slate-400 text-center text-sm">${globalIdx + 1}</td>
                       <td class="py-4 px-4">
                         <span class="text-[15px] font-extrabold text-slate-900">${escapeHtml(subj.name)}</span>
                       </td>
                       <td class="py-4 px-4 text-right whitespace-nowrap">
                         <div class="inline-flex items-center justify-end gap-1.5">
+                          <button type="button" onclick="window.handleMoveSubjectOrder('${subj.id}', 'up')"
+                            ${isFirst ? 'disabled' : ''}
+                            class="p-2 rounded-xl border border-slate-200 transition ${isFirst ? 'opacity-25 cursor-not-allowed text-slate-300' : 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 shadow-2xs'}"
+                            title="Pindah ke Atas">
+                            <i data-lucide="arrow-up" class="w-4 h-4"></i>
+                          </button>
+                          <button type="button" onclick="window.handleMoveSubjectOrder('${subj.id}', 'down')"
+                            ${isLast ? 'disabled' : ''}
+                            class="p-2 rounded-xl border border-slate-200 transition ${isLast ? 'opacity-25 cursor-not-allowed text-slate-300' : 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 shadow-2xs'}"
+                            title="Pindah ke Bawah">
+                            <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                          </button>
                           <button type="button" onclick="window.handleEditSubject('${subj.id}')"
                             class="p-2 rounded-xl hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition" title="Edit Mapel">
                             <i data-lucide="pencil" class="w-[18px] h-[18px]"></i>
@@ -7882,7 +7972,8 @@
                         </div>
                       </td>
                     </tr>
-                  `).join('')}
+                  `;
+                  }).join('')}
                 </tbody>
               </table>
             </div>
@@ -8013,6 +8104,42 @@
     window.handleOpenAddSubjectModal = function () {
       state.editingSubjectId = null;
       openSubjectFormModal(null);
+    };
+
+    window.handleMoveSubjectOrder = async function (subjectId, direction) {
+      if (!subjectId || !direction) return;
+      if (!Array.isArray(state.subjects) || state.subjects.length <= 1) return;
+
+      const idx = state.subjects.findIndex(s => s.id === subjectId);
+      if (idx === -1) return;
+
+      const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (newIdx < 0 || newIdx >= state.subjects.length) return;
+
+      const temp = state.subjects[idx];
+      state.subjects[idx] = state.subjects[newIdx];
+      state.subjects[newIdx] = temp;
+
+      saveSubjectsMetaToStorage();
+      saveCacheToStorage();
+
+      if (!IS_PREVIEW && supabase) {
+        state.academicSettings.updatedAt = Date.now();
+        saveAcademicSettingsToStorage();
+        enqueuePendingSync({
+          id: crypto.randomUUID(),
+          table: 'classes',
+          action: 'upsert',
+          record: buildAcademicConfigRow()
+        });
+        updateSyncBadge('syncing');
+        flushPendingSyncToSupabase().then(() => {
+          updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+        });
+      }
+
+      showToast(`Urutan mata pelajaran berhasil diubah.`, 'success');
+      renderCurrentMenu();
     };
 
     window.handleEditSubject = function (subjectId) {
@@ -9309,9 +9436,9 @@
             <thead>
               <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-400 text-center">
                 <th class="py-3 px-3 w-12 text-center">No</th>
-                <th class="py-3 px-3 text-center">Nama & Jabatan</th>
+                <th class="py-3 px-3 text-center">Nama &amp; Jabatan</th>
                 <th class="py-3 px-3 text-center">Identitas / Password</th>
-                <th class="py-3 px-3 text-center">Mapel & Kelas Ampuan</th>
+                <th class="py-3 px-3 text-center">Kelas Ampuan</th>
                 <th class="py-3 px-3 text-center">Aksi</th>
               </tr>
             </thead>
@@ -9335,9 +9462,10 @@
                     <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold">${escapeHtml(t.username)}</span>
                     <div class="text-[11px] text-slate-400 mt-0.5">pw: ${escapeHtml(t.password)}</div>
                   </td>
-                  <td class="py-3 px-3">
-                    <div class="font-semibold text-slate-800">${escapeHtml(t.subject)}</div>
-                    <div class="text-[11px] text-slate-500 font-semibold mt-0.5">${escapeHtml(tMeta.classAssigned)}</div>
+                  <td class="py-3 px-3 text-center">
+                    <span class="inline-block px-3 py-1 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">
+                      ${escapeHtml(tMeta.classAssigned || '-')}
+                    </span>
                   </td>
                   <td class="py-3 px-3 text-right whitespace-nowrap">
                     <div class="inline-flex items-center justify-end gap-1">
@@ -9373,8 +9501,7 @@
 
       return `
         <div class="space-y-6">
-          <!-- Top Sub-Tab Switcher: Mengajar vs Data Guru -->
-          <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex items-center justify-between gap-4">
             <div class="flex items-center gap-3">
               <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-100">
                 <i data-lucide="${state.teacherManagementTab === 'mengajar' ? 'book-open' : 'users'}" class="w-5 h-5"></i>
@@ -9387,20 +9514,6 @@
                   ${state.teacherManagementTab === 'mengajar' ? 'Atur guru pengampu per mata pelajaran untuk Kelas 1 s/d Kelas 6' : 'Kelola akun login guru, identitas ID, jabatan, dan kelas ampuan'}
                 </p>
               </div>
-            </div>
-
-            <!-- Tab Pills -->
-            <div class="inline-flex p-1 bg-slate-100/90 rounded-2xl border border-slate-200 self-start md:self-center shadow-inner">
-              <button type="button" onclick="window.navigateTeacherSubmenu('mengajar')"
-                class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${state.teacherManagementTab === 'mengajar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
-                <i data-lucide="book-open" class="w-4 h-4"></i>
-                <span>Mengajar (Kelas 1–6)</span>
-              </button>
-              <button type="button" onclick="window.navigateTeacherSubmenu('akun')"
-                class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${state.teacherManagementTab === 'akun' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
-                <i data-lucide="users" class="w-4 h-4"></i>
-                <span>Data Guru (${state.teachers.length})</span>
-              </button>
             </div>
           </div>
 
@@ -10357,105 +10470,6 @@
       saveSessionToStorage();
       updateWorkspacePeriodUI();
       populateExamSelectors();
-      renderCurrentMenu();
-      showToast(`Menampilkan data TA ${nextYear} • Semester ${nextSem}.`, 'info');
-    };
-
-    window.handleBackupAllDataJson = function () {
-      if (!isAdminUser()) {
-        showToast('Fitur backup khusus untuk Administrator.', 'warning');
-        return;
-      }
-      mergeAcademicYearsFromExams();
-      const payload = {
-        app: 'SIHASUL',
-        schemaVersion: 2,
-        exportedAt: new Date().toISOString(),
-        exportedBy: state.currentUser?.full_name || 'Administrator',
-        academicSettings: {
-          activeAcademicYear: state.academicSettings?.activeAcademicYear || DEFAULT_ACADEMIC_YEAR,
-          activeSemester: normalizeSemester(state.academicSettings?.activeSemester || DEFAULT_SEMESTER),
-          academicYears: [...(state.academicSettings?.academicYears || DEFAULT_ACADEMIC_YEARS)],
-          headmasterName: state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME,
-          headmasterNip: state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP,
-          signatureCity: state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY,
-          signatureDate: state.academicSettings?.signatureDate || ''
-        },
-        data: {
-          teachers: state.teachers || [],
-          classes: (state.classes || []).filter(c => c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME),
-          subjects: state.subjects || [],
-          deletedSubjectNames: state.deletedSubjectNames || [],
-          students: state.students || [],
-          exams: state.exams || [],
-          examResults: state.examResults || []
-        }
-      };
-
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const now = new Date();
-      const stamp = `${now.toISOString().slice(0, 10)}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `SIHASUL_Backup_${stamp}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('Backup data lengkap (.json) berhasil diunduh!', 'success');
-    };
-
-    async function upsertTableInBatches(table, rows, batchSize = 100) {
-      if (!supabase || !Array.isArray(rows) || rows.length === 0) return { error: null };
-      for (let i = 0; i < rows.length; i += batchSize) {
-        const chunk = rows.slice(i, i + batchSize);
-        const res = await supabase.from(table).upsert(chunk, { onConflict: 'id' });
-        if (res?.error) return { error: res.error };
-      }
-      return { error: null };
-    }
-
-    window.handleRestoreBackupJson = async function (event) {
-      const file = event?.target?.files?.[0];
-      if (!file) return;
-      event.target.value = '';
-
-      if (!isAdminUser()) {
-        showToast('Fitur restore data khusus untuk Administrator.', 'warning');
-        return;
-      }
-
-      try {
-        const text = await file.text();
-        const parsed = JSON.parse(text);
-        if (!parsed || parsed.app !== 'SIHASUL' || !parsed.data || typeof parsed.data !== 'object') {
-          showToast('File bukan backup SIHASUL yang valid.', 'danger');
-          return;
-        }
-        const d = parsed.data;
-        if (!Array.isArray(d.teachers) || !Array.isArray(d.exams) || !Array.isArray(d.examResults)) {
-          showToast('Struktur data di dalam file backup tidak lengkap.', 'danger');
-          return;
-        }
-
-        const studentsArr = Array.isArray(d.students) ? d.students : [];
-        const subjectsArr = Array.isArray(d.subjects) ? d.subjects : [];
-        const classesArr = Array.isArray(d.classes)
-          ? d.classes.filter(c => c && c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME)
-          : [];
-        const deletedSubjArr = Array.isArray(d.deletedSubjectNames) ? d.deletedSubjectNames : [];
-        const exportedDateText = parsed.exportedAt
-          ? new Date(parsed.exportedAt).toLocaleString('id-ID')
-          : '-';
-
-        openConfirmModal(
-          'Konfirmasi Restore Backup Data',
-          `
-            <div class="space-y-3 text-xs">
-              <p>Data aplikasi saat ini akan dipulihkan menggunakan file backup tanggal <strong>${escapeHtml(exportedDateText)}</strong>:</p>
-              <div class="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700">
-                <div>Guru: <strong>${d.teachers.length}</strong></div>
                 <div>Kelas: <strong>${classesArr.length}</strong></div>
                 <div>Mata Pelajaran: <strong>${subjectsArr.length}</strong></div>
                 <div>Siswa: <strong>${studentsArr.length}</strong></div>
@@ -11041,6 +11055,27 @@
       const orderedList = [];
       const seen = new Set();
 
+      if (Array.isArray(state.subjects) && state.subjects.length > 0) {
+        state.subjects.forEach(s => {
+          const cleanName = String(s?.name || '').trim();
+          let lower = cleanName.toLowerCase();
+          if (lower === 'pai' || lower === 'pendidikan agama islam') return;
+          if (lower === "al-qur'an hadis" || lower === "al qur`an hadis" || lower === "al-qur`an hadis" || lower === "al quran hadis") {
+            lower = "al qur'an hadis";
+          }
+          const aliasList = aliases[lower] || [];
+          const allVariants = [lower, ...aliasList];
+          if (allVariants.some(v => deletedSet.has(v))) return;
+
+          if (!seen.has(lower) && !deletedSet.has(lower)) {
+            const displayName = (lower === "al qur'an hadis") ? "Al Qur'an Hadis" : cleanName;
+            orderedList.push(displayName);
+            seen.add(lower);
+            allVariants.forEach(v => seen.add(v));
+          }
+        });
+      }
+
       canonicalBase.forEach(name => {
         const lower = name.toLowerCase();
         const aliasList = aliases[lower] || [];
@@ -11048,25 +11083,10 @@
 
         if (allVariants.some(v => deletedSet.has(v))) return;
 
-        const matchedSubject = (state.subjects || []).find(s => {
-          const sLow = String(s?.name || '').trim().toLowerCase();
-          return allVariants.includes(sLow);
-        });
-
-        const displayName = (lower === "al qur'an hadis") ? "Al Qur'an Hadis" : (matchedSubject?.name || name);
-        orderedList.push(displayName);
-        seen.add(lower);
-        allVariants.forEach(v => seen.add(v));
-        if (matchedSubject) seen.add(String(matchedSubject.name || '').trim().toLowerCase());
-      });
-
-      (state.subjects || []).forEach(s => {
-        const cleanName = String(s?.name || '').trim();
-        const lower = cleanName.toLowerCase();
-        if (lower === 'pai' || lower === 'pendidikan agama islam') return;
-        if (cleanName && !seen.has(lower) && !deletedSet.has(lower)) {
-          orderedList.push(cleanName);
+        if (!seen.has(lower) && !deletedSet.has(lower)) {
+          orderedList.push(name);
           seen.add(lower);
+          allVariants.forEach(v => seen.add(v));
         }
       });
 
