@@ -568,12 +568,43 @@
         border: 1px solid #cbd5e1 !important;
       }
     }
+
+    /* Cegah flash halaman login saat refresh ketika sesi tersimpan masih aktif */
+    html.sihasul-restoring-session #auth-view {
+      display: none !important;
+    }
+
+    html:not(.sihasul-restoring-session) #session-restore-splash {
+      display: none !important;
+    }
   </style>
+  <script>
+    try {
+      var _rawSess = localStorage.getItem('flowora_session_v1');
+      if (_rawSess) {
+        var _parsedSess = JSON.parse(_rawSess);
+        if (_parsedSess && _parsedSess.currentUser && _parsedSess.currentUser.id) {
+          document.documentElement.classList.add('sihasul-restoring-session');
+        }
+      }
+    } catch (e) { }
+  </script>
 </head>
 
 <body>
 
   <div id="flowora-app-root" class="ambient-bg flex flex-col lg:flex-row">
+
+    <!-- Splash Ringan Saat Memulihkan Sesi (Mencegah Flash Halaman Login) -->
+    <div id="session-restore-splash" class="w-full h-full flex items-center justify-center p-6">
+      <div class="flex flex-col items-center gap-3 text-center">
+        <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-lg shadow-indigo-500/30 animate-pulse">
+          SH
+        </div>
+        <div class="text-sm font-extrabold text-slate-800">Memuat SIHASUL...</div>
+        <div class="text-xs font-medium text-slate-500">Memulihkan sesi kerja Anda</div>
+      </div>
+    </div>
 
     <!-- ==================== VIEW 1: LOGIN SCREEN ==================== -->
     <div id="auth-view" class="w-full h-full overflow-y-auto custom-scroll flex items-center justify-center p-4 md:p-8">
@@ -10498,23 +10529,6 @@
         activeContentHtml = `
         <!-- Card 2: Pengaturan Kepala Madrasah & Tanda Tangan Dokumen -->
         <div class="glass-surface rounded-3xl p-6 space-y-5">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="flex items-start gap-3">
-              <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <i data-lucide="award" class="w-5 h-5"></i>
-              </div>
-              <div>
-                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Kepala Madrasah &amp; Tanda Tangan</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Kelola data identitas madrasah (KOP laporan), Kepala Madrasah, kota domisili, dan tanggal pengesahan tanda tangan pada seluruh cetak laporan dan rekap nilai</p>
-              </div>
-            </div>
-          </div>
-
-          <form onsubmit="window.handleSaveSignatureSettings(event)" oninput="window.updateSignatureLivePreview()" class="p-5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-6">
-            <!-- Bagian 1: Identitas Madrasah untuk KOP Laporan & Rekap -->
-            <div class="space-y-4">
-              <div class="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-indigo-900 border-b border-slate-200/80 pb-2">
-                <i data-lucide="building-2" class="w-4 h-4 text-indigo-600"></i>
                 <span>Bagian 1: Identitas Madrasah (KOP Laporan &amp; Cetak Rekap)</span>
               </div>
               
@@ -12529,25 +12543,7 @@
 
       const savedSession = loadSessionFromStorage();
 
-      if (!IS_PREVIEW && firebaseAuth) {
-        try {
-          const initialUser = await waitForFirebaseAuthInit();
-          state.firebaseIdToken = initialUser ? await initialUser.getIdToken() : null;
-          onAuthStateChanged(firebaseAuth, async (user) => {
-            try {
-              state.firebaseIdToken = user ? await user.getIdToken() : null;
-            } catch (e) {
-              state.firebaseIdToken = null;
-            }
-          });
-          if ((savedSession?.currentUser?.role === 'admin' || savedSession?.impersonatedByAdmin) && !initialUser) {
-            clearSessionFromStorage();
-            savedSession.currentUser = null;
-            savedSession.impersonatedByAdmin = null;
-          }
-        } catch (e) { }
-      }
-
+      // Pulihkan workspace terlebih dahulu secara instan agar tidak ada jeda / flash halaman login saat refresh
       if (savedSession?.currentUser) {
         if (savedSession.currentUser.role === 'admin') {
           savedSession.currentUser.full_name = 'Administrator';
@@ -12566,8 +12562,36 @@
         state.sessionAcademicYear = savedSession.sessionAcademicYear || state.academicSettings.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
         state.sessionSemester = normalizeSemester(savedSession.sessionSemester || state.academicSettings.activeSemester || DEFAULT_SEMESTER);
         if (savedSession.activeExamId) state.activeExamId = savedSession.activeExamId;
-        await enterWorkspace({ animate: true, fromRefresh: true });
+        await enterWorkspace({ animate: false, fromRefresh: true });
+        document.documentElement.classList.remove('sihasul-restoring-session');
         updateSyncBadge('syncing', 'Menyinkronkan...');
+      } else {
+        document.documentElement.classList.remove('sihasul-restoring-session');
+      }
+
+      if (!IS_PREVIEW && firebaseAuth) {
+        try {
+          const initialUser = await waitForFirebaseAuthInit();
+          state.firebaseIdToken = initialUser ? await initialUser.getIdToken() : null;
+          onAuthStateChanged(firebaseAuth, async (user) => {
+            try {
+              state.firebaseIdToken = user ? await user.getIdToken() : null;
+            } catch (e) {
+              state.firebaseIdToken = null;
+            }
+          });
+          if ((state.currentUser?.role === 'admin' || state.impersonatedByAdmin) && !initialUser) {
+            state.currentUser = null;
+            state.impersonatedByAdmin = null;
+            state.activeMenu = 'dashboard';
+            clearSessionFromStorage();
+            await switchViewAnimated(
+              document.getElementById('app-view'),
+              document.getElementById('auth-view')
+            );
+            showToast('Sesi Admin telah berakhir, silakan masuk kembali.', 'warning');
+          }
+        } catch (e) { }
       }
 
       await autoSetupDatabase();
