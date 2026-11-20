@@ -694,7 +694,7 @@
               class="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-100 text-xs text-indigo-900 flex items-start gap-2.5">
               <i data-lucide="info" class="w-4 h-4 text-indigo-600 shrink-0 mt-0.5"></i>
               <span id="auth-helper-text">
-                <strong>Mode Guru:</strong> Validasi langsung ke tabel <code>teachers</code> di database Supabase
+                <strong>Mode Guru:</strong> Validasi langsung ke koleksi <code>teachers</code> di Cloud Firestore (Firebase)
                 menggunakan Username/NIP & Password.
               </span>
             </div>
@@ -803,8 +803,8 @@
 
           <!-- Global Exam Filter & Quick Actions -->
           <div class="flex items-center gap-2.5 md:gap-3">
-            <button type="button" id="sync-status-badge" onclick="window.manualSyncSupabase()"
-              title="Klik untuk sinkronisasi manual ke Supabase"
+            <button type="button" id="sync-status-badge" onclick="window.manualSyncFirebase()"
+              title="Klik untuk sinkronisasi manual ke Firebase"
               class="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-bold transition hover:bg-emerald-100/80 shrink-0">
               <i data-lucide="cloud-check" class="w-3.5 h-3.5"></i>
               <span class="hidden sm:inline" id="sync-status-text">Tersinkron</span>
@@ -934,7 +934,7 @@
         </div>
         <div class="space-y-1">
           <h3 id="action-anim-title" class="text-lg font-extrabold text-slate-900">Memproses...</h3>
-          <p id="action-anim-subtitle" class="text-xs font-medium text-slate-500">Menyinkronkan data dengan Supabase</p>
+          <p id="action-anim-subtitle" class="text-xs font-medium text-slate-500">Menyinkronkan data dengan Firebase</p>
         </div>
         <div id="action-anim-progress-track" class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
           <div id="action-anim-progress-bar"
@@ -953,17 +953,111 @@
 
   <!-- ==================== APPLICATION MODULE SCRIPT ==================== -->
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+    import {
+      getAuth,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged
+    } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+    import {
+      getFirestore,
+      collection,
+      doc,
+      getDocs,
+      setDoc,
+      deleteDoc,
+      query,
+      where,
+      limit,
+      writeBatch
+    } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-    // KONFIGURASI APLIKASI
-    const IS_PREVIEW = false; // Set false JIKA SUDAH TERHUBUNG KE SUPABASE
-    // PASTE SUPABASE URL & ANON KEY ANDA DI SINI
-    const SUPABASE_URL = "https://razildwckekwirqemxnx.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhemlsZHdja2Vrd2lycWVteG54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0MDYwNzgsImV4cCI6MjEwOTk4MjA3OH0.E2Jr2P1_sRYyxOeKa5iLPNjRR0llh3JX0wVhT9zwfTw";
+    // KONFIGURASI APLIKASI (FIREBASE)
+    const IS_PREVIEW = false; // Set false JIKA SUDAH TERHUBUNG KE FIREBASE
+    // PASTE KONFIGURASI FIREBASE PROJECT ANDA DI SINI
+    // (Ambil dari Firebase Console -> Project Settings -> Your Apps -> Web App -> firebaseConfig)
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyBNOpmKQNnH5CXtPXTiGaX7txewgkwvdMM",
+      authDomain: "analisis-soal-4d37c.firebaseapp.com",
+      projectId: "analisis-soal-4d37c",
+      storageBucket: "analisis-soal-4d37c.firebasestorage.app",
+      messagingSenderId: "171999257049",
+      appId: "1:171999257049:web:30fd91a0cbc677e7ba39c8"
+    };
 
-    let supabase = null;
-    if (!IS_PREVIEW && SUPABASE_URL !== "URL_SUPABASE_ANDA" && SUPABASE_ANON_KEY !== "ANON_KEY_ANDA") {
-      supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const isFirebaseConfigured = Boolean(
+      !IS_PREVIEW &&
+      FIREBASE_CONFIG.apiKey &&
+      FIREBASE_CONFIG.apiKey !== "API_KEY_FIREBASE_ANDA" &&
+      FIREBASE_CONFIG.projectId &&
+      FIREBASE_CONFIG.projectId !== "PROJECT_ID_ANDA"
+    );
+
+    let firebaseApp = null;
+    let firebaseAuth = null;
+    let db = null;
+    if (isFirebaseConfigured) {
+      firebaseApp = initializeApp(FIREBASE_CONFIG);
+      firebaseAuth = getAuth(firebaseApp);
+      db = getFirestore(firebaseApp);
+    }
+
+    function sanitizeForFirestore(val) {
+      if (val === undefined) return null;
+      if (val === null || typeof val !== 'object') return val;
+      if (val instanceof Date) return val.toISOString();
+      if (Array.isArray(val)) return val.map(v => sanitizeForFirestore(v));
+      const clean = {};
+      Object.keys(val).forEach(k => {
+        if (val[k] !== undefined) {
+          clean[k] = sanitizeForFirestore(val[k]);
+        }
+      });
+      return clean;
+    }
+
+    function toFirestoreRestValue(val) {
+      if (val === null || val === undefined) return { nullValue: null };
+      if (typeof val === 'boolean') return { booleanValue: val };
+      if (typeof val === 'number') {
+        if (!Number.isFinite(val)) return { nullValue: null };
+        return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+      }
+      if (typeof val === 'string') return { stringValue: val };
+      if (Array.isArray(val)) {
+        return { arrayValue: { values: val.map(v => toFirestoreRestValue(v)) } };
+      }
+      if (typeof val === 'object') {
+        const fields = {};
+        Object.keys(val).forEach(k => {
+          if (val[k] !== undefined) fields[k] = toFirestoreRestValue(val[k]);
+        });
+        return { mapValue: { fields } };
+      }
+      return { stringValue: String(val) };
+    }
+
+    function toFirestoreRestFields(obj) {
+      const fields = {};
+      const clean = sanitizeForFirestore(obj || {});
+      Object.keys(clean).forEach(k => {
+        fields[k] = toFirestoreRestValue(clean[k]);
+      });
+      return fields;
+    }
+
+    function waitForFirebaseAuthInit() {
+      if (!firebaseAuth) return Promise.resolve(null);
+      return new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+          unsubscribe();
+          resolve(user || null);
+        }, () => {
+          unsubscribe();
+          resolve(null);
+        });
+      });
     }
 
     // ==================== 1-FILE PWA SERVICE WORKER (BLOB) ====================
@@ -1114,11 +1208,11 @@
       impersonatedByAdmin: null, // Menyimpan profil Admin asal saat beralih langsung ke akun Guru
       activeMenu: 'dashboard',
       activeExamId: null,
-      supabaseAccessToken: null,
+      firebaseIdToken: null,
       isSyncing: false,
       lastSyncedAt: null,
-      hasSubjectsTable: null,
-      hasStudentsTable: null,
+      hasSubjectsTable: true,
+      hasStudentsTable: true,
       deletedSubjectNames: [],
       headerExamClassFilter: 'ALL',
       examClassFilter: 'ALL',
@@ -1902,7 +1996,7 @@
       return Number.isFinite(n) && n > 0 ? Number(n.toFixed(2)) : 1;
     }
 
-    /** Encode jenis soal dan kunci jawaban ke kolom answer_key agar tetap kompatibel dengan skema Supabase. */
+    /** Encode jenis soal dan kunci jawaban ke field answer_key agar tetap kompatibel dengan skema Firestore. */
     function encodeExamAnswerKey(qType, rawKey, expectedCount = null, scorePerItem = 1) {
       const upperType = QUESTION_TYPES[qType] ? qType : 'PG';
       const itemWeight = normalizeItemScoreWeight(scorePerItem);
@@ -2718,7 +2812,7 @@
       return matched || (str || 'Kelas 1');
     }
 
-    /** Encode kelas ampuan, jabatan, dan jenis ID di kolom class_assigned agar kompatibel penuh dengan tabel teachers Supabase. */
+    /** Encode kelas ampuan, jabatan, dan jenis ID di field class_assigned agar kompatibel penuh dengan koleksi teachers Firestore. */
     function encodeTeacherMeta(classAssigned, jabatan, idType) {
       const cls = normalizeTeacherClass(classAssigned);
       const jab = normalizeTeacherJabatan(jabatan);
@@ -3000,7 +3094,7 @@
       }
     }
 
-    function showActionOverlay({ stateType = 'loading', title = 'Memproses...', subtitle = 'Menyinkronkan dengan Supabase' }) {
+    function showActionOverlay({ stateType = 'loading', title = 'Memproses...', subtitle = 'Menyinkronkan dengan Firebase' }) {
       const overlay = document.getElementById('action-anim-overlay');
       const card = document.getElementById('action-anim-card');
       const ring = document.getElementById('action-anim-ring');
@@ -3063,10 +3157,10 @@
       }
     }
 
-    async function flushPendingSyncToSupabase() {
+    async function flushPendingSyncToFirebase() {
       const queue = getPendingSyncQueue();
       if (queue.length === 0) return { ok: true, fatalError: null };
-      if (IS_PREVIEW || !supabase) {
+      if (IS_PREVIEW || !db) {
         savePendingSyncQueue([]);
         return { ok: true, fatalError: null };
       }
@@ -3076,37 +3170,29 @@
 
       for (let i = 0; i < queue.length; i++) {
         const op = queue[i];
-        if (op.table === 'subjects' && state.hasSubjectsTable === false) continue;
-        if (op.table === 'students' && state.hasStudentsTable === false) continue;
         try {
-          let res;
           if (op.action === 'upsert') {
-            res = await supabase.from(op.table).upsert([op.record], { onConflict: 'id' });
+            const docId = String(op.record?.id || crypto.randomUUID());
+            const cleanRecord = sanitizeForFirestore({ ...op.record, id: docId });
+            await setDoc(doc(db, op.table, docId), cleanRecord, { merge: true });
           } else if (op.action === 'delete') {
-            res = await supabase.from(op.table).delete().eq('id', op.recordId);
-          }
-
-          if (res?.error) {
-            const isMissingTable = /does not exist|schema cache|not find the table|PGRST205|42P01/i.test(res.error.message || res.error.code || '');
-            if (isMissingTable && op.table === 'subjects') {
-              state.hasSubjectsTable = false;
-              continue;
+            if (op.recordId !== undefined && op.recordId !== null && String(op.recordId).trim() !== '') {
+              await deleteDoc(doc(db, op.table, String(op.recordId)));
             }
-            if (isMissingTable && op.table === 'students') {
-              state.hasStudentsTable = false;
-              continue;
-            }
-            const isNetworkLike = !navigator.onLine || /fetch|network|timeout|load failed|offline|abort/i.test(res.error.message || '');
-            if (isNetworkLike) {
-              remaining.push(op, ...queue.slice(i + 1));
-              break;
-            }
-            // Database constraint / permission error: don't loop forever
-            fatalError = res.error;
           }
         } catch (err) {
-          remaining.push(op, ...queue.slice(i + 1));
-          break;
+          const errCode = String(err?.code || '').toLowerCase();
+          const errMsg = String(err?.message || '');
+          const isNetworkLike = !navigator.onLine ||
+            errCode === 'unavailable' ||
+            errCode === 'deadline-exceeded' ||
+            /fetch|network|timeout|load failed|offline|abort|unavailable/i.test(errMsg);
+          if (isNetworkLike) {
+            remaining.push(op, ...queue.slice(i + 1));
+            break;
+          }
+          // Firestore security rules / permission / invalid-argument error: don't loop forever
+          fatalError = err;
         }
       }
 
@@ -3118,32 +3204,27 @@
       saveSessionToStorage();
       saveCacheToStorage();
       saveStudentsToStorage();
-      if (IS_PREVIEW || !supabase) return;
-      const queue = getPendingSyncQueue().filter(op =>
-        !(op.table === 'subjects' && state.hasSubjectsTable === false) &&
-        !(op.table === 'students' && state.hasStudentsTable === false)
-      );
+      if (IS_PREVIEW || !db || !FIREBASE_CONFIG.projectId) return;
+      const queue = getPendingSyncQueue();
       if (queue.length === 0) return;
 
-      const token = state.supabaseAccessToken || SUPABASE_ANON_KEY;
-      const baseHeaders = {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal'
-      };
+      const baseUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FIREBASE_CONFIG.projectId)}/databases/(default)/documents`;
+      const baseHeaders = { 'Content-Type': 'application/json' };
+      if (state.firebaseIdToken) {
+        baseHeaders.Authorization = `Bearer ${state.firebaseIdToken}`;
+      }
 
       queue.forEach(op => {
         try {
-          if (op.action === 'upsert') {
-            fetch(`${SUPABASE_URL}/rest/v1/${op.table}?on_conflict=id`, {
-              method: 'POST',
+          if (op.action === 'upsert' && op.record?.id) {
+            fetch(`${baseUrl}/${encodeURIComponent(op.table)}/${encodeURIComponent(String(op.record.id))}?key=${encodeURIComponent(FIREBASE_CONFIG.apiKey)}`, {
+              method: 'PATCH',
               headers: baseHeaders,
-              body: JSON.stringify([op.record]),
+              body: JSON.stringify({ fields: toFirestoreRestFields(op.record) }),
               keepalive: true
             }).catch(() => { });
-          } else if (op.action === 'delete') {
-            fetch(`${SUPABASE_URL}/rest/v1/${op.table}?id=eq.${encodeURIComponent(op.recordId)}`, {
+          } else if (op.action === 'delete' && op.recordId) {
+            fetch(`${baseUrl}/${encodeURIComponent(op.table)}/${encodeURIComponent(String(op.recordId))}?key=${encodeURIComponent(FIREBASE_CONFIG.apiKey)}`, {
               method: 'DELETE',
               headers: baseHeaders,
               keepalive: true
@@ -3153,7 +3234,7 @@
       });
     }
 
-    async function syncWithSupabase({ reason = 'manual', showOverlay = false } = {}) {
+    async function syncWithFirebase({ reason = 'manual', showOverlay = false } = {}) {
       if (state.isSyncing) return { ok: true };
       state.isSyncing = true;
       updateSyncBadge('syncing');
@@ -3161,15 +3242,15 @@
       if (showOverlay) {
         showActionOverlay({
           stateType: 'loading',
-          title: 'Menyinkronkan Supabase...',
+          title: 'Menyinkronkan Firebase...',
           subtitle: 'Mengirim antrean data dan mengambil pembaruan terbaru'
         });
       }
 
       try {
-        const flushRes = await flushPendingSyncToSupabase();
-        if (!IS_PREVIEW && supabase) {
-          await fetchAllSupabaseData();
+        const flushRes = await flushPendingSyncToFirebase();
+        if (!IS_PREVIEW && db) {
+          await fetchAllFirebaseData();
         }
         state.lastSyncedAt = new Date();
         saveCacheToStorage();
@@ -3188,10 +3269,10 @@
         if (showOverlay) {
           showActionOverlay({
             stateType: 'success',
-            title: pendingLeft > 0 ? 'Tersimpan di Antrean Lokal' : 'Tersinkron ke Supabase!',
+            title: pendingLeft > 0 ? 'Tersimpan di Antrean Lokal' : 'Tersinkron ke Firebase!',
             subtitle: pendingLeft > 0
               ? 'Data akan otomatis terkirim saat koneksi kembali stabil'
-              : 'Seluruh data terbaru sudah masuk ke database Supabase'
+              : 'Seluruh data terbaru sudah masuk ke Cloud Firestore'
           });
           await sleep(550);
           await hideActionOverlay();
@@ -3208,12 +3289,12 @@
       }
     }
 
-    window.manualSyncSupabase = async function () {
-      const res = await syncWithSupabase({ reason: 'manual', showOverlay: true });
+    window.manualSyncFirebase = async function () {
+      const res = await syncWithFirebase({ reason: 'manual', showOverlay: true });
       if (res.ok) {
-        showToast('Seluruh data berhasil disinkronkan ke Supabase!', 'success');
+        showToast('Seluruh data berhasil disinkronkan ke Firebase!', 'success');
       } else {
-        showToast('Sebagian data masih berada di antrean lokal (cek koneksi).', 'warning');
+        showToast('Sebagian data masih berada di antrean lokal (cek koneksi / Firestore Rules).', 'warning');
       }
     };
 
@@ -3223,7 +3304,7 @@
       record,
       overlayTitle = 'Menyimpan Data...',
       overlaySuccessTitle = 'Data Tersimpan!',
-      overlaySuccessSub = 'Otomatis tersinkron masuk ke Supabase',
+      overlaySuccessSub = 'Otomatis tersinkron masuk ke Firebase',
       toastMsg = 'Data berhasil disimpan dan disinkronkan!',
       onLocalApply,
       onRollback
@@ -3233,7 +3314,7 @@
       showActionOverlay({
         stateType: 'loading',
         title: overlayTitle,
-        subtitle: 'Menyimpan & menyinkronkan masuk ke Supabase...'
+        subtitle: 'Menyimpan & menyinkronkan masuk ke Firebase...'
       });
 
       try {
@@ -3243,19 +3324,19 @@
         saveCacheToStorage();
         saveSessionToStorage();
 
-        const flushRes = await flushPendingSyncToSupabase();
+        const flushRes = await flushPendingSyncToFirebase();
         if (flushRes.fatalError) {
           if (onRollback) onRollback();
           saveCacheToStorage();
           updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
           await hideActionOverlay();
-          showToast('Gagal menyimpan ke Supabase: ' + flushRes.fatalError.message, 'danger');
+          showToast('Gagal menyimpan ke Firebase: ' + flushRes.fatalError.message, 'danger');
           return false;
         }
 
-        if (!IS_PREVIEW && supabase && getPendingSyncQueue().length === 0) {
+        if (!IS_PREVIEW && db && getPendingSyncQueue().length === 0) {
           try {
-            await fetchAllSupabaseData();
+            await fetchAllFirebaseData();
             state.lastSyncedAt = new Date();
           } catch (e) { }
         } else {
@@ -3274,7 +3355,7 @@
           stateType: 'success',
           title: overlaySuccessTitle,
           subtitle: pendingLeft > 0
-            ? 'Tersimpan lokal & akan otomatis tersinkron ke Supabase'
+            ? 'Tersimpan lokal & akan otomatis tersinkron ke Firebase'
             : overlaySuccessSub
         });
         await sleep(550);
@@ -3300,10 +3381,10 @@
       saveCacheToStorage();
       saveSessionToStorage();
 
-      const flushRes = await flushPendingSyncToSupabase();
-      if (!IS_PREVIEW && supabase && getPendingSyncQueue().length === 0) {
+      const flushRes = await flushPendingSyncToFirebase();
+      if (!IS_PREVIEW && db && getPendingSyncQueue().length === 0) {
         try {
-          await fetchAllSupabaseData();
+          await fetchAllFirebaseData();
           state.lastSyncedAt = new Date();
         } catch (e) { }
       } else {
@@ -3317,13 +3398,13 @@
       renderCurrentMenu();
 
       if (flushRes.fatalError) {
-        showToast('Gagal menghapus di Supabase: ' + flushRes.fatalError.message, 'danger');
+        showToast('Gagal menghapus di Firebase: ' + flushRes.fatalError.message, 'danger');
       } else {
         showToast(toastMsg, 'info');
       }
     }
 
-    // ==================== AUTO SETUP DATABASE (HYBRID / SUPABASE) ====================
+    // ==================== AUTO SETUP DATABASE (HYBRID / FIREBASE FIRESTORE) ====================
     function ensureStudentsLoadedFromLocal() {
       const localStudents = loadStudentsFromStorage();
       if (state.students.length === 0 && localStudents.length > 0) {
@@ -3333,7 +3414,7 @@
     }
 
     async function autoSetupDatabase() {
-      if (IS_PREVIEW || !supabase) {
+      if (IS_PREVIEW || !db) {
         // Load in-memory dummy data ONLY if no cached state exists
         if (state.teachers.length === 0) state.teachers = structuredClone(INITIAL_SEED_DATA.teachers);
         if (state.classes.length === 0) state.classes = structuredClone(INITIAL_SEED_DATA.classes);
@@ -3350,107 +3431,106 @@
       }
 
       try {
-        // Pastikan antrean sinkronisasi lokal masuk ke Supabase terlebih dahulu saat load/refresh
-        await flushPendingSyncToSupabase();
+        // Pastikan antrean sinkronisasi lokal masuk ke Firebase terlebih dahulu saat load/refresh
+        await flushPendingSyncToFirebase();
 
-        // Cek apakah tabel teachers di Supabase masih kosong
-        const { data: existingTeachers, error: tErr } = await supabase.from('teachers').select('id').limit(1);
-        if (tErr) throw tErr;
+        // Cek apakah koleksi teachers di Cloud Firestore masih kosong
+        const existingTeachersSnap = await getDocs(query(collection(db, 'teachers'), limit(1)));
 
-        if (!existingTeachers || existingTeachers.length === 0) {
-          // Suntikkan akun Guru awal otomatis agar Guru langsung bisa login pertama kali
-          await supabase.from('teachers').insert(INITIAL_SEED_DATA.teachers);
-          await supabase.from('classes').insert(INITIAL_SEED_DATA.classes);
-          showToast('Akun Guru awal berhasil dibuat otomatis di Supabase!', 'success');
+        if (existingTeachersSnap.empty) {
+          // Suntikkan akun Guru & Kelas awal otomatis agar Guru langsung bisa login pertama kali
+          const seedBatch = writeBatch(db);
+          INITIAL_SEED_DATA.teachers.forEach(t => {
+            const docId = String(t.id);
+            seedBatch.set(doc(db, 'teachers', docId), sanitizeForFirestore({ ...t, id: docId }), { merge: true });
+          });
+          INITIAL_SEED_DATA.classes.forEach(c => {
+            const docId = String(c.id);
+            seedBatch.set(doc(db, 'classes', docId), sanitizeForFirestore({ ...c, id: docId }), { merge: true });
+          });
+          await seedBatch.commit();
+          showToast('Akun Guru awal berhasil dibuat otomatis di Firebase!', 'success');
         }
 
-        await fetchAllSupabaseData();
+        await fetchAllFirebaseData();
         state.lastSyncedAt = new Date();
         saveCacheToStorage();
         saveSubjectsMetaToStorage();
         updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
 
-        // Pastikan konfigurasi mapel dan pembersihan deletedSubjectNames langsung tersinkron ke Supabase
-        if (!IS_PREVIEW && supabase && state.currentUser?.role === 'admin') {
+        // Pastikan konfigurasi mapel dan pembersihan deletedSubjectNames langsung tersinkron ke Firebase
+        if (!IS_PREVIEW && db && state.currentUser?.role === 'admin') {
           enqueuePendingSync({
             id: crypto.randomUUID(),
             table: 'classes',
             action: 'upsert',
             record: buildAcademicConfigRow()
           });
-          flushPendingSyncToSupabase().then(() => {
+          flushPendingSyncToFirebase().then(() => {
             updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
           });
         }
       } catch (err) {
-        console.error('Supabase AutoSetup Error:', err);
+        console.error('Firebase AutoSetup Error:', err);
         ensureStudentsLoadedFromLocal();
         mergeSubjectsState();
         mergeAcademicYearsFromExams();
         if (!state.currentUser) populateLoginAcademicSelectors({ preserveSelection: true });
         updateSyncBadge('pending');
-        showToast('Gagal sinkronisasi ke Supabase. Cek koneksi atau script SQL.', 'warning');
+        showToast('Gagal sinkronisasi ke Firebase. Cek konfigurasi atau Firestore Rules.', 'warning');
       }
     }
 
-    async function fetchAllSupabaseData() {
-      if (IS_PREVIEW || !supabase) {
+    async function fetchAllFirebaseData() {
+      if (IS_PREVIEW || !db) {
         ensureStudentsLoadedFromLocal();
         mergeSubjectsState();
         mergeAcademicYearsFromExams();
         return;
       }
-      const [tRes, cRes, eRes, rRes] = await Promise.all([
-        supabase.from('teachers').select('*').order('created_at', { ascending: true }),
-        supabase.from('classes').select('*').order('class_name', { ascending: true }),
-        supabase.from('exams').select('*').order('exam_date', { ascending: false }),
-        supabase.from('exam_results').select('*').order('student_name', { ascending: true })
+
+      const [tSnap, cSnap, eSnap, rSnap, sSnap, stuSnap] = await Promise.all([
+        getDocs(collection(db, 'teachers')),
+        getDocs(collection(db, 'classes')),
+        getDocs(collection(db, 'exams')),
+        getDocs(collection(db, 'exam_results')),
+        getDocs(collection(db, 'subjects')),
+        getDocs(collection(db, 'students'))
       ]);
-      if (tRes.data) state.teachers = tRes.data;
-      if (cRes.data) {
-        const cfgRow = cRes.data.find(c => c.id === ACADEMIC_CONFIG_ROW_ID || c.class_name === ACADEMIC_CONFIG_CLASS_NAME);
-        if (cfgRow) applyRemoteAcademicConfigRow(cfgRow);
-        state.classes = cRes.data.filter(c => c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME);
-      }
-      if (eRes.data) state.exams = eRes.data;
-      if (rRes.data) state.examResults = rRes.data;
 
-      let dbSubjects = null;
-      if (state.hasSubjectsTable !== false) {
-        try {
-          const sRes = await supabase.from('subjects').select('*').order('name', { ascending: true });
-          if (sRes.error) {
-            if (/does not exist|schema cache|not find the table|PGRST205|42P01/i.test(sRes.error.message || sRes.error.code || '')) {
-              state.hasSubjectsTable = false;
-            }
-          } else if (Array.isArray(sRes.data)) {
-            state.hasSubjectsTable = true;
-            dbSubjects = sRes.data;
-          }
-        } catch (e) {
-          state.hasSubjectsTable = false;
-        }
-      }
+      const mapSnap = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      if (state.hasStudentsTable !== false) {
-        try {
-          const stuRes = await supabase.from('students').select('*').order('class_name', { ascending: true }).order('full_name', { ascending: true });
-          if (stuRes.error) {
-            if (/does not exist|schema cache|not find the table|PGRST205|42P01/i.test(stuRes.error.message || stuRes.error.code || '')) {
-              state.hasStudentsTable = false;
-            }
-          } else if (Array.isArray(stuRes.data)) {
-            state.hasStudentsTable = true;
-            state.students = stuRes.data;
-            saveStudentsToStorage();
-          }
-        } catch (e) {
-          state.hasStudentsTable = false;
-        }
-      }
-      if (state.hasStudentsTable !== true) {
-        ensureStudentsLoadedFromLocal();
-      }
+      state.teachers = mapSnap(tSnap).sort((a, b) =>
+        String(a.created_at || '').localeCompare(String(b.created_at || '')) ||
+        String(a.full_name || '').localeCompare(String(b.full_name || ''))
+      );
+
+      const allClasses = mapSnap(cSnap).sort((a, b) =>
+        String(a.class_name || '').localeCompare(String(b.class_name || ''))
+      );
+      const cfgRow = allClasses.find(c => c.id === ACADEMIC_CONFIG_ROW_ID || c.class_name === ACADEMIC_CONFIG_CLASS_NAME);
+      if (cfgRow) applyRemoteAcademicConfigRow(cfgRow);
+      state.classes = allClasses.filter(c => c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME);
+
+      state.exams = mapSnap(eSnap).sort((a, b) =>
+        String(b.exam_date || '').localeCompare(String(a.exam_date || ''))
+      );
+
+      state.examResults = mapSnap(rSnap).sort((a, b) =>
+        String(a.student_name || '').localeCompare(String(b.student_name || ''))
+      );
+
+      state.hasSubjectsTable = true;
+      const dbSubjects = mapSnap(sSnap).sort((a, b) =>
+        String(a.name || '').localeCompare(String(b.name || ''))
+      );
+
+      state.hasStudentsTable = true;
+      state.students = mapSnap(stuSnap).sort((a, b) =>
+        String(a.class_name || '').localeCompare(String(b.class_name || '')) ||
+        String(a.full_name || '').localeCompare(String(b.full_name || ''))
+      );
+      saveStudentsToStorage();
 
       mergeSubjectsState({ dbSubjects });
       mergeAcademicYearsFromExams();
@@ -3458,6 +3538,73 @@
       if ((!state.activeExamId || !state.exams.some(e => e.id === state.activeExamId)) && state.exams.length > 0) {
         state.activeExamId = state.exams[0].id;
       }
+    }
+
+    async function syncAllDataToFirebase() {
+      if (IS_PREVIEW || !db) return;
+
+      const collectionsPayload = [
+        { name: 'teachers', records: state.teachers || [] },
+        {
+          name: 'classes',
+          records: [
+            ...(state.classes || []).filter(c => c && c.id !== ACADEMIC_CONFIG_ROW_ID && c.class_name !== ACADEMIC_CONFIG_CLASS_NAME),
+            buildAcademicConfigRow()
+          ]
+        },
+        {
+          name: 'subjects',
+          records: (state.subjects || []).map(s => ({
+            id: s.id,
+            name: s.name,
+            teacher_id: s.teacher_id ?? null,
+            classes: Array.isArray(s.classes) ? s.classes : ['Semua Kelas']
+          }))
+        },
+        { name: 'students', records: state.students || [] },
+        { name: 'exams', records: state.exams || [] },
+        { name: 'exam_results', records: state.examResults || [] }
+      ];
+
+      const operations = [];
+
+      for (const col of collectionsPayload) {
+        const existingSnap = await getDocs(collection(db, col.name));
+        const nextIdSet = new Set(col.records.map(r => String(r.id)));
+        existingSnap.docs.forEach(d => {
+          if (!nextIdSet.has(String(d.id))) {
+            operations.push({ type: 'delete', colName: col.name, docId: String(d.id) });
+          }
+        });
+        col.records.forEach(rec => {
+          const docId = String(rec.id || crypto.randomUUID());
+          operations.push({
+            type: 'set',
+            colName: col.name,
+            docId,
+            data: sanitizeForFirestore({ ...rec, id: docId })
+          });
+        });
+      }
+
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+        const chunk = operations.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach(op => {
+          const ref = doc(db, op.colName, op.docId);
+          if (op.type === 'delete') {
+            batch.delete(ref);
+          } else {
+            batch.set(ref, op.data, { merge: false });
+          }
+        });
+        await batch.commit();
+      }
+
+      savePendingSyncQueue([]);
+      state.lastSyncedAt = new Date();
+      updateSyncBadge('synced');
     }
 
     // ==================== UI HELPERS: TOAST & MODAL (NO ALERT/CONFIRM) ====================
@@ -3625,14 +3772,14 @@
         idLabel.textContent = 'Username Guru';
         idInput.type = 'text';
         idInput.placeholder = 'Masukkan username guru';
-        helperText.innerHTML = '<strong>Mode Guru:</strong> Validasi langsung ke tabel <code>teachers</code> di database Supabase menggunakan Username/NIP & Password.';
+        helperText.innerHTML = '<strong>Mode Guru:</strong> Validasi langsung ke koleksi <code>teachers</code> di Cloud Firestore (Firebase) menggunakan Username/NIP & Password.';
       } else {
         tabAdmin.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md';
         tabGuru.className = 'py-2.5 px-4 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
         idLabel.textContent = 'Username Admin';
         idInput.type = 'email';
         idInput.placeholder = 'Masukkan username admin';
-        helperText.innerHTML = '<strong>Mode Admin:</strong> Masuk menggunakan <strong>Supabase Authentication</strong> (Email & Password) untuk akses penuh administrator.';
+        helperText.innerHTML = '<strong>Mode Admin:</strong> Masuk menggunakan <strong>Firebase Authentication</strong> (Email & Password) untuk akses penuh administrator.';
       }
     };
 
@@ -3681,8 +3828,8 @@
 
       try {
         if (state.authRoleTab === 'admin') {
-          // Admin Login via Supabase Auth
-          if (IS_PREVIEW || !supabase) {
+          // Admin Login via Firebase Authentication
+          if (IS_PREVIEW || !firebaseAuth) {
             if (identifier.toLowerCase() === 'admin@sekolah.sch.id' && password === 'admin123') {
               state.currentUser = {
                 id: 'admin-preview-uid',
@@ -3698,45 +3845,52 @@
               return;
             }
           } else {
-            const { data, error } = await supabase.auth.signInWithPassword({
-              email: identifier,
-              password: password
-            });
-            if (error || !data.user) {
+            try {
+              const userCredential = await signInWithEmailAndPassword(firebaseAuth, identifier, password);
+              const fbUser = userCredential.user;
+              state.firebaseIdToken = await fbUser.getIdToken();
+              state.currentUser = {
+                id: fbUser.uid,
+                role: 'admin',
+                full_name: 'Administrator',
+                username: fbUser.email || identifier,
+                subject: 'MIS. Nurul Islam Km. 5',
+                class_assigned: 'Semua Kelas'
+              };
+            } catch (authErr) {
               triggerAuthShake();
-              showToast('Gagal login Supabase Auth: ' + (error?.message || 'Akun tidak ditemukan'), 'danger');
+              showToast('Gagal login Firebase Auth: ' + (authErr?.message || 'Akun tidak ditemukan'), 'danger');
               return;
             }
-            state.supabaseAccessToken = data.session?.access_token || null;
-            state.currentUser = {
-              id: data.user.id,
-              role: 'admin',
-              full_name: 'Administrator',
-              username: data.user.email,
-              subject: 'MIS. Nurul Islam Km. 5',
-              class_assigned: 'Semua Kelas'
-            };
           }
         } else {
-          // Teacher Login via Database Table `teachers` Validation
+          // Teacher Login via Firestore Collection `teachers` Validation
           let matchedTeacher = null;
-          if (IS_PREVIEW || !supabase) {
+          if (IS_PREVIEW || !db) {
             matchedTeacher = state.teachers.find(
               t => t.username.toLowerCase() === identifier.toLowerCase() && t.password === password
             );
           } else {
-            const { data, error } = await supabase
-              .from('teachers')
-              .select('*')
-              .eq('username', identifier)
-              .eq('password', password)
-              .maybeSingle();
-            if (!error && data) {
-              matchedTeacher = data;
-            } else if (error) {
+            try {
+              const q = query(
+                collection(db, 'teachers'),
+                where('username', '==', identifier)
+              );
+              const snap = await getDocs(q);
+              const matchedDoc = snap.docs.find(d => d.data()?.password === password);
+              if (matchedDoc) {
+                matchedTeacher = { id: matchedDoc.id, ...matchedDoc.data() };
+              } else {
+                // Fallback case-insensitive check terhadap daftar teachers di Firestore/cache
+                const cachedMatch = state.teachers.find(
+                  t => String(t.username || '').toLowerCase() === identifier.toLowerCase() && t.password === password
+                );
+                if (cachedMatch) matchedTeacher = cachedMatch;
+              }
+            } catch (err) {
               // Fallback ke cache lokal jika koneksi bermasalah
               matchedTeacher = state.teachers.find(
-                t => t.username.toLowerCase() === identifier.toLowerCase() && t.password === password
+                t => String(t.username || '').toLowerCase() === identifier.toLowerCase() && t.password === password
               );
             }
           }
@@ -3757,7 +3911,7 @@
           };
         }
 
-        // Animasi Login + Sinkronisasi Otomatis ke Supabase
+        // Animasi Login + Sinkronisasi Otomatis ke Firebase
         state.impersonatedByAdmin = null;
         state.sessionAcademicYear = selectedAcademicYear;
         state.sessionSemester = selectedSemester;
@@ -3766,10 +3920,10 @@
         showActionOverlay({
           stateType: 'loading',
           title: 'Berhasil Masuk!',
-          subtitle: 'Menyinkronkan data terbaru dari Supabase...'
+          subtitle: 'Menyinkronkan data terbaru dari Firebase...'
         });
 
-        await syncWithSupabase({ reason: 'login' });
+        await syncWithFirebase({ reason: 'login' });
         state.sessionAcademicYear = selectedAcademicYear;
         state.sessionSemester = selectedSemester;
         saveSessionToStorage();
@@ -3799,15 +3953,15 @@
       showActionOverlay({
         stateType: 'loading',
         title: 'Menyinkronkan & Keluar...',
-        subtitle: 'Memastikan seluruh data tersinkron masuk ke Supabase'
+        subtitle: 'Memastikan seluruh data tersinkron masuk ke Firebase'
       });
 
       try {
-        // Sinkronkan terlebih dahulu sebelum signOut agar sesi & token tetap valid saat upload ke Supabase
-        await syncWithSupabase({ reason: 'logout' });
+        // Sinkronkan terlebih dahulu sebelum signOut agar sesi & token tetap valid saat upload ke Firebase
+        await syncWithFirebase({ reason: 'logout' });
 
-        if (!IS_PREVIEW && supabase && (state.currentUser?.role === 'admin' || state.impersonatedByAdmin)) {
-          await supabase.auth.signOut();
+        if (!IS_PREVIEW && firebaseAuth && (state.currentUser?.role === 'admin' || state.impersonatedByAdmin)) {
+          await signOut(firebaseAuth);
         }
       } catch (e) {
         console.warn('Logout sync warning:', e);
@@ -3829,7 +3983,7 @@
         state.examSearchQuery = '';
         state.studentClassFilter = 'ALL';
         state.studentSearchQuery = '';
-        state.supabaseAccessToken = null;
+        state.firebaseIdToken = null;
         clearSessionFromStorage();
 
         const passInput = document.getElementById('login-password');
@@ -3844,7 +3998,7 @@
         showActionOverlay({
           stateType: 'logout-done',
           title: 'Tersinkron & Berhasil Keluar',
-          subtitle: 'Data aman di Supabase • Sesi Anda telah ditutup'
+          subtitle: 'Data aman di Firebase • Sesi Anda telah ditutup'
         });
         await sleep(550);
 
@@ -3855,7 +4009,7 @@
         await hideActionOverlay();
         setButtonLoading(desktopBtn, false);
         if (mobileBtn) mobileBtn.disabled = false;
-        showToast('Data tersinkron ke Supabase & Anda telah keluar dari sesi.', 'info');
+        showToast('Data tersinkron ke Firebase & Anda telah keluar dari sesi.', 'info');
       }
     };
 
@@ -3889,7 +4043,7 @@
       });
 
       try {
-        await flushPendingSyncToSupabase();
+        await flushPendingSyncToFirebase();
       } catch (e) { }
 
       if (state.currentUser?.role === 'admin') {
@@ -3937,10 +4091,10 @@
         subtitle: `Memulihkan sesi ${state.impersonatedByAdmin.full_name}`
       });
 
-      if (!IS_PREVIEW && supabase) {
+      if (!IS_PREVIEW && firebaseAuth) {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session?.user) {
+          const fbUser = firebaseAuth.currentUser || await waitForFirebaseAuthInit();
+          if (!fbUser) {
             state.currentUser = null;
             state.impersonatedByAdmin = null;
             state.activeMenu = 'dashboard';
@@ -3950,10 +4104,10 @@
               document.getElementById('auth-view')
             );
             await hideActionOverlay();
-            showToast('Sesi Supabase Auth Admin telah berakhir, silakan masuk kembali.', 'warning');
+            showToast('Sesi Firebase Auth Admin telah berakhir, silakan masuk kembali.', 'warning');
             return;
           }
-          state.supabaseAccessToken = session.access_token || null;
+          state.firebaseIdToken = await fbUser.getIdToken();
         } catch (e) { }
       }
 
@@ -7289,7 +7443,7 @@
         record: resultRecord,
         overlayTitle: existingResult ? 'Menyimpan Perubahan Nilai...' : 'Menyimpan Nilai Siswa...',
         overlaySuccessTitle: existingResult ? `Nilai ${studentName} Diperbarui!` : `Nilai ${studentName} Tersimpan!`,
-        overlaySuccessSub: `Skor ${score} • Otomatis tersinkron ke Supabase`,
+        overlaySuccessSub: `Skor ${score} • Otomatis tersinkron ke Firebase`,
         toastMsg: existingResult
           ? `Perubahan nilai ${studentName} (Skor: ${score}) berhasil disimpan & tersinkron!`
           : `Nilai ${studentName} (Skor: ${score}) berhasil disimpan & tersinkron!`,
@@ -8370,7 +8524,7 @@
       saveSubjectsMetaToStorage();
       saveCacheToStorage();
 
-      if (!IS_PREVIEW && supabase) {
+      if (!IS_PREVIEW && db) {
         state.academicSettings.updatedAt = Date.now();
         saveAcademicSettingsToStorage();
         enqueuePendingSync({
@@ -8380,7 +8534,7 @@
           record: buildAcademicConfigRow()
         });
         updateSyncBadge('syncing');
-        flushPendingSyncToSupabase().then(() => {
+        flushPendingSyncToFirebase().then(() => {
           updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
         });
       }
@@ -8446,7 +8600,7 @@
       showActionOverlay({
         stateType: 'loading',
         title: existingTarget ? 'Memperbarui Mata Pelajaran...' : 'Menyimpan Mata Pelajaran...',
-        subtitle: 'Memperbarui daftar mapel & sinkronisasi Supabase'
+        subtitle: 'Memperbarui daftar mapel & sinkronisasi Firebase'
       });
 
       const prevSubjectsSnapshot = state.subjects.map(s => ({ ...s, classes: Array.isArray(s.classes) ? [...s.classes] : s.classes }));
@@ -8481,7 +8635,7 @@
         saveCacheToStorage();
         saveSessionToStorage();
 
-        if (!IS_PREVIEW && supabase) {
+        if (!IS_PREVIEW && db) {
           state.academicSettings.updatedAt = Date.now();
           saveAcademicSettingsToStorage();
           enqueuePendingSync({
@@ -8496,7 +8650,7 @@
         saveSessionToStorage();
         updateSyncBadge('syncing');
 
-        const flushRes = await flushPendingSyncToSupabase();
+        const flushRes = await flushPendingSyncToFirebase();
         const pendingLeft = getPendingSyncQueue().length;
         state.lastSyncedAt = new Date();
         saveCacheToStorage();
@@ -8512,7 +8666,7 @@
         showActionOverlay({
           stateType: 'success',
           title: existingTarget ? 'Mapel Diperbarui!' : 'Mapel Baru Tersimpan!',
-          subtitle: pendingLeft > 0 ? 'Tersimpan lokal, menunggu sinkronisasi' : 'Tersinkronisasi dengan database Supabase'
+          subtitle: pendingLeft > 0 ? 'Tersimpan lokal, menunggu sinkronisasi' : 'Tersinkronisasi dengan database Firebase'
         });
         await sleep(500);
         await hideActionOverlay();
@@ -8549,7 +8703,7 @@
           saveSessionToStorage();
           saveCacheToStorage();
 
-          if (!IS_PREVIEW && supabase) {
+          if (!IS_PREVIEW && db) {
             state.academicSettings.updatedAt = Date.now();
             saveAcademicSettingsToStorage();
             enqueuePendingSync({
@@ -8564,14 +8718,14 @@
           saveSessionToStorage();
 
           updateSyncBadge('syncing');
-          const flushRes = await flushPendingSyncToSupabase();
+          const flushRes = await flushPendingSyncToFirebase();
           state.lastSyncedAt = new Date();
           saveCacheToStorage();
           updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
           renderCurrentMenu();
 
           if (flushRes.fatalError) {
-            showToast('Gagal menghapus di Supabase: ' + flushRes.fatalError.message, 'danger');
+            showToast('Gagal menghapus di Firebase: ' + flushRes.fatalError.message, 'danger');
           } else {
             showToast(`Mapel "${target.name}" dihapus dari daftar.`, 'info');
           }
@@ -8679,7 +8833,7 @@
       showActionOverlay({
         stateType: 'loading',
         title: existingTarget ? 'Memperbarui Kelas...' : 'Menyimpan Kelas...',
-        subtitle: 'Memperbarui data kelas & sinkronisasi Supabase'
+        subtitle: 'Memperbarui data kelas & sinkronisasi Firebase'
       });
 
       try {
@@ -8749,7 +8903,7 @@
         saveSubjectsMetaToStorage();
 
         updateSyncBadge('syncing');
-        const flushRes = await flushPendingSyncToSupabase();
+        const flushRes = await flushPendingSyncToFirebase();
         const pendingLeft = getPendingSyncQueue().length;
         state.lastSyncedAt = new Date();
         saveCacheToStorage();
@@ -8761,7 +8915,7 @@
         showActionOverlay({
           stateType: 'success',
           title: existingTarget ? 'Kelas Diperbarui!' : 'Kelas Baru Tersimpan!',
-          subtitle: pendingLeft > 0 ? 'Tersimpan lokal, menunggu sinkronisasi' : 'Tersinkronisasi dengan database Supabase'
+          subtitle: pendingLeft > 0 ? 'Tersimpan lokal, menunggu sinkronisasi' : 'Tersinkronisasi dengan database Firebase'
         });
         await sleep(500);
         await hideActionOverlay();
@@ -8803,14 +8957,14 @@
           saveSessionToStorage();
 
           updateSyncBadge('syncing');
-          const flushRes = await flushPendingSyncToSupabase();
+          const flushRes = await flushPendingSyncToFirebase();
           state.lastSyncedAt = new Date();
           saveCacheToStorage();
           updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
           renderCurrentMenu();
 
           if (flushRes.fatalError) {
-            showToast('Gagal menghapus di Supabase: ' + flushRes.fatalError.message, 'danger');
+            showToast('Gagal menghapus di Firebase: ' + flushRes.fatalError.message, 'danger');
           } else {
             showToast(`Kelas "${target.class_name}" berhasil dihapus.`, 'info');
           }
@@ -9117,7 +9271,7 @@
         if (state.hasStudentsTable === true) {
           enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'upsert', record: studentRecord });
           updateSyncBadge('syncing');
-          await flushPendingSyncToSupabase();
+          await flushPendingSyncToFirebase();
           const pendingLeft = getPendingSyncQueue().length;
           updateSyncBadge(pendingLeft > 0 ? 'pending' : 'synced');
         }
@@ -9155,7 +9309,7 @@
           saveCacheToStorage();
           if (state.hasStudentsTable === true) {
             enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'delete', recordId: studentId });
-            await flushPendingSyncToSupabase();
+            await flushPendingSyncToFirebase();
             updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
           }
           renderCurrentMenu();
@@ -9264,7 +9418,7 @@
 
         if (state.hasStudentsTable === true && toSync.length > 0) {
           toSync.forEach(rec => enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'upsert', record: rec }));
-          await flushPendingSyncToSupabase();
+          await flushPendingSyncToFirebase();
           updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
         }
 
@@ -9354,7 +9508,7 @@
       saveTeachingAssignmentsToStorage();
       saveCacheToStorage();
 
-      if (!IS_PREVIEW && supabase) {
+      if (!IS_PREVIEW && db) {
         state.academicSettings.updatedAt = Date.now();
         saveAcademicSettingsToStorage();
         enqueuePendingSync({
@@ -9364,7 +9518,7 @@
           record: buildAcademicConfigRow()
         });
         updateSyncBadge('syncing');
-        flushPendingSyncToSupabase().then(() => {
+        flushPendingSyncToFirebase().then(() => {
           updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
         });
       }
@@ -9391,7 +9545,7 @@
       saveTeachingAssignmentsToStorage();
       saveCacheToStorage();
 
-      if (!IS_PREVIEW && supabase) {
+      if (!IS_PREVIEW && db) {
         state.academicSettings.updatedAt = Date.now();
         saveAcademicSettingsToStorage();
         enqueuePendingSync({
@@ -9401,7 +9555,7 @@
           record: buildAcademicConfigRow()
         });
         updateSyncBadge('syncing');
-        flushPendingSyncToSupabase().then(() => {
+        flushPendingSyncToFirebase().then(() => {
           updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
         });
       }
@@ -10071,7 +10225,7 @@
         showActionOverlay({
           stateType: 'loading',
           title: 'Mengimpor Data Guru...',
-          subtitle: `Memproses ${rows.length} baris dan menyinkronkan ke Supabase`
+          subtitle: `Memproses ${rows.length} baris dan menyinkronkan ke Firebase`
         });
 
         let importedCount = 0;
@@ -10141,10 +10295,10 @@
         saveCacheToStorage();
 
         updateSyncBadge('syncing');
-        const flushRes = await flushPendingSyncToSupabase();
-        if (!IS_PREVIEW && supabase && getPendingSyncQueue().length === 0) {
+        const flushRes = await flushPendingSyncToFirebase();
+        if (!IS_PREVIEW && db && getPendingSyncQueue().length === 0) {
           try {
-            await fetchAllSupabaseData();
+            await fetchAllFirebaseData();
             state.lastSyncedAt = new Date();
           } catch (e) { }
         }
@@ -10154,7 +10308,7 @@
 
         if (flushRes.fatalError) {
           await hideActionOverlay();
-          showToast('Import lokal berhasil, namun gagal sinkron ke Supabase: ' + flushRes.fatalError.message, 'danger');
+          showToast('Import lokal berhasil, namun gagal sinkron ke Firebase: ' + flushRes.fatalError.message, 'danger');
           return;
         }
 
@@ -10354,81 +10508,6 @@
 
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1.5">NSM (Nomor Statistik Madrasah)</label>
-                  <input type="text" id="set-school-nsm" required
-                    placeholder="Contoh: 111263710005"
-                    value="${escapeHtml(curSchoolNsm)}"
-                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  <p class="text-[11px] text-slate-400 mt-1">12 digit Nomor Statistik Madrasah resmi Kemenag.</p>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">NPSN (Nomor Pokok Sekolah Nasional)</label>
-                  <input type="text" id="set-school-npsn" required
-                    placeholder="Contoh: 60723456"
-                    value="${escapeHtml(curSchoolNpsn)}"
-                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  <p class="text-[11px] text-slate-400 mt-1">8 digit NPSN Kemendikbud/Kemenag.</p>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Status Akreditasi</label>
-                  <input type="text" id="set-school-akreditasi" required
-                    placeholder="Contoh: Terakreditasi B"
-                    value="${escapeHtml(curSchoolAkreditasi)}"
-                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  <p class="text-[11px] text-slate-400 mt-1">Status akreditasi madrasah (misal: Terakreditasi A / B).</p>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Alamat Lengkap Madrasah</label>
-                  <input type="text" id="set-school-address" required
-                    placeholder="Contoh: Jl. Ahmad Yani Km. 5 No. 45, Kec. Banjarmasin Timur, Kota Banjarmasin"
-                    value="${escapeHtml(curSchoolAddress)}"
-                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  <p class="text-[11px] text-slate-400 mt-1">Jalan, nomor, kelurahan/kecamatan, dan kota domisili madrasah.</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Bagian 2: Kepala Madrasah & Titimangsa Dokumen -->
-            <div class="space-y-4 pt-3 border-t border-slate-200/80">
-              <div class="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-indigo-900 border-b border-slate-200/80 pb-2">
-                <i data-lucide="pen-tool" class="w-4 h-4 text-indigo-600"></i>
-                <span>Bagian 2: Pengesahan Kepala Madrasah &amp; Titimangsa Dokumen</span>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap &amp; Gelar Kepala Madrasah</label>
-                  <input type="text" id="set-headmaster-name" required
-                    placeholder="Contoh: H. Ahmad Syauqi, S.Pd.I, M.Pd."
-                    value="${escapeHtml(curHeadmasterName)}"
-                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  <p class="text-[11px] text-slate-400 mt-1">Dicantumkan pada bagian "Mengetahui, Kepala Madrasah".</p>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">NIP / NPK Kepala Madrasah</label>
-                  <input type="text" id="set-headmaster-nip" required
-                    placeholder="Contoh: 197808152005011004"
-                    value="${escapeHtml(curHeadmasterNip)}"
-                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  <p class="text-[11px] text-slate-400 mt-1">Nomor Induk Pegawai Kepala Madrasah (18 digit angka atau strip jika belum ada).</p>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Kota Lokasi Tanda Tangan</label>
-                  <input type="text" id="set-signature-city" required
-                    placeholder="Contoh: Banjarmasin"
-                    value="${escapeHtml(curCity)}"
-                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  <p class="text-[11px] text-slate-400 mt-1">Kota domisili penerbitan dokumen laporan (misal: Banjarmasin).</p>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal Pengesahan (Opsional)</label>
-                  <input type="date" id="set-signature-date"
-                    value="${escapeHtml(curDate)}"
               <div class="text-xl font-extrabold text-purple-700">${years.length}</div>
               <div class="text-[11px] font-bold text-slate-500">Tahun Ajaran</div>
             </div>
@@ -10458,7 +10537,7 @@
                   Restore Data dari Backup (.json)
                 </div>
                 <p class="text-xs text-amber-900/80 leading-relaxed">
-                  Pulihkan seluruh data dari file backup <code>.json</code> yang pernah diunduh. Data akan dipulihkan ke penyimpanan lokal dan otomatis disinkronkan ke database Supabase.
+                  Pulihkan seluruh data dari file backup <code>.json</code> yang pernah diunduh. Data akan dipulihkan ke penyimpanan lokal dan otomatis disinkronkan ke database Firebase.
                 </p>
               </div>
               <div>
@@ -10523,7 +10602,7 @@
         updateWorkspacePeriodUI();
         populateExamSelectors();
 
-        if (!IS_PREVIEW && supabase) {
+        if (!IS_PREVIEW && db) {
           enqueuePendingSync({
             id: crypto.randomUUID(),
             table: 'classes',
@@ -10531,7 +10610,7 @@
             record: buildAcademicConfigRow()
           });
           updateSyncBadge('syncing');
-          await flushPendingSyncToSupabase();
+          await flushPendingSyncToFirebase();
           updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
         }
 
@@ -10616,7 +10695,7 @@
         saveAcademicSettingsToStorage();
         saveCacheToStorage();
 
-        if (!IS_PREVIEW && supabase) {
+        if (!IS_PREVIEW && db) {
           enqueuePendingSync({
             id: crypto.randomUUID(),
             table: 'classes',
@@ -10624,7 +10703,7 @@
             record: buildAcademicConfigRow()
           });
           updateSyncBadge('syncing');
-          await flushPendingSyncToSupabase();
+          await flushPendingSyncToFirebase();
           updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
         }
 
@@ -10664,14 +10743,14 @@
       saveCacheToStorage();
       populateLoginAcademicSelectors({ preserveSelection: false });
 
-      if (!IS_PREVIEW && supabase) {
+      if (!IS_PREVIEW && db) {
         enqueuePendingSync({
           id: crypto.randomUUID(),
           table: 'classes',
           action: 'upsert',
           record: buildAcademicConfigRow()
         });
-        await flushPendingSyncToSupabase();
+        await flushPendingSyncToFirebase();
         updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
       }
 
@@ -10704,14 +10783,14 @@
           saveCacheToStorage();
           saveSessionToStorage();
           populateLoginAcademicSelectors({ preserveSelection: false });
-          if (!IS_PREVIEW && supabase) {
+          if (!IS_PREVIEW && db) {
             enqueuePendingSync({
               id: crypto.randomUUID(),
               table: 'classes',
               action: 'upsert',
               record: buildAcademicConfigRow()
             });
-            await flushPendingSyncToSupabase();
+            await flushPendingSyncToFirebase();
             updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
           }
           updateWorkspacePeriodUI();
@@ -10819,12 +10898,16 @@
                 <div>Paket Ulangan: <strong>${d.exams.length}</strong></div>
                 <div>Hasil Ulangan: <strong>${d.examResults.length}</strong></div>
               </div>
-              <p class="text-rose-600 font-bold">Peringatan: Seluruh data lokal dan database Supabase saat ini akan digantikan oleh isi file cadangan ini.</p>
+              <p class="text-rose-600 font-bold">Peringatan: Seluruh data lokal dan database Firebase saat ini akan digantikan oleh isi file cadangan ini.</p>
             </div>
           `,
           async () => {
             try {
-              showActionOverlay('Memulihkan data backup ke sistem...', 'Mohon tunggu sejenak...');
+              showActionOverlay({
+                stateType: 'loading',
+                title: 'Memulihkan data backup ke sistem...',
+                subtitle: 'Mohon tunggu sejenak...'
+              });
               state.teachers = d.teachers;
               state.classes = classesArr;
               state.subjects = subjectsArr;
@@ -10840,14 +10923,15 @@
                 saveTeachingAssignmentsToStorage();
               }
               saveSubjectsMetaToStorage();
+              saveStudentsToStorage();
               saveCacheToStorage();
 
               let syncWarning = null;
-              if (!IS_PREVIEW && supabase) {
+              if (!IS_PREVIEW && db) {
                 try {
-                  await syncAllDataToSupabase();
+                  await syncAllDataToFirebase();
                 } catch (syncErr) {
-                  syncWarning = syncErr?.message || 'Gagal menyinkronkan ke Supabase.';
+                  syncWarning = syncErr?.message || 'Gagal menyinkronkan ke Firebase.';
                 }
               }
 
@@ -10855,7 +10939,7 @@
               renderCurrentMenu();
               showToast(
                 syncWarning
-                  ? `Data dipulihkan secara lokal, namun sinkronisasi Supabase bermasalah: ${syncWarning}`
+                  ? `Data dipulihkan secara lokal, namun sinkronisasi Firebase bermasalah: ${syncWarning}`
                   : 'Seluruh data backup berhasil dipulihkan dan disinkronkan!',
                 syncWarning ? 'warning' : 'success'
               );
@@ -12271,12 +12355,12 @@
     window.addEventListener('pagehide', flushPendingSyncKeepalive);
     window.addEventListener('online', () => {
       if (state.currentUser || getPendingSyncQueue().length > 0) {
-        syncWithSupabase({ reason: 'online' });
+        syncWithFirebase({ reason: 'online' });
       }
     });
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && state.currentUser && !IS_PREVIEW && supabase) {
-        syncWithSupabase({ reason: 'visibility' });
+      if (document.visibilityState === 'visible' && state.currentUser && !IS_PREVIEW && db) {
+        syncWithFirebase({ reason: 'visibility' });
       }
     });
 
@@ -12294,14 +12378,18 @@
 
       const savedSession = loadSessionFromStorage();
 
-      if (!IS_PREVIEW && supabase) {
-        supabase.auth.onAuthStateChange((_event, session) => {
-          state.supabaseAccessToken = session?.access_token || null;
-        });
+      if (!IS_PREVIEW && firebaseAuth) {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
-          state.supabaseAccessToken = session?.access_token || null;
-          if ((savedSession?.currentUser?.role === 'admin' || savedSession?.impersonatedByAdmin) && !session?.user) {
+          const initialUser = await waitForFirebaseAuthInit();
+          state.firebaseIdToken = initialUser ? await initialUser.getIdToken() : null;
+          onAuthStateChanged(firebaseAuth, async (user) => {
+            try {
+              state.firebaseIdToken = user ? await user.getIdToken() : null;
+            } catch (e) {
+              state.firebaseIdToken = null;
+            }
+          });
+          if ((savedSession?.currentUser?.role === 'admin' || savedSession?.impersonatedByAdmin) && !initialUser) {
             clearSessionFromStorage();
             savedSession.currentUser = null;
             savedSession.impersonatedByAdmin = null;
@@ -12333,7 +12421,7 @@
 
       await autoSetupDatabase();
 
-      if (!IS_PREVIEW && supabase && state.currentUser?.role === 'guru' && state.teachers.length > 0) {
+      if (!IS_PREVIEW && db && state.currentUser?.role === 'guru' && state.teachers.length > 0) {
         const freshTeacher = state.teachers.find(
           t => t.id === state.currentUser.id || t.username === state.currentUser.username
         );
