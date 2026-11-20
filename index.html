@@ -3430,11 +3430,17 @@
 
     async function autoSetupDatabase() {
       if (IS_PREVIEW || !db) {
-        // Load in-memory dummy data ONLY if no cached state exists
-        if (state.teachers.length === 0) state.teachers = structuredClone(INITIAL_SEED_DATA.teachers);
-        if (state.classes.length === 0) state.classes = structuredClone(INITIAL_SEED_DATA.classes);
-        if (state.exams.length === 0) state.exams = structuredClone(INITIAL_SEED_DATA.exams);
-        if (state.examResults.length === 0) state.examResults = structuredClone(INITIAL_SEED_DATA.examResults);
+        // Load in-memory dummy data ONLY on first-ever load when no local cache exists yet
+        let hasLocalCache = false;
+        try {
+          hasLocalCache = Boolean(localStorage.getItem(STORAGE_KEYS.CACHE));
+        } catch (e) { }
+        if (!hasLocalCache) {
+          if (state.teachers.length === 0) state.teachers = structuredClone(INITIAL_SEED_DATA.teachers);
+          if (state.classes.length === 0) state.classes = structuredClone(INITIAL_SEED_DATA.classes);
+          if (state.exams.length === 0) state.exams = structuredClone(INITIAL_SEED_DATA.exams);
+          if (state.examResults.length === 0) state.examResults = structuredClone(INITIAL_SEED_DATA.examResults);
+        }
         ensureStudentsLoadedFromLocal();
         mergeSubjectsState();
         mergeAcademicYearsFromExams();
@@ -3449,22 +3455,23 @@
         // Pastikan antrean sinkronisasi lokal masuk ke Firebase terlebih dahulu saat load/refresh
         await flushPendingSyncToFirebase();
 
-        // Cek apakah koleksi teachers di Cloud Firestore masih kosong
-        const existingTeachersSnap = await getDocs(query(collection(db, 'teachers'), limit(1)));
+        // Cek apakah database Firebase benar-benar baru (baik koleksi teachers maupun classes masih kosong)
+        // Jangan pernah menyuntikkan ulang data dummy jika database sudah pernah diinisialisasi / data guru sengaja dihapus admin
+        const [existingTeachersSnap, existingClassesSnap] = await Promise.all([
+          getDocs(query(collection(db, 'teachers'), limit(1))),
+          getDocs(query(collection(db, 'classes'), limit(1)))
+        ]);
 
-        if (existingTeachersSnap.empty) {
-          // Suntikkan akun Guru & Kelas awal otomatis agar Guru langsung bisa login pertama kali
+        if (existingTeachersSnap.empty && existingClassesSnap.empty) {
+          // Database benar-benar baru pertama kali dipakai: buat daftar kelas default & dokumen konfigurasi saja (tanpa memaksa ulang guru dummy jika sudah dihapus)
           const seedBatch = writeBatch(db);
-          INITIAL_SEED_DATA.teachers.forEach(t => {
-            const docId = String(t.id);
-            seedBatch.set(doc(db, 'teachers', docId), sanitizeForFirestore({ ...t, id: docId }), { merge: true });
-          });
           INITIAL_SEED_DATA.classes.forEach(c => {
             const docId = String(c.id);
             seedBatch.set(doc(db, 'classes', docId), sanitizeForFirestore({ ...c, id: docId }), { merge: true });
           });
+          const cfgRow = buildAcademicConfigRow();
+          seedBatch.set(doc(db, 'classes', String(cfgRow.id)), sanitizeForFirestore(cfgRow), { merge: true });
           await seedBatch.commit();
-          showToast('Akun Guru awal berhasil dibuat otomatis di Firebase!', 'success');
         }
 
         await fetchAllFirebaseData();
