@@ -3689,13 +3689,15 @@
       if (!user) return '';
       if (user.role === 'admin') return 'MIS. Nurul Islam Km. 5';
       const meta = decodeTeacherMeta(user);
+      if (meta.jabatan === 'Wali Kelas') {
+        const cls = meta.classAssigned && meta.classAssigned !== '-' ? meta.classAssigned : 'Semua Kelas';
+        return `Wali Kelas • ${cls}`;
+      }
       const assignedClasses = getTeacherAssignedClasses(user);
-      const classText = (meta.jabatan === 'Guru Mapel' && assignedClasses.length > 0)
-        ? assignedClasses.join(', ')
-        : (meta.classAssigned || '-');
-      const assignedSubjs = getTeacherAssignedSubjects(user);
-      const subjText = assignedSubjs.length > 0 ? assignedSubjs.join(', ') : (user.subject || '-');
-      return `${meta.jabatan} • ${classText} • ${subjText}`;
+      const classText = (assignedClasses.length === 1 && meta.classAssigned !== 'Semua Kelas')
+        ? assignedClasses[0]
+        : (meta.classAssigned && meta.classAssigned !== '-' && assignedClasses.length <= 1 ? meta.classAssigned : 'Semua Kelas');
+      return `Guru • ${classText}`;
     }
 
     function ensureXlsxLoaded() {
