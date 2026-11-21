@@ -9493,7 +9493,7 @@
         </div>
         <div class="no-print flex flex-wrap items-center gap-2.5">
           <button type="button" onclick="window.exportAnalysisCSV()" class="px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
-            <i data-lucide="download" class="w-4 h-4"></i> Export CSV / Excel
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export Excel (.xlsx)
           </button>
           <button type="button" onclick="window.printCombinedReport()" class="px-4 py-2.5 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-1.5" title="Cetak 1 file Landscape berisi Rekap Jawaban Siswa, Analisis Butir, Remedial, dan Pengayaan">
             <i data-lucide="printer" class="w-4 h-4"></i> Cetak Laporan Lengkap (PDF)
@@ -9611,6 +9611,7 @@
     }
 
     window.exportAnalysisCSV = function () {
+      if (!ensureXlsxLoaded()) return;
       const exam = getActiveExam();
       if (!exam) return;
       const stats = computeExamStatistics(exam);
@@ -9621,32 +9622,133 @@
       const qTypeSummary = examMeta.sections.map(s => {
         return examMeta.isMultiType ? `${s.typeMeta.shortLabel} (${s.count})` : `${s.typeMeta.label}`;
       }).join(' + ');
+      const schoolName = state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME;
+      const year = state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const sem = state.sessionSemester || DEFAULT_SEMESTER;
 
-      let csv = `Laporan Analisis Hasil Ulangan - ${exam.title} (${classLabel})\n`;
-      csv += `Mata Pelajaran,"${exam.subject}",Nama Guru,"${teacherName}",Jenis Soal,"${qTypeSummary}",KKM,${exam.kkm},Tanggal,${exam.exam_date}\n\n`;
-      csv += showPointsCol
-        ? `NIS,Nama Siswa,Rincian Jawaban / Skor,Total Poin,Butir Tuntas,Nilai Akhir,Status Ketuntasan,Catatan\n`
-        : `NIS,Nama Siswa,Jawaban Siswa,Jumlah Benar,Nilai Akhir,Status Ketuntasan,Catatan\n`;
+      const sortedResults = sortByNameAlphabetical(stats.results, 'student_name', 'student_nis');
 
-      sortByNameAlphabetical(stats.results, 'student_name', 'student_nis').forEach(r => {
-        const status = r.score >= exam.kkm ? 'TUNTAS' : 'REMEDIAL';
+      // Sheet 1: Rekap Hasil & Tindak Lanjut (Semua Siswa)
+      const mainHeader = showPointsCol
+        ? ['No', 'NIS / NISN', 'Nama Siswa', 'Rincian Jawaban / Skor', 'Total Poin', 'Butir Tuntas', 'Nilai Akhir', 'Status Ketuntasan', 'Program Tindak Lanjut', 'Catatan']
+        : ['No', 'NIS / NISN', 'Nama Siswa', 'Jawaban Siswa', 'Jumlah Benar', 'Nilai Akhir', 'Status Ketuntasan', 'Program Tindak Lanjut', 'Catatan'];
+
+      const mainRows = sortedResults.map((r, idx) => {
+        const isPassed = Number(r.score) >= Number(exam.kkm);
+        const status = isPassed ? 'TUNTAS' : 'REMEDIAL';
+        const program = isPassed ? 'Pengayaan' : 'Remedial';
         const graded = scoreStudentResponse(exam, r.student_answers);
+        const defaultNote = isPassed
+          ? 'Tuntas KKM; diberikan pengayaan materi.'
+          : 'Perlu remedial pada butir soal yang belum tuntas.';
+        const noteVal = r.notes || defaultNote;
+
         if (showPointsCol) {
-          csv += `"${r.student_nis}","${r.student_name}","${graded.displayStudentValue}",${graded.earnedTotal}/${graded.maxTotal},${graded.correctCount},${r.score},${status},"${r.notes || ''}"\n`;
-        } else {
-          csv += `"${r.student_nis}","${r.student_name}","${graded.displayStudentValue || r.student_answers}",${graded.correctCount},${r.score},${status},"${r.notes || ''}"\n`;
+          return [
+            idx + 1,
+            String(r.student_nis || '-'),
+            r.student_name || '-',
+            graded.displayStudentValue || '',
+            `${graded.earnedTotal}/${graded.maxTotal}`,
+            Number(graded.correctCount) || 0,
+            Number(r.score) || 0,
+            status,
+            program,
+            noteVal
+          ];
         }
+        return [
+          idx + 1,
+          String(r.student_nis || '-'),
+          r.student_name || '-',
+          graded.displayStudentValue || r.student_answers || '',
+          Number(graded.correctCount) || 0,
+          Number(r.score) || 0,
+          status,
+          program,
+          noteVal
+        ];
       });
 
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Analisis_Ulangan_${exam.class_name}_${exam.title.replace(/\s+/g, '_')}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      showToast('File CSV Analisis Nilai berhasil diunduh!', 'success');
+      const mainAoa = [
+        ['LAPORAN PROGRAM TINDAK LANJUT & ANALISIS HASIL ULANGAN'],
+        [schoolName],
+        [],
+        ['Judul Ulangan', exam.title || '-', '', 'Kelas', classLabel],
+        ['Mata Pelajaran', exam.subject || '-', '', 'Tahun Ajaran', `${year} (${sem})`],
+        ['Nama Guru', teacherName, '', 'KKM', Number(exam.kkm) || 75],
+        ['Jenis Soal', qTypeSummary, '', 'Tanggal', exam.exam_date || '-'],
+        [],
+        mainHeader,
+        ...mainRows
+      ];
+
+      // Sheet 2: Daftar Remedial
+      const remedialList = sortedResults.filter(r => Number(r.score) < Number(exam.kkm));
+      const remedialAoa = [
+        [`DAFTAR SISWA PROGRAM REMEDIAL — ${exam.subject} (${classLabel})`],
+        [`${exam.title} • KKM: ${exam.kkm} • Tahun Ajaran ${year} (${sem})`],
+        [],
+        ['No', 'NIS / NISN', 'Nama Siswa', 'Nilai Akhir', 'KKM', 'Kurang dari KKM', 'Bentuk Tindak Lanjut', 'Catatan'],
+        ...(remedialList.length > 0
+          ? remedialList.map((r, idx) => [
+              idx + 1,
+              String(r.student_nis || '-'),
+              r.student_name || '-',
+              Number(r.score) || 0,
+              Number(exam.kkm) || 75,
+              Math.max(0, Number(exam.kkm) - Number(r.score)),
+              'Bimbingan Ulang / Tes Remedial',
+              r.notes || 'Perlu remedial pada butir soal yang belum tuntas.'
+            ])
+          : [['-', '-', 'Tidak ada siswa yang perlu remedial (semua tuntas KKM).', '-', '-', '-', '-', '-']])
+      ];
+
+      // Sheet 3: Daftar Pengayaan
+      const enrichmentList = sortedResults.filter(r => Number(r.score) >= Number(exam.kkm));
+      const enrichmentAoa = [
+        [`DAFTAR SISWA PROGRAM PENGAYAAN — ${exam.subject} (${classLabel})`],
+        [`${exam.title} • KKM: ${exam.kkm} • Tahun Ajaran ${year} (${sem})`],
+        [],
+        ['No', 'NIS / NISN', 'Nama Siswa', 'Nilai Akhir', 'KKM', 'Bentuk Tindak Lanjut', 'Catatan'],
+        ...(enrichmentList.length > 0
+          ? enrichmentList.map((r, idx) => [
+              idx + 1,
+              String(r.student_nis || '-'),
+              r.student_name || '-',
+              Number(r.score) || 0,
+              Number(exam.kkm) || 75,
+              'Pengayaan Materi & Soal HOTS',
+              r.notes || 'Tuntas KKM; diberikan pengayaan materi.'
+            ])
+          : [['-', '-', 'Belum ada siswa yang mencapai KKM.', '-', '-', '-', '-']])
+      ];
+
+      const safePart = str => String(str || '').trim().replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+      const filename = `Program_Tindak_Lanjut_${safePart(exam.subject)}_${safePart(exam.class_name)}_${safePart(exam.title)}.xlsx`;
+
+      downloadXlsxWorkbook(filename, [
+        {
+          name: 'Hasil & Tindak Lanjut',
+          aoa: mainAoa,
+          colWidths: showPointsCol ? [6, 18, 28, 42, 13, 13, 12, 18, 20, 38] : [6, 18, 28, 34, 14, 12, 18, 20, 38],
+          textCols: [1]
+        },
+        {
+          name: 'Program Remedial',
+          aoa: remedialAoa,
+          colWidths: [6, 18, 28, 12, 8, 16, 28, 38],
+          textCols: [1]
+        },
+        {
+          name: 'Program Pengayaan',
+          aoa: enrichmentAoa,
+          colWidths: [6, 18, 28, 12, 8, 28, 38],
+          textCols: [1]
+        }
+      ]);
+
+      showToast('File Excel (.xlsx) Program Tindak Lanjut berhasil diunduh!', 'success');
     };
 
     // ==================== 6. MANAJEMEN MAPEL & KELAS ====================
