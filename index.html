@@ -1095,7 +1095,7 @@
 
         <!-- Mobile Active Exam Selector Bar -->
         <div id="mobile-exam-selector-wrap"
-          class="no-print md:hidden px-4 py-2 bg-indigo-50/90 border-b border-indigo-100 flex items-center justify-between gap-2">
+          class="hidden no-print px-4 py-2 bg-indigo-50/90 border-b border-indigo-100 items-center justify-between gap-2">
           <span class="text-[11px] font-bold text-indigo-800 flex items-center gap-1 shrink-0">
             <i data-lucide="layers" class="w-3.5 h-3.5"></i> Paket:
           </span>
@@ -4889,7 +4889,7 @@
     // ==================== NAVIGATION & EXAM SELECTORS ====================
     const MENU_CONFIG = [
       { id: 'dashboard', label: 'Dashboard', shortLabel: 'Dashboard', icon: 'layout-dashboard', subtitle: 'Ringkasan performa ulangan, ketuntasan KKM, dan grafik klasikal', roles: ['admin', 'guru'] },
-      { id: 'manajemen_siswa', label: 'Data Siswa', shortLabel: 'Siswa', icon: 'graduation-cap', subtitle: 'Kelola data siswa per kelas, NIS/NISN, serta template, import & ekspor Excel', roles: ['admin', 'guru'] },
+      { id: 'manajemen_siswa', label: 'Data Siswa', shortLabel: 'Siswa', icon: 'graduation-cap', subtitle: 'Kelola data siswa per kelas, NIS/NISN, serta template, import & ekspor Excel', roles: ['admin'] },
       { id: 'manajemen_guru', label: 'Guru', shortLabel: 'Guru', icon: 'users-round', subtitle: 'Manajemen akun guru dan pembagian tugas mengajar', roles: ['admin'] },
       { id: 'manajemen_mapel', label: 'Mapel & Kelas', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Kelola daftar mata pelajaran dan pembagian kelas untuk setiap mapel', roles: ['admin'] },
       { id: 'rekap_laporan', label: 'Rekap & Laporan', shortLabel: 'Rekap', icon: 'clipboard-check', subtitle: 'Pantau hasil ulangan, analisis butir, remedial, dan cetak rapor siswa per kelas', roles: ['admin'] },
@@ -4966,30 +4966,18 @@
     function populateExamSelectors() {
       const desktopWrap = document.getElementById('header-exam-selector-wrap');
       const mobileWrap = document.getElementById('mobile-exam-selector-wrap');
-      const isAdmin = isAdminUser();
 
+      // Sembunyikan dropdown "Ulangan Aktif" di pojok kanan atas & bar mobile untuk Admin maupun Guru
       if (desktopWrap) {
-        if (isAdmin) {
-          desktopWrap.classList.add('hidden');
-          desktopWrap.classList.remove('md:flex');
-          desktopWrap.style.display = 'none';
-        } else {
-          desktopWrap.classList.remove('hidden');
-          desktopWrap.classList.add('md:flex');
-          desktopWrap.style.display = '';
-        }
+        desktopWrap.classList.add('hidden');
+        desktopWrap.classList.remove('md:flex');
+        desktopWrap.style.display = 'none';
       }
 
       if (mobileWrap) {
-        if (isAdmin) {
-          mobileWrap.classList.add('hidden');
-          mobileWrap.classList.remove('flex');
-          mobileWrap.style.display = 'none';
-        } else {
-          mobileWrap.classList.remove('hidden');
-          mobileWrap.classList.add('flex');
-          mobileWrap.style.display = '';
-        }
+        mobileWrap.classList.add('hidden');
+        mobileWrap.classList.remove('flex');
+        mobileWrap.style.display = 'none';
       }
 
       const desktopSelect = document.getElementById('global-exam-selector');
@@ -5201,6 +5189,9 @@
       state.isGuruMenuOpen = menuId === 'manajemen_guru';
       state.isMapelMenuOpen = menuId === 'manajemen_mapel';
       state.isPengaturanMenuOpen = menuId === 'pengaturan_sistem';
+      if (menuId !== 'mapel_kelas_detail') {
+        state.openTeacherSubjectMenu = null;
+      }
       if (menuId !== 'manajemen_guru') {
         state.teacherManagementTab = 'akun';
       }
@@ -5515,7 +5506,7 @@
           subjectEntries.forEach(([subjName, classes]) => {
             const shortCode = getSubjectShortCode(subjName);
             const isSubjActive = state.activeMenu === 'mapel_kelas_detail' && state.selectedTeacherSubject === subjName;
-            const isOpen = state.openTeacherSubjectMenu === subjName || isSubjActive;
+            const isOpen = state.openTeacherSubjectMenu === subjName;
 
             navHtml += `
               <div class="space-y-1">
@@ -5565,7 +5556,6 @@
         // TUGAS TAMBAHAN Section
         const isAnalisisActive = state.activeMenu === 'analisis_butir';
         const isRemedialActive = state.activeMenu === 'remedial_pengayaan';
-        const isSiswaActive = state.activeMenu === 'manajemen_siswa';
 
         navHtml += `
           <div class="text-[10px] font-black uppercase tracking-wider text-slate-400 px-3 pt-3.5 pb-1">Tugas Tambahan</div>
@@ -5585,14 +5575,6 @@
               }">
               <i data-lucide="award" class="w-4 h-4 shrink-0"></i>
               <span class="truncate">Remedial &amp; Pengayaan</span>
-            </button>
-            <button type="button" onclick="window.navigateMenu('manajemen_siswa')"
-              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${isSiswaActive
-                ? 'flowora-btn-primary text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
-              }">
-              <i data-lucide="graduation-cap" class="w-4 h-4 shrink-0"></i>
-              <span class="truncate">Data Siswa</span>
             </button>
           </div>
         `;
@@ -9181,10 +9163,36 @@
       if (sheet) sheet.innerHTML = '';
     });
 
+    function renderInlineExamSelectorCard(exam, subtitleText = 'Pilih paket ulangan untuk ditampilkan') {
+      const visibleExams = getVisibleExams();
+      if (visibleExams.length === 0) return '';
+      return `
+        <div class="no-print glass-surface rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <i data-lucide="book-open-check" class="w-4 h-4"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="text-xs font-extrabold text-slate-900">Paket Ulangan Dipilih</div>
+              <div class="text-[11px] text-slate-500 truncate">${escapeHtml(subtitleText)} (${visibleExams.length} paket tersedia)</div>
+            </div>
+          </div>
+          <select onchange="window.handleChangeActiveExam(this.value)"
+            class="w-full sm:w-auto sm:min-w-[260px] max-w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+            ${visibleExams.map(ex => `
+              <option value="${ex.id}" ${exam && ex.id === exam.id ? 'selected' : ''}>
+                ${escapeHtml(ex.subject)} • ${escapeHtml(ex.class_name)} — ${escapeHtml(ex.title)}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+      `;
+    }
+
     // ==================== 4. ANALISIS BUTIR SOAL (ITEM ANALYSIS) ====================
     function renderAnalisisButirView(exam, stats) {
       if (!exam) {
-        return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Pilih paket ulangan terlebih dahulu.</div>`;
+        return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Belum ada paket ulangan. Pilih <strong>Mata Pelajaran &amp; Kelas</strong> di menu samping lalu buat paket pada tab <strong>Paket Ulangan &amp; Kunci</strong>.</div>`;
       }
 
       const examMeta = stats.examMeta || decodeExamMeta(exam);
@@ -9204,6 +9212,7 @@
         : (isNumType ? 'Rata-rata / Bobot Maks' : (qType === 'BS' ? 'Sebaran Jawaban (B/S)' : 'Sebaran Opsi (A/B/C/D/E)'));
 
       return `
+      ${renderInlineExamSelectorCard(exam, 'Pilih paket ulangan untuk melihat analisis butir soal')}
       <!-- Summary Metrics Row for Item Mastery & Follow-Up -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="glass-surface rounded-3xl p-5 flex items-center justify-between border-l-4 border-l-emerald-500">
@@ -9364,7 +9373,7 @@
     // ==================== 5. PROGRAM REMEDIAL & PENGAYAAN ====================
     function renderRemedialPengayaanView(exam, stats) {
       if (!exam) {
-        return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Pilih paket ulangan terlebih dahulu.</div>`;
+        return `<div class="glass-surface rounded-3xl p-8 text-center text-sm text-slate-500">Belum ada paket ulangan. Pilih <strong>Mata Pelajaran &amp; Kelas</strong> di menu samping lalu buat paket pada tab <strong>Paket Ulangan &amp; Kunci</strong>.</div>`;
       }
 
       const examMeta = stats.examMeta || decodeExamMeta(exam);
@@ -9375,6 +9384,7 @@
       const enrichmentStudents = alphabeticalResults.filter(r => Number(r.score) >= Number(exam.kkm));
 
       return `
+      ${renderInlineExamSelectorCard(exam, 'Pilih paket ulangan untuk program remedial & pengayaan')}
       <!-- Header Action Bar -->
       <div class="glass-surface rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
