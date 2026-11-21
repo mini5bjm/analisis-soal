@@ -3022,6 +3022,7 @@
 
     function getSubjectShortCode(name) {
       const norm = normalizeSubjectKey(name);
+      if (norm.includes('baca tulis') || norm.includes('btq') || norm.includes('bta')) return 'BTQ';
       if (norm.includes('quran') || norm.includes('qur an')) return 'QM';
       if (norm.includes('akidah') || norm.includes('aqidah')) return 'AA';
       if (norm.includes('fikih') || norm.includes('fiqih')) return 'FK';
@@ -3034,7 +3035,6 @@
       if (norm.includes('ipas') || norm.includes('alam')) return 'IPAS';
       if (norm.includes('pjok') || norm.includes('penjas')) return 'PJOK';
       if (norm.includes('sbdp') || norm.includes('seni')) return 'SBdP';
-      if (norm.includes('baca tulis') || norm.includes('btq') || norm.includes('bta')) return 'BTQ';
       const words = String(name || '').trim().split(/\s+/).filter(Boolean);
       if (words.length > 1) return words.map(w => w[0].toUpperCase()).join('').slice(0, 4);
       return String(name || '').slice(0, 4).toUpperCase();
@@ -3073,8 +3073,11 @@
         }
 
         if (match) {
-          if (!map[subjectName]) map[subjectName] = new Set();
-          map[subjectName].add(className);
+          const canonicalSubj = (state.subjects || []).find(s => isSameSubject(s.name, subjectName))?.name
+            || Object.keys(map).find(k => isSameSubject(k, subjectName))
+            || subjectName;
+          if (!map[canonicalSubj]) map[canonicalSubj] = new Set();
+          map[canonicalSubj].add(className);
         }
       });
 
@@ -5564,7 +5567,8 @@
 
             navHtml += `
               <div class="space-y-1">
-                <button type="button" onclick="window.toggleTeacherSubjectMenuCollapse('${escapeHtml(subjName)}')"
+                <button type="button" data-subject="${escapeHtml(subjName)}"
+                  onclick="window.toggleTeacherSubjectMenuCollapse(this.dataset.subject)"
                   class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-2xl border text-xs font-bold transition-all ${isSubjActive
                     ? 'bg-indigo-50/90 text-indigo-700 border-indigo-200/80 shadow-2xs'
                     : 'border-transparent text-slate-700 hover:bg-slate-100/80 hover:text-slate-900'
@@ -5580,7 +5584,8 @@
                     const isClsActive = isSubjActive && state.selectedTeacherClass === cls;
                     const roman = toRomanGrade(cls);
                     return `
-                      <button type="button" onclick="window.navigateTeacherClassMapel('${escapeHtml(subjName)}', '${escapeHtml(cls)}')"
+                      <button type="button" data-subject="${escapeHtml(subjName)}" data-class="${escapeHtml(cls)}"
+                        onclick="window.navigateTeacherClassMapel(this.dataset.subject, this.dataset.class)"
                         class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isClsActive
                           ? 'flowora-btn-primary text-white shadow-sm'
                           : 'text-slate-600 hover:bg-indigo-50/60 hover:text-indigo-700'
@@ -6292,15 +6297,15 @@
             <!-- Action Toolbar: Copy, Print, Excel, Show Entries & Search -->
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
               <div class="flex flex-wrap items-center gap-2">
-                <button type="button" onclick="window.handleCopyClassStudents('${escapeHtml(cls)}')"
+                <button type="button" data-class="${escapeHtml(cls)}" onclick="window.handleCopyClassStudents(this.dataset.class)"
                   class="px-2.5 py-1 rounded border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 shadow-xs transition">
                   <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-500"></i> Copy
                 </button>
-                <button type="button" onclick="window.handlePrintClassStudents('${escapeHtml(cls)}')"
+                <button type="button" data-class="${escapeHtml(cls)}" onclick="window.handlePrintClassStudents(this.dataset.class)"
                   class="px-2.5 py-1 rounded border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 shadow-xs transition">
                   <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-500"></i> Print
                 </button>
-                <button type="button" onclick="window.handleExportClassStudentsXlsx('${escapeHtml(cls)}')"
+                <button type="button" data-class="${escapeHtml(cls)}" onclick="window.handleExportClassStudentsXlsx(this.dataset.class)"
                   class="px-2.5 py-1 rounded border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 shadow-xs transition">
                   <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i> Excel
                 </button>
