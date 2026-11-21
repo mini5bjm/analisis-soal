@@ -7300,10 +7300,9 @@
         const isSelected = ex.id === state.activeExamId;
         const isEditingCard = Boolean(editingExam && ex.id === editingExam.id);
         const typeBadgesHtml = exMeta.sections.map(sec => {
-          const weightSuffix = !isNumericQuestionType(sec.questionType) && sec.scorePerItem !== 1 ? ` • @${sec.scorePerItem}` : '';
           const badgeLabel = exMeta.isMultiType
-            ? `${sec.typeMeta.shortLabel} (${sec.count}${weightSuffix})`
-            : `${sec.typeMeta.label}${weightSuffix}`;
+            ? `${sec.typeMeta.shortLabel} (${sec.count})`
+            : `${sec.typeMeta.label}`;
           return `<span class="px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${sec.typeMeta.badgeClass}">${badgeLabel}</span>`;
         }).join(' ');
 
@@ -8221,8 +8220,7 @@
       const editSectionAnswers = editingResult ? parseStudentAnswerSections(examMeta, editingResult.student_answers) : {};
 
       const headerBadgesHtml = examMeta.sections.map(sec => {
-        const w = !isNumericQuestionType(sec.questionType) && sec.scorePerItem !== 1 ? ` • @${sec.scorePerItem}` : '';
-        const label = examMeta.isMultiType ? `${sec.typeMeta.shortLabel} (${sec.count}${w})` : `${sec.typeMeta.label}${w}`;
+        const label = examMeta.isMultiType ? `${sec.typeMeta.shortLabel} (${sec.count})` : `${sec.typeMeta.label}`;
         return `<span class="px-2.5 py-1 rounded-full border text-[10px] font-extrabold ${sec.typeMeta.badgeClass}">${label}</span>`;
       }).join(' ');
 
@@ -8920,8 +8918,7 @@
       const sigConfig = getReportSignatureConfig();
       const teacherSig = getTeacherSignatureMeta(examTeacher, exam.subject, exam.class_name);
       const qTypeSummary = examMeta.sections.map(s => {
-        const w = !isNumericQuestionType(s.questionType) && s.scorePerItem !== 1 ? ` @${s.scorePerItem}` : '';
-        return isMulti ? `${s.typeMeta.shortLabel} (${s.count}${w})` : `${s.typeMeta.label}${w}`;
+        return isMulti ? `${s.typeMeta.shortLabel} (${s.count})` : `${s.typeMeta.label}`;
       }).join(' + ');
 
       const { masteredCount, reinforceCount, reteachCount } = summarizeItemMastery(stats.itemAnalysis);
@@ -9644,8 +9641,7 @@
       const classLabel = formatExamClassLabel(exam.class_name);
       const showPointsCol = examMeta.hasWeightedScore || examMeta.isMultiType;
       const qTypeSummary = examMeta.sections.map(s => {
-        const w = !isNumericQuestionType(s.questionType) && s.scorePerItem !== 1 ? ` @${s.scorePerItem}` : '';
-        return examMeta.isMultiType ? `${s.typeMeta.shortLabel} (${s.count}${w})` : `${s.typeMeta.label}${w}`;
+        return examMeta.isMultiType ? `${s.typeMeta.shortLabel} (${s.count})` : `${s.typeMeta.label}`;
       }).join(' + ');
 
       let csv = `Laporan Analisis Hasil Ulangan - ${exam.title} (${classLabel})\n`;
