@@ -8,7 +8,7 @@
 
   <!-- PWA Manifest Data URI (1-File Standard) -->
   <link rel="manifest"
-    href='data:application/manifest+json,{"name":"SIHASUL — Sistem Analisis Hasil Ulangan","short_name":"SIHASUL","start_url":".","display":"standalone","background_color":"#F8FAFC","theme_color":"#4F46E5","icons":[{"src":"https://placehold.co/192x192/4F46E5/ffffff?text=SH","sizes":"192x192","type":"image/png"},{"src":"https://placehold.co/512x512/4F46E5/ffffff?text=SH","sizes":"512x512","type":"image/png"}]}' />
+    href='data:application/manifest+json,{"name":"SIHASUL — Sistem Analisis Hasil Ulangan","short_name":"SIHASUL","start_url":".","display":"standalone","background_color":"%23F8FAFC","theme_color":"%234F46E5","icons":[{"src":"https://placehold.co/192x192/4F46E5/ffffff?text=SH","sizes":"192x192","type":"image/png"},{"src":"https://placehold.co/512x512/4F46E5/ffffff?text=SH","sizes":"512x512","type":"image/png"}]}' />
   <meta name="theme-color" content="#4F46E5" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
 
@@ -10537,6 +10537,118 @@
       setButtonLoading(submitterBtn, true, 'Menyimpan...');
       showActionOverlay({
         stateType: 'loading',
+        title: existingTarget ? 'Memperbarui Data Siswa...' : 'Menyimpan Data Siswa...',
+        subtitle: 'Memperbarui daftar siswa & menyinkronkan data'
+      });
+
+      try {
+        if (existingTarget) {
+          Object.assign(existingTarget, studentRecord);
+          state.editingStudentId = null;
+        } else {
+          state.students.push(studentRecord);
+        }
+        saveStudentsToStorage();
+        saveCacheToStorage();
+
+        if (state.hasStudentsTable === true) {
+          enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'upsert', record: studentRecord });
+          updateSyncBadge('syncing');
+          await flushPendingSyncToFirebase();
+          const pendingLeft = getPendingSyncQueue().length;
+          updateSyncBadge(pendingLeft > 0 ? 'pending' : 'synced');
+        }
+
+        closeFormModal({ resetEditState: false });
+        renderCurrentMenu();
+        showActionOverlay({
+          stateType: 'success',
+          title: existingTarget ? 'Perubahan Siswa Tersimpan!' : 'Data Siswa Tersimpan!',
+          subtitle: `${fullName} (${className}) berhasil ${existingTarget ? 'diperbarui' : 'ditambahkan'}`
+        });
+        await sleep(450);
+        await hideActionOverlay();
+        showToast(`Siswa "${fullName}" (${className}) berhasil ${existingTarget ? 'diperbarui' : 'disimpan'}!`, 'success');
+      } finally {
+        setButtonLoading(submitterBtn, false);
+      }
+    };
+
+    window.handleDeleteStudent = function (studentId) {
+      if (!isAdminUser()) {
+        showToast('Fitur hapus data siswa khusus untuk Administrator.', 'warning');
+        return;
+      }
+      const target = state.students.find(s => s.id === studentId);
+      if (!target) return;
+
+      openConfirmModal(
+        'Hapus Data Siswa',
+        `<p>Apakah Anda yakin ingin menghapus data siswa <strong>${escapeHtml(target.full_name)}</strong> (${escapeHtml(target.class_name)})?</p>`,
+        async () => {
+          state.students = state.students.filter(s => s.id !== studentId);
+          if (state.editingStudentId === studentId) state.editingStudentId = null;
+          saveStudentsToStorage();
+          saveCacheToStorage();
+          if (state.hasStudentsTable === true) {
+            enqueuePendingSync({ id: crypto.randomUUID(), table: 'students', action: 'delete', recordId: studentId });
+            await flushPendingSyncToFirebase();
+            updateSyncBadge(getPendingSyncQueue().length > 0 ? 'pending' : 'synced');
+          }
+          renderCurrentMenu();
+          showToast(`Data siswa "${target.full_name}" berhasil dihapus.`, 'info');
+        },
+        'Ya, Hapus'
+      );
+    };
+
+    window.handleDownloadStudentTemplate = function () {
+      if (!isAdminUser()) {
+        showToast('Fitur unduh template siswa khusus untuk Administrator.', 'warning');
+        return;
+      }
+      downloadXlsxWorkbook('Template_Data_Siswa.xlsx', [
+        {
+          name: 'Data Siswa',
+          aoa: [
+            ['NIS / NISN', 'Nama Lengkap', 'Jenis Kelamin (L/P)', 'Kelas'],
+            ['102401', 'Ahmad Fauzi', 'L', 'Kelas 1'],
+            ['102402', 'Siti Aisyah', 'P', 'Kelas 1']
+          ],
+          colWidths: [18, 30, 22, 14],
+          textCols: [0]
+        },
+        {
+          name: 'Petunjuk',
+          aoa: [
+            ['Kolom', 'Keterangan / Pilihan Valid'],
+            ['NIS / NISN', 'Nomor induk siswa (angka)'],
+            ['Nama Lengkap', 'Nama lengkap siswa'],
+            ['Jenis Kelamin (L/P)', 'Isi L (Laki-laki) atau P (Perempuan)'],
+            ['Kelas', 'Isi salah satu: Kelas 1, Kelas 2, Kelas 3, Kelas 4, Kelas 5, atau Kelas 6']
+          ],
+          colWidths: [22, 60]
+        }
+      ]);
+      showToast('Template Excel Data Siswa berhasil diunduh!', 'success');
+    };
+
+    window.handleImportStudentsXlsx = async function (event) {
+      const file = event?.target?.files?.[0];
+      if (!file) return;
+      event.target.value = '';
+      if (!isAdminUser()) {
+        showToast('Fitur import data siswa khusus untuk Administrator.', 'warning');
+        return;
+      }
+
+      try {
+        const rows = await readXlsxFirstSheetRows(file);
+        if (!rows || rows.length === 0) {
+          showToast('File Excel kosong atau tidak memiliki baris data.', 'warning');
+          return;
+        }
+
         showActionOverlay({
           stateType: 'loading',
           title: 'Mengimpor Data Siswa...',
