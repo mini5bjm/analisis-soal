@@ -1483,6 +1483,13 @@
       mengajarSelectedClass: 'Kelas 1',
       mengajarSearchQuery: '',
       teachingAssignments: {},
+      selectedTeacherSubject: null,
+      selectedTeacherClass: null,
+      teacherClassViewTab: 'rincian',
+      openTeacherSubjectMenu: null,
+      teacherClassStudentSearch: '',
+      teacherClassStudentPage: 1,
+      teacherClassStudentPageSize: 10,
       editingSubjectId: null,
       editingClassId: null,
       editingStudentId: null,
@@ -1515,6 +1522,7 @@
       examResults: [],
       teacherLoginLogs: []
     };
+    window.state = state;
 
     const INITIAL_SEED_DATA = {
       teachers: [
@@ -1628,6 +1636,10 @@
           mapelKelasActiveTab: state.mapelKelasActiveTab,
           pengaturanActiveTab: state.pengaturanActiveTab,
           activeExamId: state.activeExamId,
+          selectedTeacherSubject: state.selectedTeacherSubject,
+          selectedTeacherClass: state.selectedTeacherClass,
+          teacherClassViewTab: state.teacherClassViewTab,
+          openTeacherSubjectMenu: state.openTeacherSubjectMenu,
           sessionAcademicYear: state.sessionAcademicYear,
           sessionSemester: state.sessionSemester,
           savedAt: Date.now()
@@ -2968,6 +2980,279 @@
 
       return Array.from(classes);
     }
+
+    function getSubjectShortCode(name) {
+      const norm = normalizeSubjectKey(name);
+      if (norm.includes('quran') || norm.includes('qur an')) return 'QM';
+      if (norm.includes('akidah') || norm.includes('aqidah')) return 'AA';
+      if (norm.includes('fikih') || norm.includes('fiqih')) return 'FK';
+      if (norm.includes('ski')) return 'SKI';
+      if (norm.includes('pancasila')) return 'PP';
+      if (norm.includes('indonesia')) return 'BINDO';
+      if (norm.includes('matematika')) return 'MTK';
+      if (norm.includes('arab')) return 'BAR';
+      if (norm.includes('inggris')) return 'BING';
+      if (norm.includes('ipas') || norm.includes('alam')) return 'IPAS';
+      if (norm.includes('pjok') || norm.includes('penjas')) return 'PJOK';
+      if (norm.includes('sbdp') || norm.includes('seni')) return 'SBdP';
+      if (norm.includes('baca tulis') || norm.includes('btq') || norm.includes('bta')) return 'BTQ';
+      const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+      if (words.length > 1) return words.map(w => w[0].toUpperCase()).join('').slice(0, 4);
+      return String(name || '').slice(0, 4).toUpperCase();
+    }
+
+    function toRomanGrade(className) {
+      const m = String(className || '').match(/\d+/);
+      if (!m) return className || '';
+      const num = parseInt(m[0], 10);
+      const roman = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+      return roman[num] || className;
+    }
+
+    function getTeacherSubjectClassesMap(user = state.currentUser) {
+      if (!user) return {};
+      const userId = String(user.id || '').trim();
+      const userName = String(user.full_name || '').trim().toLowerCase();
+
+      const map = {};
+
+      Object.entries(state.teachingAssignments || {}).forEach(([key, rec]) => {
+        if (!rec) return;
+        const parts = key.split('::');
+        if (parts.length < 2) return;
+        const className = parts[0].trim();
+        const subjectName = parts.slice(1).join('::').trim();
+        if (!className || !subjectName) return;
+
+        let match = false;
+        if (typeof rec === 'string') {
+          if (userId && rec === userId) match = true;
+          if (userName && rec.trim().toLowerCase() === userName) match = true;
+        } else if (typeof rec === 'object') {
+          if (userId && rec.teacherId === userId) match = true;
+          if (userName && rec.teacherName && rec.teacherName.trim().toLowerCase() === userName) match = true;
+        }
+
+        if (match) {
+          if (!map[subjectName]) map[subjectName] = new Set();
+          map[subjectName].add(className);
+        }
+      });
+
+      if (Object.keys(map).length === 0 && user.subject && user.subject !== '-') {
+        const meta = decodeTeacherMeta(user);
+        const classes = (meta.classAssigned && meta.classAssigned !== 'Semua Kelas' && meta.classAssigned !== '-')
+          ? [meta.classAssigned]
+          : getAvailableClassNames();
+        parseTeacherSubjects(user.subject).forEach(subj => {
+          if (!map[subj]) map[subj] = new Set();
+          classes.forEach(c => map[subj].add(c));
+        });
+      }
+
+      const result = {};
+      Object.keys(map).sort().forEach(subj => {
+        result[subj] = sortClassNamesNatural(Array.from(map[subj]));
+      });
+      return result;
+    }
+
+    window.navigateTeacherClassMapel = function (subjectName, className) {
+      state.activeMenu = 'mapel_kelas_detail';
+      state.selectedTeacherSubject = subjectName;
+      state.selectedTeacherClass = className;
+      state.teacherClassViewTab = 'rincian';
+      state.openTeacherSubjectMenu = subjectName;
+      state.examSubjectFilter = subjectName;
+      state.examClassFilter = className;
+      state.teacherClassStudentSearch = '';
+      state.teacherClassStudentPage = 1;
+
+      const matchExam = (state.exams || []).find(e =>
+        isSameSubject(e.subject, subjectName) &&
+        String(e.class_name || '').trim().toLowerCase() === String(className).trim().toLowerCase()
+      );
+      if (matchExam) {
+        state.activeExamId = matchExam.id;
+      }
+
+      saveSessionToStorage();
+      renderNavigationMenus();
+      renderCurrentMenu();
+    };
+
+    window.toggleTeacherSubjectMenuCollapse = function (subjectName) {
+      if (state.openTeacherSubjectMenu === subjectName) {
+        state.openTeacherSubjectMenu = null;
+      } else {
+        state.openTeacherSubjectMenu = subjectName;
+      }
+      renderNavigationMenus();
+    };
+
+    window.switchTeacherClassTab = function (tab) {
+      state.teacherClassViewTab = tab;
+      if (tab === 'ulangan') {
+        state.examSubjectFilter = state.selectedTeacherSubject;
+        state.examClassFilter = state.selectedTeacherClass;
+      } else if (tab === 'koreksi') {
+        state.examSubjectFilter = state.selectedTeacherSubject;
+        state.examClassFilter = state.selectedTeacherClass;
+        const matchExam = (state.exams || []).find(e =>
+          isSameSubject(e.subject, state.selectedTeacherSubject) &&
+          String(e.class_name || '').trim().toLowerCase() === String(state.selectedTeacherClass).trim().toLowerCase()
+        );
+        if (matchExam) state.activeExamId = matchExam.id;
+      }
+      saveSessionToStorage();
+      renderNavigationMenus();
+      renderCurrentMenu();
+    };
+
+    window.handleCopyClassStudents = function (className) {
+      const cls = className || state.selectedTeacherClass || 'Kelas 1';
+      const list = (state.students || [])
+        .filter(s => String(s.class_name || '').trim().toLowerCase() === cls.toLowerCase())
+        .slice()
+        .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+
+      if (list.length === 0) {
+        showToast('Tidak ada data siswa untuk disalin.', 'warning');
+        return;
+      }
+
+      const rows = [
+        `DAFTAR SISWA - ${cls.toUpperCase()}`,
+        state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME,
+        `Tahun Ajaran: ${state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR} • Semester: ${state.sessionSemester || DEFAULT_SEMESTER}`,
+        '',
+        'No\tNISN\tNama Siswa\tL/P'
+      ];
+      list.forEach((s, idx) => {
+        rows.push(`${idx + 1}\t${s.nis || '-'}\t${s.full_name || '-'}\t${s.gender === 'P' ? 'P' : 'L'}`);
+      });
+
+      navigator.clipboard.writeText(rows.join('\n')).then(() => {
+        showToast(`Daftar siswa ${cls} (${list.length} siswa) berhasil disalin ke clipboard!`, 'success');
+      }).catch(() => {
+        showToast('Gagal menyalin ke clipboard.', 'warning');
+      });
+    };
+
+    window.handlePrintClassStudents = function (className) {
+      const cls = className || state.selectedTeacherClass || 'Kelas 1';
+      const list = (state.students || [])
+        .filter(s => String(s.class_name || '').trim().toLowerCase() === cls.toLowerCase())
+        .slice()
+        .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+
+      const printWindow = window.open('', '_blank', 'width=850,height=650');
+      if (!printWindow) {
+        showToast('Izinkan pop-up peramban untuk mencetak data siswa.', 'warning');
+        return;
+      }
+      const year = state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const sem = state.sessionSemester || DEFAULT_SEMESTER;
+      const homeroom = getHomeroomTeacherForClass(cls);
+      const homeroomName = homeroom ? (homeroom.full_name || homeroom.username) : '-';
+
+      const rowsHtml = list.map((s, idx) => `
+        <tr>
+          <td style="text-align:center; padding:6px; border:1px solid #cbd5e1;">${idx + 1}</td>
+          <td style="padding:6px 10px; border:1px solid #cbd5e1; font-family:monospace;">${escapeHtml(s.nis || '-')}</td>
+          <td style="padding:6px 10px; border:1px solid #cbd5e1; font-weight:600;">${escapeHtml(s.full_name)}</td>
+          <td style="text-align:center; padding:6px; border:1px solid #cbd5e1;">${s.gender === 'P' ? 'P' : 'L'}</td>
+        </tr>
+      `).join('');
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Daftar Siswa - ${cls}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #1e293b; padding: 24px; }
+            h2 { margin: 0 0 4px; font-size: 16px; text-transform: uppercase; }
+            p { margin: 2px 0 16px; color: #64748b; font-size: 11px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+            th { background: #f8fafc; font-weight: 700; font-size: 11px; text-transform: uppercase; border: 1px solid #cbd5e1; padding: 8px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h2>Daftar Siswa • ${escapeHtml(cls)}</h2>
+          <p>${escapeHtml(state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME)} &bull; Wali Kelas: ${escapeHtml(homeroomName)} &bull; Tahun Ajaran: ${escapeHtml(year)} &bull; Semester: ${escapeHtml(sem)}</p>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40px;">No</th>
+                <th style="width:140px;">NISN</th>
+                <th>Nama Siswa</th>
+                <th style="width:60px;">L/P</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || '<tr><td colspan="4" style="text-align:center; padding:12px;">Belum ada data siswa.</td></tr>'}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    };
+
+    window.handleExportClassStudentsXlsx = function (className) {
+      if (!ensureXlsxLoaded()) return;
+      const cls = className || state.selectedTeacherClass || 'Kelas 1';
+      const list = (state.students || [])
+        .filter(s => String(s.class_name || '').trim().toLowerCase() === cls.toLowerCase())
+        .slice()
+        .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+
+      if (list.length === 0) {
+        showToast('Tidak ada data siswa untuk diekspor.', 'warning');
+        return;
+      }
+
+      const aoa = [
+        [`DAFTAR SISWA - ${cls.toUpperCase()}`],
+        [state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME],
+        [`Tahun Ajaran: ${state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR} • Semester: ${state.sessionSemester || DEFAULT_SEMESTER}`],
+        [],
+        ['No', 'NISN', 'Nama Lengkap', 'Jenis Kelamin', 'Kelas'],
+        ...list.map((s, idx) => [idx + 1, String(s.nis || ''), s.full_name || '', s.gender === 'P' ? 'P' : 'L', cls])
+      ];
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      downloadXlsxWorkbook(`Data_Siswa_${cls.replace(/\s+/g, '_')}_${dateStr}.xlsx`, [
+        { name: `Siswa ${cls}`, aoa, colWidths: [6, 18, 30, 16, 14], textCols: [1] }
+      ]);
+      showToast(`Berhasil mengekspor ${list.length} data siswa ${cls} ke Excel!`, 'success');
+    };
+
+    window.handleTeacherClassStudentSearch = function (q) {
+      state.teacherClassStudentSearch = q || '';
+      state.teacherClassStudentPage = 1;
+      renderCurrentMenu();
+      const nextSearch = document.getElementById('teacher-class-search-input');
+      if (nextSearch) {
+        nextSearch.focus();
+        const len = nextSearch.value.length;
+        nextSearch.setSelectionRange(len, len);
+      }
+    };
+
+    window.handleTeacherClassPageSizeChange = function (val) {
+      state.teacherClassStudentPageSize = val;
+      state.teacherClassStudentPage = 1;
+      renderCurrentMenu();
+    };
+
+    window.handleTeacherClassPageChange = function (page) {
+      state.teacherClassStudentPage = page;
+      renderCurrentMenu();
+    };
 
     function getTeachingAssignment(className, subjectName) {
       if (!className || !subjectName) return null;
@@ -4545,6 +4830,7 @@
       { id: 'manajemen_guru', label: 'Guru', shortLabel: 'Guru', icon: 'users-round', subtitle: 'Manajemen akun guru dan pembagian tugas mengajar', roles: ['admin'] },
       { id: 'manajemen_mapel', label: 'Mapel & Kelas', shortLabel: 'Mapel', icon: 'book-open', subtitle: 'Kelola daftar mata pelajaran dan pembagian kelas untuk setiap mapel', roles: ['admin'] },
       { id: 'rekap_laporan', label: 'Rekap & Laporan', shortLabel: 'Rekap', icon: 'clipboard-check', subtitle: 'Pantau hasil ulangan, analisis butir, remedial, dan cetak rapor siswa per kelas', roles: ['admin'] },
+      { id: 'mapel_kelas_detail', label: 'Rincian Kelas Mapel', shortLabel: 'Rincian', icon: 'school', subtitle: 'Rincian kelas ampuan, data siswa, ulangan & penilaian', roles: ['guru'] },
       { id: 'manajemen_ulangan', label: 'Paket Ulangan & Kunci', shortLabel: 'Ulangan', icon: 'file-key-2', subtitle: 'Kelola daftar ulangan, jenis soal, KKM, jumlah butir, dan kunci jawaban', roles: ['guru'] },
       { id: 'input_nilai', label: 'Input Jawaban Siswa', shortLabel: 'Input Nilai', icon: 'pen-tool', subtitle: 'Koreksi otomatis lembar jawaban PG, Benar Salah, Isian, dan Uraian', roles: ['guru'] },
       { id: 'analisis_butir', label: 'Analisis Butir Soal', shortLabel: 'Butir Soal', icon: 'bar-chart-3', subtitle: 'Tingkat kesukaran (P), capaian penguasaan siswa, dan tindak lanjut pembelajaran', roles: ['guru'] },
@@ -4976,170 +5262,324 @@
 
       // Desktop Sidebar
       const desktopNav = document.getElementById('desktop-nav-list');
-      desktopNav.innerHTML = allowedMenus.map(m => {
-        if (role === 'admin' && m.id === 'manajemen_guru') {
-          const isGuruActive = state.activeMenu === 'manajemen_guru';
-          const isDataGuruActive = isGuruActive && state.teacherManagementTab === 'akun';
-          const isMengajarActive = isGuruActive && state.teacherManagementTab === 'mengajar';
-          const isOpen = Boolean(state.isGuruMenuOpen);
-          return `
-            <div class="space-y-1">
-              <button type="button" onclick="window.toggleTeacherMenuCollapse()"
-                class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isGuruActive
-                  ? 'bg-indigo-50/80 text-indigo-700'
-                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
-                }">
-                <div class="flex items-center gap-3.5 truncate">
-                  <i data-lucide="users-round" class="w-[18px] h-[18px] shrink-0"></i>
-                  <span class="truncate">Guru</span>
+      if (role === 'admin') {
+        desktopNav.innerHTML = allowedMenus.map(m => {
+          if (m.id === 'mapel_kelas_detail') return '';
+          if (m.id === 'manajemen_guru') {
+            const isGuruActive = state.activeMenu === 'manajemen_guru';
+            const isDataGuruActive = isGuruActive && state.teacherManagementTab === 'akun';
+            const isMengajarActive = isGuruActive && state.teacherManagementTab === 'mengajar';
+            const isOpen = Boolean(state.isGuruMenuOpen);
+            return `
+              <div class="space-y-1">
+                <button type="button" onclick="window.toggleTeacherMenuCollapse()"
+                  class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isGuruActive
+                    ? 'bg-indigo-50/80 text-indigo-700'
+                    : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                  }">
+                  <div class="flex items-center gap-3.5 truncate">
+                    <i data-lucide="users-round" class="w-[18px] h-[18px] shrink-0"></i>
+                    <span class="truncate">Guru</span>
+                  </div>
+                  <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
+                </button>
+                <div class="pl-7 pr-1 space-y-1 ${isOpen ? 'block' : 'hidden'}">
+                  <button type="button" onclick="window.navigateTeacherSubmenu('akun')"
+                    class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isDataGuruActive
+                      ? 'flowora-btn-primary text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                    }">
+                    <i data-lucide="users" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span class="truncate">Data Guru</span>
+                  </button>
+                  <button type="button" onclick="window.navigateTeacherSubmenu('mengajar')"
+                    class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isMengajarActive
+                      ? 'flowora-btn-primary text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                    }">
+                    <i data-lucide="book-open" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span class="truncate">Mengajar</span>
+                  </button>
                 </div>
-                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
-              </button>
-              <div class="pl-7 pr-1 space-y-1 ${isOpen ? 'block' : 'hidden'}">
-                <button type="button" onclick="window.navigateTeacherSubmenu('akun')"
-                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isDataGuruActive
-                    ? 'flowora-btn-primary text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
-                  }">
-                  <i data-lucide="users" class="w-3.5 h-3.5 shrink-0"></i>
-                  <span class="truncate">Data Guru</span>
-                </button>
-                <button type="button" onclick="window.navigateTeacherSubmenu('mengajar')"
-                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isMengajarActive
-                    ? 'flowora-btn-primary text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
-                  }">
-                  <i data-lucide="book-open" class="w-3.5 h-3.5 shrink-0"></i>
-                  <span class="truncate">Mengajar</span>
-                </button>
               </div>
+            `;
+          }
+
+          if (m.id === 'manajemen_mapel') {
+            const isMapelActive = state.activeMenu === 'manajemen_mapel';
+            const isSubjActive = isMapelActive && state.mapelKelasActiveTab !== 'kelas';
+            const isClassActive = isMapelActive && state.mapelKelasActiveTab === 'kelas';
+            const isOpen = Boolean(state.isMapelMenuOpen);
+            return `
+              <div class="space-y-1">
+                <button type="button" onclick="window.toggleMapelMenuCollapse()"
+                  class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isMapelActive
+                    ? 'bg-indigo-50/80 text-indigo-700'
+                    : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                  }">
+                  <div class="flex items-center gap-3.5 truncate">
+                    <i data-lucide="book-open" class="w-[18px] h-[18px] shrink-0"></i>
+                    <span class="truncate">Mapel &amp; Kelas</span>
+                  </div>
+                  <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
+                </button>
+                <div class="pl-7 pr-1 space-y-1 ${isOpen ? 'block' : 'hidden'}">
+                  <button type="button" onclick="window.navigateMapelKelasSubmenu('mapel')"
+                    class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isSubjActive
+                      ? 'flowora-btn-primary text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                    }">
+                    <i data-lucide="book-marked" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span class="truncate">Mata Pelajaran</span>
+                  </button>
+                  <button type="button" onclick="window.navigateMapelKelasSubmenu('kelas')"
+                    class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isClassActive
+                      ? 'flowora-btn-primary text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                    }">
+                    <i data-lucide="layout-grid" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span class="truncate">Daftar Kelas</span>
+                  </button>
+                </div>
+              </div>
+            `;
+          }
+
+          if (m.id === 'pengaturan_sistem') {
+            const isPengaturanActive = state.activeMenu === 'pengaturan_sistem';
+            const isPeriodeActive = isPengaturanActive && (!state.pengaturanActiveTab || state.pengaturanActiveTab === 'periode');
+            const isKepalaActive = isPengaturanActive && state.pengaturanActiveTab === 'kepala_madrasah';
+            const isBackupActive = isPengaturanActive && state.pengaturanActiveTab === 'backup';
+            const isOpen = Boolean(state.isPengaturanMenuOpen);
+            return `
+              <div class="space-y-1">
+                <button type="button" onclick="window.togglePengaturanMenuCollapse()"
+                  class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isPengaturanActive
+                    ? 'bg-indigo-50/80 text-indigo-700'
+                    : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                  }">
+                  <div class="flex items-center gap-3.5 truncate">
+                    <i data-lucide="settings" class="w-[18px] h-[18px] shrink-0"></i>
+                    <span class="truncate">Pengaturan</span>
+                  </div>
+                  <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
+                </button>
+                <div class="pl-7 pr-1 space-y-1 ${isOpen ? 'block' : 'hidden'}">
+                  <button type="button" onclick="window.navigatePengaturanSubmenu('periode')"
+                    class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isPeriodeActive
+                      ? 'flowora-btn-primary text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                    }" title="Tahun Ajaran &amp; Semester">
+                    <i data-lucide="calendar-range" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span class="truncate">Tahun Ajaran &amp; Semester</span>
+                  </button>
+                  <button type="button" onclick="window.navigatePengaturanSubmenu('kepala_madrasah')"
+                    class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isKepalaActive
+                      ? 'flowora-btn-primary text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                    }" title="Kepala Madrasah &amp; Tanda Tangan">
+                    <i data-lucide="award" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span class="truncate">Kepala Madrasah &amp; Tanda Tangan</span>
+                  </button>
+                  <button type="button" onclick="window.navigatePengaturanSubmenu('backup')"
+                    class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isBackupActive
+                      ? 'flowora-btn-primary text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                    }" title="Backup &amp; Restore Data">
+                    <i data-lucide="database-backup" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span class="truncate">Backup &amp; Restore Data</span>
+                  </button>
+                </div>
+              </div>
+            `;
+          }
+
+          const isActive = state.activeMenu === m.id;
+          return `
+          <button type="button" onclick="window.navigateMenu('${m.id}')"
+            class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isActive
+              ? 'flowora-btn-primary text-white shadow-md'
+              : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+            }">
+            <i data-lucide="${m.icon}" class="w-[18px] h-[18px] shrink-0"></i>
+            <span class="truncate">${m.label}</span>
+          </button>
+        `;
+        }).join('');
+
+        // Mobile Bottom Nav for Admin
+        const mobileNav = document.getElementById('mobile-nav-list');
+        mobileNav.innerHTML = allowedMenus.filter(m => m.id !== 'mapel_kelas_detail').map(m => {
+          const isActive = state.activeMenu === m.id;
+          return `
+          <button type="button" onclick="window.navigateMenu('${m.id}')"
+            class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${isActive ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-700 font-semibold'}">
+            <div class="${isActive ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}">
+              <i data-lucide="${m.icon}" class="w-4 h-4"></i>
+            </div>
+            <span class="text-[11px] mt-0.5 truncate max-w-[70px]">${m.shortLabel}</span>
+          </button>
+        `;
+        }).join('');
+      } else {
+        // ROLE === 'GURU': RDM-STYLE TEACHER SIDEBAR!
+        const subjectClassesMap = getTeacherSubjectClassesMap(state.currentUser);
+        const subjectEntries = Object.entries(subjectClassesMap);
+        const isDashboardActive = state.activeMenu === 'dashboard';
+
+        let navHtml = `
+          <!-- Dashboard Guru -->
+          <button type="button" onclick="window.navigateMenu('dashboard')"
+            class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isDashboardActive
+              ? 'flowora-btn-primary text-white shadow-md'
+              : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+            }">
+            <i data-lucide="layout-dashboard" class="w-[18px] h-[18px] shrink-0"></i>
+            <span class="truncate">Dashboard</span>
+          </button>
+        `;
+
+        if (subjectEntries.length > 0) {
+          navHtml += `
+            <div class="text-[10px] font-black uppercase tracking-wider text-slate-400 px-3 pt-3.5 pb-1">Mata Pelajaran yang Diampu</div>
+            <div class="space-y-1">
+          `;
+
+          subjectEntries.forEach(([subjName, classes]) => {
+            const shortCode = getSubjectShortCode(subjName);
+            const isSubjActive = state.activeMenu === 'mapel_kelas_detail' && state.selectedTeacherSubject === subjName;
+            const isOpen = state.openTeacherSubjectMenu === subjName || isSubjActive;
+
+            navHtml += `
+              <div class="space-y-1">
+                <button type="button" onclick="window.toggleTeacherSubjectMenuCollapse('${escapeHtml(subjName)}')"
+                  class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${isSubjActive
+                    ? 'bg-indigo-50/90 text-indigo-700 border border-indigo-200/80'
+                    : 'text-slate-700 hover:bg-slate-100/80'
+                  }" title="${escapeHtml(subjName)}">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="px-1.5 py-0.5 rounded-md text-[10px] font-black ${isSubjActive ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'} shrink-0">${escapeHtml(shortCode)}</span>
+                    <span class="truncate text-xs font-bold">${escapeHtml(subjName)}</span>
+                  </div>
+                  <i data-lucide="chevron-down" class="w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
+                </button>
+                <div class="pl-4 pr-1 space-y-1 ${isOpen ? 'block' : 'hidden'}">
+                  ${classes.map(cls => {
+                    const isClsActive = isSubjActive && state.selectedTeacherClass === cls;
+                    const roman = toRomanGrade(cls);
+                    return `
+                      <button type="button" onclick="window.navigateTeacherClassMapel('${escapeHtml(subjName)}', '${escapeHtml(cls)}')"
+                        class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${isClsActive
+                          ? 'flowora-btn-primary text-white shadow-sm'
+                          : 'text-slate-500 hover:bg-indigo-50/60 hover:text-indigo-700'
+                        }">
+                        <div class="flex items-center gap-2 min-w-0">
+                          <span class="w-5 h-5 rounded-md ${isClsActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'} text-[10px] font-black flex items-center justify-center shrink-0">${escapeHtml(roman)}</span>
+                          <span class="truncate">${escapeHtml(cls)}</span>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-3 h-3 ${isClsActive ? 'text-white' : 'text-slate-300'}"></i>
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `;
+          });
+
+          navHtml += `</div>`;
+        } else {
+          navHtml += `
+            <div class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-400 font-medium">
+              Belum ada penugasan mengajar dari Admin.
             </div>
           `;
         }
 
-        if (role === 'admin' && m.id === 'manajemen_mapel') {
-          const isMapelActive = state.activeMenu === 'manajemen_mapel';
-          const isSubjActive = isMapelActive && state.mapelKelasActiveTab !== 'kelas';
-          const isClassActive = isMapelActive && state.mapelKelasActiveTab === 'kelas';
-          const isOpen = Boolean(state.isMapelMenuOpen);
-          return `
-            <div class="space-y-1">
-              <button type="button" onclick="window.toggleMapelMenuCollapse()"
-                class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isMapelActive
-                  ? 'bg-indigo-50/80 text-indigo-700'
-                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
-                }">
-                <div class="flex items-center gap-3.5 truncate">
-                  <i data-lucide="book-open" class="w-[18px] h-[18px] shrink-0"></i>
-                  <span class="truncate">Mapel &amp; Kelas</span>
-                </div>
-                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
-              </button>
-              <div class="pl-7 pr-1 space-y-1 ${isOpen ? 'block' : 'hidden'}">
-                <button type="button" onclick="window.navigateMapelKelasSubmenu('mapel')"
-                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isSubjActive
-                    ? 'flowora-btn-primary text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
-                  }">
-                  <i data-lucide="book-marked" class="w-3.5 h-3.5 shrink-0"></i>
-                  <span class="truncate">Mata Pelajaran</span>
-                </button>
-                <button type="button" onclick="window.navigateMapelKelasSubmenu('kelas')"
-                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isClassActive
-                    ? 'flowora-btn-primary text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
-                  }">
-                  <i data-lucide="layout-grid" class="w-3.5 h-3.5 shrink-0"></i>
-                  <span class="truncate">Daftar Kelas</span>
-                </button>
-              </div>
-            </div>
-          `;
-        }
+        // TUGAS TAMBAHAN Section
+        const isAnalisisActive = state.activeMenu === 'analisis_butir';
+        const isRemedialActive = state.activeMenu === 'remedial_pengayaan';
+        const isSiswaActive = state.activeMenu === 'manajemen_siswa';
 
-        if (role === 'admin' && m.id === 'pengaturan_sistem') {
-          const isPengaturanActive = state.activeMenu === 'pengaturan_sistem';
-          const isPeriodeActive = isPengaturanActive && (!state.pengaturanActiveTab || state.pengaturanActiveTab === 'periode');
-          const isKepalaActive = isPengaturanActive && state.pengaturanActiveTab === 'kepala_madrasah';
-          const isBackupActive = isPengaturanActive && state.pengaturanActiveTab === 'backup';
-          const isOpen = Boolean(state.isPengaturanMenuOpen);
-          return `
-            <div class="space-y-1">
-              <button type="button" onclick="window.togglePengaturanMenuCollapse()"
-                class="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isPengaturanActive
-                  ? 'bg-indigo-50/80 text-indigo-700'
-                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
-                }">
-                <div class="flex items-center gap-3.5 truncate">
-                  <i data-lucide="settings" class="w-[18px] h-[18px] shrink-0"></i>
-                  <span class="truncate">Pengaturan</span>
-                </div>
-                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
-              </button>
-              <div class="pl-7 pr-1 space-y-1 ${isOpen ? 'block' : 'hidden'}">
-                <button type="button" onclick="window.navigatePengaturanSubmenu('periode')"
-                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isPeriodeActive
-                    ? 'flowora-btn-primary text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
-                  }" title="Tahun Ajaran &amp; Semester">
-                  <i data-lucide="calendar-range" class="w-3.5 h-3.5 shrink-0"></i>
-                  <span class="truncate">Tahun Ajaran &amp; Semester</span>
-                </button>
-                <button type="button" onclick="window.navigatePengaturanSubmenu('kepala_madrasah')"
-                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isKepalaActive
-                    ? 'flowora-btn-primary text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
-                  }" title="Kepala Madrasah &amp; Tanda Tangan">
-                  <i data-lucide="award" class="w-3.5 h-3.5 shrink-0"></i>
-                  <span class="truncate">Kepala Madrasah &amp; Tanda Tangan</span>
-                </button>
-                <button type="button" onclick="window.navigatePengaturanSubmenu('backup')"
-                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isBackupActive
-                    ? 'flowora-btn-primary text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
-                  }" title="Backup &amp; Restore Data">
-                  <i data-lucide="database-backup" class="w-3.5 h-3.5 shrink-0"></i>
-                  <span class="truncate">Backup &amp; Restore Data</span>
-                </button>
-              </div>
-            </div>
-          `;
-        }
-
-        const isActive = state.activeMenu === m.id;
-        return `
-        <button type="button" onclick="window.navigateMenu('${m.id}')"
-          class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${isActive
-            ? 'flowora-btn-primary text-white shadow-md'
-            : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
-          }">
-          <i data-lucide="${m.icon}" class="w-[18px] h-[18px] shrink-0"></i>
-          <span class="truncate">${m.label}</span>
-        </button>
-      `;
-      }).join('');
-
-      // Mobile Bottom Nav
-      const mobileNav = document.getElementById('mobile-nav-list');
-      mobileNav.innerHTML = allowedMenus.map(m => {
-        const isActive = state.activeMenu === m.id;
-        return `
-        <button type="button" onclick="window.navigateMenu('${m.id}')"
-          class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${isActive ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-700 font-semibold'
-          }">
-          <div class="${isActive ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}">
-            <i data-lucide="${m.icon}" class="w-4 h-4"></i>
+        navHtml += `
+          <div class="text-[10px] font-black uppercase tracking-wider text-slate-400 px-3 pt-3.5 pb-1">Tugas Tambahan</div>
+          <div class="space-y-1">
+            <button type="button" onclick="window.navigateMenu('analisis_butir')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${isAnalisisActive
+                ? 'flowora-btn-primary text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+              }">
+              <i data-lucide="bar-chart-3" class="w-4 h-4 shrink-0"></i>
+              <span class="truncate">Analisis Butir Soal</span>
+            </button>
+            <button type="button" onclick="window.navigateMenu('remedial_pengayaan')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${isRemedialActive
+                ? 'flowora-btn-primary text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+              }">
+              <i data-lucide="award" class="w-4 h-4 shrink-0"></i>
+              <span class="truncate">Remedial &amp; Pengayaan</span>
+            </button>
+            <button type="button" onclick="window.navigateMenu('manajemen_siswa')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${isSiswaActive
+                ? 'flowora-btn-primary text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+              }">
+              <i data-lucide="graduation-cap" class="w-4 h-4 shrink-0"></i>
+              <span class="truncate">Data Siswa</span>
+            </button>
           </div>
-          <span class="text-[11px] mt-0.5 truncate max-w-[70px]">${m.shortLabel}</span>
-        </button>
-      `;
-      }).join('');
+        `;
+
+        desktopNav.innerHTML = navHtml;
+
+        // Mobile Bottom Nav for Guru
+        const isDetail = state.activeMenu === 'mapel_kelas_detail';
+        const mobileNav = document.getElementById('mobile-nav-list');
+        mobileNav.innerHTML = `
+          <button type="button" onclick="window.navigateMenu('dashboard')"
+            class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.activeMenu === 'dashboard' ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
+            <div class="${state.activeMenu === 'dashboard' ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}"><i data-lucide="layout-dashboard" class="w-4 h-4"></i></div>
+            <span class="text-[10px] mt-0.5">Dashboard</span>
+          </button>
+          ${isDetail ? `
+            <button type="button" onclick="window.switchTeacherClassTab('rincian')"
+              class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.teacherClassViewTab === 'rincian' ? 'text-emerald-700 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
+              <div class="${state.teacherClassViewTab === 'rincian' ? 'bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full' : ''}"><i data-lucide="home" class="w-4 h-4"></i></div>
+              <span class="text-[10px] mt-0.5">Rincian</span>
+            </button>
+            <button type="button" onclick="window.switchTeacherClassTab('ulangan')"
+              class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.teacherClassViewTab === 'ulangan' ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
+              <div class="${state.teacherClassViewTab === 'ulangan' ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}"><i data-lucide="file-key-2" class="w-4 h-4"></i></div>
+              <span class="text-[10px] mt-0.5">Ulangan</span>
+            </button>
+            <button type="button" onclick="window.switchTeacherClassTab('koreksi')"
+              class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.teacherClassViewTab === 'koreksi' ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
+              <div class="${state.teacherClassViewTab === 'koreksi' ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}"><i data-lucide="pen-tool" class="w-4 h-4"></i></div>
+              <span class="text-[10px] mt-0.5">Koreksi</span>
+            </button>
+          ` : `
+            <button type="button" onclick="window.navigateMenu('analisis_butir')"
+              class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.activeMenu === 'analisis_butir' ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
+              <div class="${state.activeMenu === 'analisis_butir' ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}"><i data-lucide="bar-chart-3" class="w-4 h-4"></i></div>
+              <span class="text-[10px] mt-0.5">Analisis</span>
+            </button>
+            <button type="button" onclick="window.navigateMenu('remedial_pengayaan')"
+              class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.activeMenu === 'remedial_pengayaan' ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
+              <div class="${state.activeMenu === 'remedial_pengayaan' ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}"><i data-lucide="award" class="w-4 h-4"></i></div>
+              <span class="text-[10px] mt-0.5">Remedial</span>
+            </button>
+          `}
+        `;
+      }
 
       const currentMeta = MENU_CONFIG.find(m => m.id === state.activeMenu);
       if (currentMeta) {
         let label = currentMeta.label;
         let subtitle = currentMeta.subtitle;
-        if (currentMeta.id === 'manajemen_guru' && role === 'admin') {
+        if (currentMeta.id === 'mapel_kelas_detail') {
+          label = `${state.selectedTeacherSubject || 'Mata Pelajaran'} • ${state.selectedTeacherClass || 'Kelas'}`;
+          subtitle = 'Rincian kelas ampuan, data siswa, ulangan & penilaian siswa';
+        } else if (currentMeta.id === 'manajemen_guru' && role === 'admin') {
           if (state.teacherManagementTab === 'mengajar') {
             label = 'Mengajar';
             subtitle = 'Atur guru pengampu mata pelajaran untuk Kelas 1 s/d Kelas 6';
@@ -5178,6 +5618,7 @@
 
       lucide.createIcons();
     }
+    window.renderNavigationMenus = renderNavigationMenus;
 
     // ==================== STATISTICAL & ITEM ANALYSIS ENGINE ====================
     function sortByNameAlphabetical(list, nameKey = 'student_name', secondaryKey = 'student_nis') {
@@ -5381,6 +5822,9 @@
         case 'dashboard':
           container.innerHTML = renderDashboardView(exam, stats);
           break;
+        case 'mapel_kelas_detail':
+          container.innerHTML = renderTeacherMapelKelasDetailView();
+          break;
         case 'manajemen_ulangan':
           container.innerHTML = renderManajemenUlanganView();
           break;
@@ -5419,6 +5863,414 @@
       if (state.activeMenu === 'input_nilai' && state.editingResultId) {
         window.previewLiveScore();
       }
+    }
+    window.renderCurrentMenu = renderCurrentMenu;
+
+    // ==================== RINCIAN KELAS MAPEL (RDM STYLE UNTUK GURU) ====================
+    function renderTeacherMapelKelasDetailView() {
+      let subj = state.selectedTeacherSubject;
+      let cls = state.selectedTeacherClass;
+
+      if (!subj || !cls) {
+        const subMap = getTeacherSubjectClassesMap(state.currentUser);
+        const subEntries = Object.entries(subMap);
+        if (subEntries.length > 0) {
+          subj = subEntries[0][0];
+          cls = subEntries[0][1][0] || 'Kelas 1';
+          state.selectedTeacherSubject = subj;
+          state.selectedTeacherClass = cls;
+          state.openTeacherSubjectMenu = subj;
+        } else {
+          return `
+            <div class="glass-surface rounded-3xl p-10 text-center space-y-3">
+              <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center">
+                <i data-lucide="book-open" class="w-7 h-7"></i>
+              </div>
+              <h3 class="text-base font-bold text-slate-800">Pilih Mata Pelajaran &amp; Kelas</h3>
+              <p class="text-xs text-slate-500 max-w-sm mx-auto">
+                Silakan pilih salah satu kelas di bawah kelompok Mata Pelajaran yang Diampu pada menu navigasi sebelah kiri.
+              </p>
+            </div>
+          `;
+        }
+      }
+
+      const activeTab = state.teacherClassViewTab || 'rincian';
+      const roman = toRomanGrade(cls);
+      const homeroom = getHomeroomTeacherForClass(cls);
+      const homeroomName = homeroom ? (homeroom.full_name || homeroom.username || homeroom.name) : '-';
+
+      // 1. TOP GREEN RDM-STYLE BAR (matching Rapor Digital Madrasah)
+      const topBarHtml = `
+        <div class="bg-gradient-to-r from-emerald-800 via-[#15803d] to-emerald-800 text-white rounded-2xl shadow-md px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+          <!-- Left: Tab Navigation Buttons -->
+          <div class="flex items-center gap-1.5 overflow-x-auto custom-scroll py-0.5">
+            <button type="button" onclick="window.switchTeacherClassTab('rincian')"
+              class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === 'rincian'
+                ? 'bg-emerald-950/50 text-white shadow-inner border border-emerald-400/40 ring-1 ring-white/10'
+                : 'text-emerald-100 hover:bg-white/15 hover:text-white'
+              }">
+              <i data-lucide="home" class="w-4 h-4"></i>
+              <span>Beranda</span>
+            </button>
+            <button type="button" onclick="window.switchTeacherClassTab('ulangan')"
+              class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === 'ulangan'
+                ? 'bg-emerald-950/50 text-white shadow-inner border border-emerald-400/40 ring-1 ring-white/10'
+                : 'text-emerald-100 hover:bg-white/15 hover:text-white'
+              }">
+              <i data-lucide="file-key-2" class="w-4 h-4"></i>
+              <span>Paket Ulangan &amp; Kunci</span>
+            </button>
+            <button type="button" onclick="window.switchTeacherClassTab('koreksi')"
+              class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === 'koreksi'
+                ? 'bg-emerald-950/50 text-white shadow-inner border border-emerald-400/40 ring-1 ring-white/10'
+                : 'text-emerald-100 hover:bg-white/15 hover:text-white'
+              }">
+              <i data-lucide="pen-tool" class="w-4 h-4"></i>
+              <span>Input Jawaban Siswa</span>
+            </button>
+          </div>
+
+          <!-- Right: Identity Pill & Academic Info -->
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-900/60 text-emerald-200 text-[11px] font-bold border border-emerald-600/50">
+              <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+              <span>${escapeHtml(state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR)} • ${escapeHtml(state.sessionSemester || DEFAULT_SEMESTER)}</span>
+            </span>
+            <div class="flex items-center gap-2 bg-emerald-900/40 border border-emerald-600/40 rounded-full py-1 px-2.5">
+              <div class="w-6 h-6 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center font-black text-[11px] shadow-sm">
+                ${escapeHtml((state.currentUser?.full_name || 'G').charAt(0).toUpperCase())}
+              </div>
+              <span class="text-xs font-bold text-white max-w-[150px] truncate">${escapeHtml(state.currentUser?.full_name || 'Guru')}</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // 2. TAB: ULANGAN
+      if (activeTab === 'ulangan') {
+        state.examSubjectFilter = subj;
+        state.examClassFilter = cls;
+        return `
+          <div class="space-y-4">
+            ${topBarHtml}
+            ${renderManajemenUlanganView()}
+          </div>
+        `;
+      }
+
+      // 3. TAB: KOREKSI (Input Jawaban Siswa)
+      if (activeTab === 'koreksi') {
+        const classExams = (state.exams || []).filter(e =>
+          isSameSubject(e.subject, subj) &&
+          String(e.class_name || '').trim().toLowerCase() === cls.toLowerCase()
+        );
+
+        if (classExams.length === 0) {
+          return `
+            <div class="space-y-4">
+              ${topBarHtml}
+              <div class="glass-surface rounded-3xl p-10 text-center space-y-4">
+                <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 mx-auto flex items-center justify-center">
+                  <i data-lucide="file-question" class="w-7 h-7"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-bold text-slate-800">Belum Ada Paket Ulangan</h3>
+                  <p class="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    Belum ada paket ulangan untuk mata pelajaran <strong>${escapeHtml(subj)}</strong> di <strong>${escapeHtml(cls)}</strong>. Silakan buat paket ulangan terlebih dahulu sebelum memasukkan jawaban siswa.
+                  </p>
+                </div>
+                <div>
+                  <button type="button" onclick="window.switchTeacherClassTab('ulangan')"
+                    class="flowora-btn-primary px-5 py-2.5 rounded-xl text-xs font-bold text-white inline-flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Buat Paket Ulangan Sekarang
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        let currentExam = classExams.find(e => e.id === state.activeExamId);
+        if (!currentExam) {
+          currentExam = classExams[0];
+          state.activeExamId = currentExam.id;
+        }
+
+        const selectorHtml = `
+          <div class="bg-white border border-slate-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                <i data-lucide="pen-tool" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-extrabold text-slate-900">Pilih Paket Ulangan untuk Dikoreksi</h4>
+                <p class="text-[11px] text-slate-500">${escapeHtml(subj)} • ${escapeHtml(cls)} (${classExams.length} Paket Tersedia)</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <select onchange="window.handleChangeActiveExam(this.value)"
+                class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer">
+                ${classExams.map(ex => `
+                  <option value="${ex.id}" ${ex.id === currentExam.id ? 'selected' : ''}>
+                    ${escapeHtml(ex.title || 'Ulangan')} (${ex.total_questions || 10} Soal • KKM: ${ex.kkm || 75})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+        `;
+
+        return `
+          <div class="space-y-4">
+            ${topBarHtml}
+            ${selectorHtml}
+            ${renderInputNilaiView(currentExam, computeExamStatistics(currentExam))}
+          </div>
+        `;
+      }
+
+      // 4. TAB: RINCIAN (default matching screenshot)
+      const classStudents = (state.students || [])
+        .filter(s => String(s.class_name || '').trim().toLowerCase() === cls.toLowerCase())
+        .slice()
+        .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+
+      const searchQuery = String(state.teacherClassStudentSearch || '').trim().toLowerCase();
+      const filteredStudents = searchQuery
+        ? classStudents.filter(s =>
+            String(s.nis || '').toLowerCase().includes(searchQuery) ||
+            String(s.full_name || '').toLowerCase().includes(searchQuery)
+          )
+        : classStudents;
+
+      const pageSize = Number(state.teacherClassStudentPageSize) || 10;
+      const totalFiltered = filteredStudents.length;
+      const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+      const currentPage = Math.min(Math.max(1, Number(state.teacherClassStudentPage) || 1), totalPages);
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = Math.min(startIndex + pageSize, totalFiltered);
+      const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
+
+      const tableRowsHtml = paginatedStudents.length > 0
+        ? paginatedStudents.map((s, idx) => {
+            const rowNumber = startIndex + idx + 1;
+            const genderLabel = s.gender === 'P' ? 'P' : 'L';
+            return `
+              <tr class="hover:bg-slate-50/80 transition-colors">
+                <td class="py-2.5 px-3 text-center border-r border-slate-200 text-slate-500 font-medium">${rowNumber}</td>
+                <td class="py-2.5 px-4 border-r border-slate-200 font-mono text-slate-600">${escapeHtml(s.nis || '-')}</td>
+                <td class="py-2.5 px-4 border-r border-slate-200 font-bold text-slate-800 uppercase">${escapeHtml(s.full_name || '-')}</td>
+                <td class="py-2.5 px-3 text-center font-bold ${genderLabel === 'P' ? 'text-pink-600' : 'text-blue-600'}">${genderLabel}</td>
+              </tr>
+            `;
+          }).join('')
+        : `
+          <tr>
+            <td colspan="4" class="py-8 text-center text-slate-400">
+              <i data-lucide="user-x" class="w-6 h-6 mx-auto mb-1 opacity-60"></i>
+              <span>${searchQuery ? 'Tidak ada data siswa yang cocok dengan pencarian.' : 'Belum ada data siswa di kelas ini.'}</span>
+            </td>
+          </tr>
+        `;
+
+      let paginationHtml = '';
+      if (totalPages > 1) {
+        paginationHtml = `
+          <button type="button" onclick="window.handleTeacherClassPageChange(1)"
+            ${currentPage === 1 ? 'disabled class="px-2.5 py-1 rounded text-xs text-slate-300 cursor-not-allowed"' : 'class="px-2.5 py-1 rounded text-xs text-slate-600 hover:bg-slate-100 font-medium"'}>First</button>
+          <button type="button" onclick="window.handleTeacherClassPageChange(${currentPage - 1})"
+            ${currentPage === 1 ? 'disabled class="px-2.5 py-1 rounded text-xs text-slate-300 cursor-not-allowed"' : 'class="px-2.5 py-1 rounded text-xs text-slate-600 hover:bg-slate-100 font-medium"'}>Previous</button>
+        `;
+
+        for (let p = 1; p <= totalPages; p++) {
+          if (p === currentPage) {
+            paginationHtml += `
+              <button type="button" class="px-3 py-1 rounded text-xs font-bold bg-emerald-700 text-white shadow-sm">${p}</button>
+            `;
+          } else if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1) {
+            paginationHtml += `
+              <button type="button" onclick="window.handleTeacherClassPageChange(${p})" class="px-3 py-1 rounded text-xs font-semibold text-slate-600 hover:bg-slate-100">${p}</button>
+            `;
+          } else if (Math.abs(p - currentPage) === 2) {
+            paginationHtml += `<span class="px-1 text-slate-400">...</span>`;
+          }
+        }
+
+        paginationHtml += `
+          <button type="button" onclick="window.handleTeacherClassPageChange(${currentPage + 1})"
+            ${currentPage === totalPages ? 'disabled class="px-2.5 py-1 rounded text-xs text-slate-300 cursor-not-allowed"' : 'class="px-2.5 py-1 rounded text-xs text-slate-600 hover:bg-slate-100 font-medium"'}>Next</button>
+          <button type="button" onclick="window.handleTeacherClassPageChange(${totalPages})"
+            ${currentPage === totalPages ? 'disabled class="px-2.5 py-1 rounded text-xs text-slate-300 cursor-not-allowed"' : 'class="px-2.5 py-1 rounded text-xs text-slate-600 hover:bg-slate-100 font-medium"'}>Last</button>
+        `;
+      }
+
+      return `
+        <div class="space-y-4">
+          ${topBarHtml}
+
+          <!-- Breadcrumb -->
+          <div class="flex items-center gap-1.5 text-xs text-slate-400">
+            <button type="button" onclick="window.navigateMenu('dashboard')" class="hover:text-emerald-700 transition">Home</button>
+            <span>/</span>
+            <span class="text-slate-600 font-semibold">${escapeHtml(roman)} (${escapeHtml(cls)})</span>
+            <span>/</span>
+            <span class="text-emerald-700 font-bold">${escapeHtml(subj)}</span>
+          </div>
+
+          <!-- Top 2 Cards Row -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <!-- Left Card: Circular Illustration & Wali Kelas -->
+            <div class="lg:col-span-5 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center">
+              <div class="w-28 h-28 rounded-full bg-sky-100/90 border-2 border-sky-200 flex items-center justify-center mb-4 relative overflow-hidden shadow-inner">
+                <svg viewBox="0 0 120 120" class="w-24 h-24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="60" cy="60" r="54" fill="#38BDF8" fill-opacity="0.3"/>
+                  <!-- Classroom Blackboard -->
+                  <rect x="36" y="24" width="48" height="30" rx="4" fill="#0284C7"/>
+                  <rect x="39" y="27" width="42" height="24" rx="2" fill="#0369A1"/>
+                  <line x1="43" y1="34" x2="65" y2="34" stroke="#E0F2FE" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="43" y1="40" x2="57" y2="40" stroke="#E0F2FE" stroke-width="2" stroke-linecap="round"/>
+                  <!-- Teacher / Classroom Icon -->
+                  <circle cx="70" cy="40" r="4.5" fill="#FDE047"/>
+                  <path d="M64 51C64 47.5 66.5 46 70 46C73.5 46 76 47.5 76 51V52H64V51Z" fill="#F8FAFC"/>
+                  <!-- Student Desk -->
+                  <rect x="25" y="68" width="70" height="7" rx="3.5" fill="#0284C7"/>
+                  <!-- Student Heads -->
+                  <circle cx="36" cy="62" r="5" fill="#FBBF24"/>
+                  <circle cx="52" cy="62" r="5" fill="#38BDF8"/>
+                  <circle cx="68" cy="62" r="5" fill="#34D399"/>
+                  <circle cx="84" cy="62" r="5" fill="#F472B6"/>
+                  <!-- Desk Legs -->
+                  <rect x="32" y="75" width="4" height="15" rx="2" fill="#0369A1"/>
+                  <rect x="84" y="75" width="4" height="15" rx="2" fill="#0369A1"/>
+                </svg>
+              </div>
+              <div class="text-3xl font-black text-slate-800 tracking-tight">${escapeHtml(roman)}</div>
+              <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-1.5">Wali Kelas</div>
+              <div class="text-sm font-extrabold text-slate-800 mt-0.5">${escapeHtml(homeroomName)}</div>
+            </div>
+
+            <!-- Right Card: Rincian Kelas -->
+            <div class="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+              <div>
+                <h3 class="text-sm font-extrabold text-slate-800 pb-3 border-b border-slate-100 flex items-center gap-2">
+                  <i data-lucide="info" class="w-4 h-4 text-emerald-600"></i>
+                  Rincian Kelas
+                </h3>
+                <div class="divide-y divide-slate-100 text-xs">
+                  <div class="py-2.5 flex items-center justify-between">
+                    <span class="text-slate-500 flex items-center gap-2.5 font-medium">
+                      <i data-lucide="book-open" class="w-4 h-4 text-blue-500"></i>
+                      Mata Pelajaran
+                    </span>
+                    <span class="font-bold text-slate-800 text-right">${escapeHtml(subj)}</span>
+                  </div>
+                  <div class="py-2.5 flex items-center justify-between">
+                    <span class="text-slate-500 flex items-center gap-2.5 font-medium">
+                      <i data-lucide="users" class="w-4 h-4 text-indigo-500"></i>
+                      Jumlah Siswa
+                    </span>
+                    <span class="font-bold text-slate-800 text-right">${classStudents.length} Siswa</span>
+                  </div>
+                  <div class="py-2.5 flex items-center justify-between">
+                    <span class="text-slate-500 flex items-center gap-2.5 font-medium">
+                      <i data-lucide="calendar" class="w-4 h-4 text-emerald-500"></i>
+                      Tahun Ajaran
+                    </span>
+                    <span class="font-bold text-slate-800 text-right">${escapeHtml(state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR)}</span>
+                  </div>
+                  <div class="py-2.5 flex items-center justify-between">
+                    <span class="text-slate-500 flex items-center gap-2.5 font-medium">
+                      <i data-lucide="clock" class="w-4 h-4 text-amber-500"></i>
+                      Semester
+                    </span>
+                    <span class="font-bold text-slate-800 text-right">${escapeHtml(state.sessionSemester || DEFAULT_SEMESTER)}</span>
+                  </div>
+                  <div class="py-2.5 flex items-center justify-between">
+                    <span class="text-slate-500 flex items-center gap-2.5 font-medium">
+                      <i data-lucide="graduation-cap" class="w-4 h-4 text-violet-500"></i>
+                      Kurikulum
+                    </span>
+                    <span class="font-bold text-slate-800 text-right">Kurikulum Merdeka</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Card: Siswa Mapel Table -->
+          <div class="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm space-y-4">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-800">Siswa Mapel</h3>
+              <p class="text-xs text-slate-400 font-semibold">${escapeHtml(roman)}</p>
+            </div>
+
+            <!-- Action Toolbar: Copy, Print, Excel, Show Entries & Search -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="window.handleCopyClassStudents('${escapeHtml(cls)}')"
+                  class="px-2.5 py-1 rounded border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 shadow-xs transition">
+                  <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-500"></i> Copy
+                </button>
+                <button type="button" onclick="window.handlePrintClassStudents('${escapeHtml(cls)}')"
+                  class="px-2.5 py-1 rounded border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 shadow-xs transition">
+                  <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-500"></i> Print
+                </button>
+                <button type="button" onclick="window.handleExportClassStudentsXlsx('${escapeHtml(cls)}')"
+                  class="px-2.5 py-1 rounded border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 shadow-xs transition">
+                  <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i> Excel
+                </button>
+                <div class="flex items-center gap-1.5 ml-2 text-xs text-slate-600 font-semibold">
+                  <span>Show</span>
+                  <select onchange="window.handleTeacherClassPageSizeChange(this.value)"
+                    class="border border-slate-300 rounded px-2 py-0.5 text-xs font-semibold bg-white focus:outline-none focus:border-emerald-600 cursor-pointer">
+                    <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
+                    <option value="25" ${pageSize === 25 ? 'selected' : ''}>25</option>
+                    <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
+                    <option value="9999" ${pageSize >= 9999 ? 'selected' : ''}>All</option>
+                  </select>
+                  <span>entries</span>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <label for="teacher-class-search-input" class="text-xs text-slate-600 font-medium shrink-0">Search:</label>
+                <input type="text" id="teacher-class-search-input" value="${escapeHtml(state.teacherClassStudentSearch || '')}"
+                  oninput="window.handleTeacherClassStudentSearch(this.value)"
+                  class="border border-slate-300 rounded px-2.5 py-1 text-xs text-slate-800 bg-white focus:outline-none focus:border-emerald-600 w-40 sm:w-52" />
+              </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+              <table class="w-full text-xs text-left">
+                <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                  <tr>
+                    <th class="py-2.5 px-3 text-center w-12 border-r border-slate-200">No</th>
+                    <th class="py-2.5 px-4 w-44 border-r border-slate-200">NISN</th>
+                    <th class="py-2.5 px-4 border-r border-slate-200">Nama</th>
+                    <th class="py-2.5 px-3 text-center w-16">L/P</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 text-slate-700">
+                  ${tableRowsHtml}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Row -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-slate-500">
+              <div>
+                Showing ${totalFiltered === 0 ? 0 : startIndex + 1} to ${endIndex} of ${totalFiltered} entries
+              </div>
+              <div class="flex items-center gap-1">
+                ${paginationHtml}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     // ==================== 1. DASHBOARD ANALITIK (FLOWORA BENTO STYLE) ====================
@@ -5933,16 +6785,22 @@
       const editingMeta = editingExam ? decodeExamMeta(editingExam) : null;
       const sectionByType = new Map((editingMeta?.sections || []).map(sec => [sec.questionType, sec]));
 
-      const initTitle = editingExam ? String(editingExam.title || '').trim() : '';
-      const initSubject = editingExam ? String(editingExam.subject || '').trim() : '';
-      const initTeacherId = editingExam ? String(editingExam.teacher_id || '').trim() : '';
-      const initClass = editingExam ? String(editingExam.class_name || '').trim() : '';
-      const initKkm = editingExam && editingExam.kkm !== null && editingExam.kkm !== undefined ? String(editingExam.kkm) : '';
-      const initDate = editingExam ? String(editingExam.exam_date || '').trim() : '';
-
       const isAdmin = isAdminUser();
       const tRole = getCurrentTeacherRoleMeta();
       const isWaliLockedClass = Boolean(!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade);
+
+      const initTitle = editingExam ? String(editingExam.title || '').trim() : '';
+      const initSubject = editingExam
+        ? String(editingExam.subject || '').trim()
+        : (state.activeMenu === 'mapel_kelas_detail' && state.selectedTeacherSubject ? state.selectedTeacherSubject : '');
+      const initTeacherId = editingExam
+        ? String(editingExam.teacher_id || '').trim()
+        : (!isAdmin && state.currentUser ? state.currentUser.id : '');
+      const initClass = editingExam
+        ? String(editingExam.class_name || '').trim()
+        : (state.activeMenu === 'mapel_kelas_detail' && state.selectedTeacherClass ? state.selectedTeacherClass : '');
+      const initKkm = editingExam && editingExam.kkm !== null && editingExam.kkm !== undefined ? String(editingExam.kkm) : '';
+      const initDate = editingExam ? String(editingExam.exam_date || '').trim() : '';
 
       const titleList = [...EXAM_TITLE_OPTIONS];
       if (initTitle && !titleList.includes(initTitle)) titleList.unshift(initTitle);
@@ -9822,6 +10680,12 @@
     window.handleSearchMengajar = function (query) {
       state.mengajarSearchQuery = query || '';
       renderCurrentMenu();
+      const nextSearch = document.getElementById('mengajar-search');
+      if (nextSearch) {
+        nextSearch.focus();
+        const len = nextSearch.value.length;
+        nextSearch.setSelectionRange(len, len);
+      }
     };
 
     window.handleAssignTeacherToClassMapel = async function (className, subjectName, teacherIdOrName) {
@@ -9831,7 +10695,19 @@
         window.handleRemoveTeacherFromClassMapel(className, subjectName);
         return;
       }
-      const teacher = state.teachers.find(t => t.id === teacherIdOrName || t.full_name.toLowerCase() === String(teacherIdOrName).toLowerCase());
+
+      const prevAssignment = state.teachingAssignments[key];
+      const prevTeacherId = typeof prevAssignment === 'object' ? prevAssignment?.teacherId : prevAssignment;
+      const prevTeacherName = typeof prevAssignment === 'object' ? prevAssignment?.teacherName : '';
+      const prevTeacher = state.teachers.find(t =>
+        (prevTeacherId && t.id === prevTeacherId) ||
+        (prevTeacherName && String(t.full_name || '').toLowerCase() === String(prevTeacherName).toLowerCase())
+      );
+
+      const teacher = state.teachers.find(t =>
+        t.id === teacherIdOrName ||
+        String(t.full_name || '').toLowerCase() === String(teacherIdOrName).toLowerCase()
+      );
       const record = {
         teacherId: teacher ? teacher.id : null,
         teacherName: teacher ? teacher.full_name : teacherIdOrName,
@@ -9846,12 +10722,15 @@
       }
       saveTeachingAssignmentsToStorage();
 
-      if (teacher) {
-        const assignedSubjs = getTeacherAssignedSubjects(teacher);
-        teacher.subject = assignedSubjs.length > 0 ? assignedSubjs.join(', ') : '-';
-        saveTeachersToStorage();
-        if (state.currentUser?.id === teacher.id) {
-          state.currentUser.subject = teacher.subject;
+      const affectedTeachers = [];
+      if (teacher) affectedTeachers.push(teacher);
+      if (prevTeacher && (!teacher || prevTeacher.id !== teacher.id)) affectedTeachers.push(prevTeacher);
+
+      affectedTeachers.forEach(tObj => {
+        const assignedSubjs = getTeacherAssignedSubjects(tObj);
+        tObj.subject = assignedSubjs.length > 0 ? assignedSubjs.join(', ') : '-';
+        if (state.currentUser?.id === tObj.id) {
+          state.currentUser.subject = tObj.subject;
           saveSessionToStorage();
           const subEl = document.getElementById('user-display-sub');
           if (subEl) subEl.textContent = formatTeacherHeaderSub(state.currentUser);
@@ -9861,10 +10740,11 @@
             id: crypto.randomUUID(),
             table: 'teachers',
             action: 'upsert',
-            record: { ...teacher }
+            record: { ...tObj }
           });
         }
-      }
+      });
+
       saveCacheToStorage();
 
       if (!IS_PREVIEW && db) {
@@ -9892,7 +10772,10 @@
       const prevAssignment = state.teachingAssignments[key];
       const prevTeacherId = typeof prevAssignment === 'object' ? prevAssignment?.teacherId : prevAssignment;
       const prevTeacherName = typeof prevAssignment === 'object' ? prevAssignment?.teacherName : '';
-      const prevTeacher = state.teachers.find(t => (prevTeacherId && t.id === prevTeacherId) || (prevTeacherName && t.full_name.toLowerCase() === prevTeacherName.toLowerCase()));
+      const prevTeacher = state.teachers.find(t =>
+        (prevTeacherId && t.id === prevTeacherId) ||
+        (prevTeacherName && String(t.full_name || '').toLowerCase() === String(prevTeacherName).toLowerCase())
+      );
 
       const record = {
         teacherId: null,
@@ -9911,7 +10794,6 @@
       if (prevTeacher) {
         const assignedSubjs = getTeacherAssignedSubjects(prevTeacher);
         prevTeacher.subject = assignedSubjs.length > 0 ? assignedSubjs.join(', ') : '-';
-        saveTeachersToStorage();
         if (state.currentUser?.id === prevTeacher.id) {
           state.currentUser.subject = prevTeacher.subject;
           saveSessionToStorage();
@@ -9927,6 +10809,7 @@
           });
         }
       }
+
       saveCacheToStorage();
 
       if (!IS_PREVIEW && db) {
@@ -10123,7 +11006,7 @@
           </div>
         </div>
 
-        <!-- Tabel Penugasan Guru Mengajar (Hanya Kolom No, Mata Pelajaran, Guru, Aksi) -->
+        <!-- Tabel Penugasan Guru Mengajar -->
         <div class="overflow-x-auto custom-scroll border border-slate-200/90 rounded-2xl bg-white shadow-2xs">
           <table class="w-full text-left border-collapse">
             <thead>
@@ -10327,7 +11210,7 @@
       const bodyHtml = `
         <form onsubmit="window.handleSaveTeacher(event)" class="space-y-3.5">
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap & Gelar Guru</label>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap &amp; Gelar Guru</label>
             <input type="text" id="t-fullname" required placeholder="Contoh: Hendra Wijaya, S.Pd."
               value="${escapeHtml(editingTeacher ? editingTeacher.full_name || '' : '')}"
               class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
@@ -10545,22 +11428,22 @@
             ['Hendra Wijaya, S.Pd.', 'NIP', '198705122015031002', '123456', 'Wali Kelas', 'Kelas 4', "Al Qur'an Hadis, Akidah Akhlak"],
             ['Siti Aminah, M.Pd.', 'NUPTK', '1234567890123456', '123456', 'Guru Mapel', 'Semua Kelas', 'Bahasa Arab, Fikih']
           ],
-          colWidths: [28, 12, 24, 16, 15, 16, 36],
+          colWidths: [28, 12, 22, 16, 15, 16, 36],
           textCols: [2, 3]
         },
         {
           name: 'Petunjuk',
           aoa: [
             ['Kolom', 'Keterangan / Pilihan Valid'],
-            ['Nama Lengkap', 'Nama lengkap beserta gelar guru'],
-            ['Jenis ID', 'Pilih salah satu: NIP, NUPTK, PegID, atau NPK'],
-            ['Nomor Identitas', 'Hanya angka — otomatis menjadi ID login Guru'],
-            ['Password Login', 'Kata sandi login akun Guru'],
-            ['Jabatan', 'Pilih salah satu: Wali Kelas atau Guru Mapel'],
-            ['Kelas Ampuan', 'Pilih: Semua Kelas, Kelas 1, Kelas 2, Kelas 3, Kelas 4, Kelas 5, atau Kelas 6'],
-            ['Mata Pelajaran', 'Jika lebih dari 1 mapel, pisahkan dengan tanda koma (,)']
+            ['Nama Lengkap', 'Nama lengkap dan gelar guru'],
+            ['Jenis ID', 'Pilih salah satu: NIP, NUPTK, atau PegID'],
+            ['Nomor Identitas', 'Hanya angka, berfungsi sebagai Username/ID login guru'],
+            ['Password Login', 'Kata sandi login guru (default: 123456)'],
+            ['Jabatan', 'Pilih: Wali Kelas atau Guru Mapel'],
+            ['Kelas Ampuan', 'Pilih: Kelas 1 s/d Kelas 6 atau Semua Kelas'],
+            ['Mata Pelajaran', 'Opsional; pisahkan dengan koma atau atur melalui submenu Mengajar']
           ],
-          colWidths: [20, 62]
+          colWidths: [22, 62]
         }
       ]);
       showToast('Template Excel Data Guru berhasil diunduh!', 'success');
@@ -10752,6 +11635,103 @@
         <!-- Card 1: Pengaturan Tahun Ajaran & Semester -->
         <div class="glass-surface rounded-3xl p-6 space-y-5">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <i data-lucide="calendar-range" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Tahun Ajaran &amp; Semester</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Atur periode aktif sekolah untuk halaman login Guru &amp; Admin</p>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
+                Aktif: ${escapeHtml(activeYear)} • ${escapeHtml(activeSem)}
+              </span>
+            </div>
+          </div>
+
+          <!-- Form Set Active Period -->
+          <form onsubmit="window.handleSaveAcademicPeriodSettings(event)" class="p-5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-4">
+            <div>
+              <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-700">Atur Periode Aktif Sekolah</h4>
+              <p class="text-[11px] text-slate-500 mt-0.5">Menjadi pilihan utama otomatis di halaman login Guru &amp; Admin.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Tahun Ajaran Aktif</label>
+                <select id="set-active-year" required
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  ${yearOptions}
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Semester Aktif</label>
+                <div class="flex items-center gap-2">
+                  <select id="set-active-semester" required
+                    class="flex-1 px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    ${semOptions}
+                  </select>
+                  <button type="button" id="btn-delete-selected-year"
+                    onclick="window.handleDeleteAcademicYear(document.getElementById('set-active-year')?.value || '')"
+                    class="p-2.5 rounded-2xl bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition shrink-0"
+                    title="Hapus Tahun Ajaran yang dipilih">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/80 items-end">
+              <div class="space-y-1.5">
+                <label class="block text-xs font-bold text-slate-700">Tambah Tahun Ajaran Baru</label>
+                <div class="flex items-center gap-2">
+                  <input type="text" id="new-academic-year-input" value="${escapeHtml(suggestedNextYear)}" placeholder="Misal: 2028/2029"
+                    class="flex-1 px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <button type="button" onclick="window.handleAddAcademicYear()"
+                    class="px-4 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition shrink-0">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Tambah
+                  </button>
+                </div>
+              </div>
+              <button type="submit"
+                class="w-full py-2.5 px-5 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Simpan &amp; Aktifkan Periode
+              </button>
+            </div>
+          </form>
+        </div>
+        `;
+      } else if (activeTab === 'kepala_madrasah') {
+        const curSchoolName = state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME;
+        const curSchoolNsm = state.academicSettings?.schoolNsm || DEFAULT_SCHOOL_NSM;
+        const curSchoolNpsn = state.academicSettings?.schoolNpsn || DEFAULT_SCHOOL_NPSN;
+        const curSchoolAkreditasi = state.academicSettings?.schoolAkreditasi || DEFAULT_SCHOOL_AKREDITASI;
+        const curSchoolAddress = state.academicSettings?.schoolAddress || DEFAULT_SCHOOL_ADDRESS;
+        const curHeadmasterName = state.academicSettings?.headmasterName || DEFAULT_HEADMASTER_NAME;
+        const curHeadmasterNip = state.academicSettings?.headmasterNip || DEFAULT_HEADMASTER_NIP;
+        const curCity = state.academicSettings?.signatureCity || DEFAULT_SIGNATURE_CITY;
+        const curDate = state.academicSettings?.signatureDate || '';
+
+        activeContentHtml = `
+        <!-- Card 2: Pengaturan Kepala Madrasah & Tanda Tangan Dokumen -->
+        <div class="glass-surface rounded-3xl p-6 space-y-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <i data-lucide="award" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h3 class="text-base md:text-lg font-extrabold text-slate-900">Kepala Madrasah &amp; Tanda Tangan</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Kelola data identitas madrasah (KOP laporan), Kepala Madrasah, kota domisili, dan tanggal pengesahan tanda tangan pada seluruh cetak laporan dan rekap nilai</p>
+              </div>
+            </div>
+          </div>
+
+          <form onsubmit="window.handleSaveSignatureSettings(event)" oninput="window.updateSignatureLivePreview()" class="p-5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-6">
+            <!-- Bagian 1: Identitas Madrasah untuk KOP Laporan & Rekap -->
+            <div class="space-y-4">
+              <div class="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-indigo-900 border-b border-slate-200/80 pb-2">
+                <i data-lucide="building-2" class="w-4 h-4 text-indigo-600"></i>
                 <span>Bagian 1: Identitas Madrasah (KOP Laporan &amp; Cetak Rekap)</span>
               </div>
               
@@ -10759,6 +11739,13 @@
                 <div class="md:col-span-2">
                   <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Madrasah / Sekolah</label>
                   <input type="text" id="set-school-name" required
+                    placeholder="Contoh: MIS. NURUL ISLAM KM. 5 BANJARMASIN"
+                    value="${escapeHtml(curSchoolName)}"
+                    class="w-full px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p class="text-[11px] text-slate-400 mt-1">Nama madrasah yang dicantumkan pada judul utama KOP Laporan &amp; Rekapitulasi Nilai.</p>
+                </div>
+
+                <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1.5">NSM (Nomor Statistik Madrasah)</label>
                   <input type="text" id="set-school-nsm" required
                     placeholder="Contoh: 111263710005"
@@ -12807,6 +13794,10 @@
         if (savedSession.teacherManagementTab) state.teacherManagementTab = savedSession.teacherManagementTab;
         if (savedSession.mapelKelasActiveTab) state.mapelKelasActiveTab = savedSession.mapelKelasActiveTab;
         if (savedSession.pengaturanActiveTab) state.pengaturanActiveTab = savedSession.pengaturanActiveTab;
+        if (savedSession.selectedTeacherSubject) state.selectedTeacherSubject = savedSession.selectedTeacherSubject;
+        if (savedSession.selectedTeacherClass) state.selectedTeacherClass = savedSession.selectedTeacherClass;
+        if (savedSession.teacherClassViewTab) state.teacherClassViewTab = savedSession.teacherClassViewTab;
+        if (savedSession.openTeacherSubjectMenu) state.openTeacherSubjectMenu = savedSession.openTeacherSubjectMenu;
         state.sessionAcademicYear = savedSession.sessionAcademicYear || state.academicSettings.activeAcademicYear || DEFAULT_ACADEMIC_YEAR;
         state.sessionSemester = normalizeSemester(savedSession.sessionSemester || state.academicSettings.activeSemester || DEFAULT_SEMESTER);
         if (savedSession.activeExamId) state.activeExamId = savedSession.activeExamId;
