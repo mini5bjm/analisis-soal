@@ -3099,18 +3099,14 @@
       state.activeMenu = 'mapel_kelas_detail';
       state.selectedTeacherSubject = subjectName;
       state.selectedTeacherClass = className;
-      state.teacherClassViewTab = 'koreksi';
+      state.teacherClassViewTab = 'rincian';
       state.openTeacherSubjectMenu = subjectName;
       state.examSubjectFilter = subjectName;
       state.examClassFilter = className;
-      state.examSearchQuery = '';
-      state.editingExamId = null;
-      state.editingResultId = null;
       state.teacherClassStudentSearch = '';
       state.teacherClassStudentPage = 1;
 
-      const visible = getVisibleExams();
-      const matchExam = visible.find(e =>
+      const matchExam = (state.exams || []).find(e =>
         isSameSubject(e.subject, subjectName) &&
         String(e.class_name || '').trim().toLowerCase() === String(className).trim().toLowerCase()
       );
@@ -3162,29 +3158,15 @@
       if (tab === 'ulangan') {
         state.examSubjectFilter = state.selectedTeacherSubject;
         state.examClassFilter = state.selectedTeacherClass;
-        state.examSearchQuery = '';
       } else if (tab === 'koreksi') {
         state.examSubjectFilter = state.selectedTeacherSubject;
         state.examClassFilter = state.selectedTeacherClass;
-        const visible = getVisibleExams();
-        const matchExam = visible.find(e =>
+        const matchExam = (state.exams || []).find(e =>
           isSameSubject(e.subject, state.selectedTeacherSubject) &&
           String(e.class_name || '').trim().toLowerCase() === String(state.selectedTeacherClass).trim().toLowerCase()
         );
-        if (matchExam && (!state.activeExamId || !visible.some(e => e.id === state.activeExamId && isSameSubject(e.subject, state.selectedTeacherSubject) && String(e.class_name || '').trim().toLowerCase() === String(state.selectedTeacherClass).trim().toLowerCase()))) {
-          state.activeExamId = matchExam.id;
-        }
+        if (matchExam) state.activeExamId = matchExam.id;
       }
-      saveSessionToStorage();
-      renderNavigationMenus();
-      renderCurrentMenu();
-    };
-
-    window.handleOpenExamForInput = function (examId) {
-      if (!examId) return;
-      state.activeExamId = examId;
-      state.editingResultId = null;
-      state.teacherClassViewTab = 'koreksi';
       saveSessionToStorage();
       renderNavigationMenus();
       renderCurrentMenu();
@@ -5614,20 +5596,20 @@
             <span class="text-[10px] mt-0.5">Mapel</span>
           </button>
           ${isDetail ? `
-            <button type="button" onclick="window.switchTeacherClassTab('koreksi')"
-              class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.teacherClassViewTab === 'koreksi' ? 'text-emerald-700 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
-              <div class="${state.teacherClassViewTab === 'koreksi' ? 'bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full' : ''}"><i data-lucide="pen-tool" class="w-4 h-4"></i></div>
-              <span class="text-[10px] mt-0.5">Input</span>
+            <button type="button" onclick="window.switchTeacherClassTab('rincian')"
+              class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.teacherClassViewTab === 'rincian' ? 'text-emerald-700 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
+              <div class="${state.teacherClassViewTab === 'rincian' ? 'bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full' : ''}"><i data-lucide="home" class="w-4 h-4"></i></div>
+              <span class="text-[10px] mt-0.5">Rincian</span>
             </button>
             <button type="button" onclick="window.switchTeacherClassTab('ulangan')"
               class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.teacherClassViewTab === 'ulangan' ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
               <div class="${state.teacherClassViewTab === 'ulangan' ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}"><i data-lucide="file-key-2" class="w-4 h-4"></i></div>
-              <span class="text-[10px] mt-0.5">Paket</span>
+              <span class="text-[10px] mt-0.5">Ulangan</span>
             </button>
-            <button type="button" onclick="window.switchTeacherClassTab('rincian')"
-              class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.teacherClassViewTab === 'rincian' ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
-              <div class="${state.teacherClassViewTab === 'rincian' ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}"><i data-lucide="home" class="w-4 h-4"></i></div>
-              <span class="text-[10px] mt-0.5">Rincian</span>
+            <button type="button" onclick="window.switchTeacherClassTab('koreksi')"
+              class="shrink-0 flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all ${state.teacherClassViewTab === 'koreksi' ? 'text-indigo-600 font-extrabold scale-105' : 'text-slate-400 font-semibold'}">
+              <div class="${state.teacherClassViewTab === 'koreksi' ? 'bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full' : ''}"><i data-lucide="pen-tool" class="w-4 h-4"></i></div>
+              <span class="text-[10px] mt-0.5">Koreksi</span>
             </button>
           ` : `
             <button type="button" onclick="window.navigateMenu('analisis_butir')"
@@ -5932,7 +5914,7 @@
       void container.offsetWidth;
       container.classList.add('animate-view-in');
       lucide.createIcons({ nodes: [container] });
-      if ((state.activeMenu === 'input_nilai' || (state.activeMenu === 'mapel_kelas_detail' && state.teacherClassViewTab === 'koreksi')) && state.editingResultId) {
+      if (state.activeMenu === 'input_nilai' && state.editingResultId) {
         window.previewLiveScore();
       }
     }
@@ -5967,16 +5949,32 @@
         }
       }
 
-      const activeTab = state.teacherClassViewTab || 'koreksi';
+      const activeTab = state.teacherClassViewTab || 'rincian';
       const roman = toRomanGrade(cls);
       const homeroom = getHomeroomTeacherForClass(cls);
       const homeroomName = homeroom ? (homeroom.full_name || homeroom.username || homeroom.name) : '-';
 
-      // 1. TOP GREEN RDM-STYLE BAR
+      // 1. TOP GREEN RDM-STYLE BAR (matching Rapor Digital Madrasah)
       const topBarHtml = `
         <div class="bg-gradient-to-r from-emerald-800 via-[#15803d] to-emerald-800 text-white rounded-2xl shadow-md px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
-          <!-- Left: Primary View Tabs + Tombol Paket Ulangan & Kunci -->
-          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+          <!-- Left: Tab Navigation Buttons -->
+          <div class="flex items-center gap-1.5 overflow-x-auto custom-scroll py-0.5">
+            <button type="button" onclick="window.switchTeacherClassTab('rincian')"
+              class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === 'rincian'
+                ? 'bg-emerald-950/50 text-white shadow-inner border border-emerald-400/40 ring-1 ring-white/10'
+                : 'text-emerald-100 hover:bg-white/15 hover:text-white'
+              }">
+              <i data-lucide="home" class="w-4 h-4"></i>
+              <span>Beranda</span>
+            </button>
+            <button type="button" onclick="window.switchTeacherClassTab('ulangan')"
+              class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === 'ulangan'
+                ? 'bg-emerald-950/50 text-white shadow-inner border border-emerald-400/40 ring-1 ring-white/10'
+                : 'text-emerald-100 hover:bg-white/15 hover:text-white'
+              }">
+              <i data-lucide="file-key-2" class="w-4 h-4"></i>
+              <span>Paket Ulangan &amp; Kunci</span>
+            </button>
             <button type="button" onclick="window.switchTeacherClassTab('koreksi')"
               class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === 'koreksi'
                 ? 'bg-emerald-950/50 text-white shadow-inner border border-emerald-400/40 ring-1 ring-white/10'
@@ -5984,22 +5982,6 @@
               }">
               <i data-lucide="pen-tool" class="w-4 h-4"></i>
               <span>Input Jawaban Siswa</span>
-            </button>
-            <button type="button" onclick="window.switchTeacherClassTab('rincian')"
-              class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === 'rincian'
-                ? 'bg-emerald-950/50 text-white shadow-inner border border-emerald-400/40 ring-1 ring-white/10'
-                : 'text-emerald-100 hover:bg-white/15 hover:text-white'
-              }">
-              <i data-lucide="home" class="w-4 h-4"></i>
-              <span>Rincian Kelas &amp; Siswa</span>
-            </button>
-            <button type="button" onclick="window.switchTeacherClassTab('ulangan')"
-              class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shrink-0 ${activeTab === 'ulangan'
-                ? 'bg-amber-400 text-emerald-950 shadow-sm'
-                : 'bg-white text-emerald-800 hover:bg-amber-300 hover:text-emerald-950 shadow-sm'
-              }">
-              <i data-lucide="file-key-2" class="w-4 h-4"></i>
-              <span>Paket Ulangan &amp; Kunci</span>
             </button>
           </div>
 
@@ -6019,37 +6001,21 @@
         </div>
       `;
 
-      // 2. TAB: PAKET ULANGAN & KUNCI (dibuka saat tombol Paket Ulangan & Kunci diklik)
+      // 2. TAB: ULANGAN
       if (activeTab === 'ulangan') {
         state.examSubjectFilter = subj;
         state.examClassFilter = cls;
-        state.examSearchQuery = '';
         return `
           <div class="space-y-4">
             ${topBarHtml}
-            <div class="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200/80 rounded-2xl px-4 py-3 shadow-2xs">
-              <div class="flex items-center gap-2.5 min-w-0">
-                <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                  <i data-lucide="file-key-2" class="w-4 h-4"></i>
-                </div>
-                <div class="min-w-0">
-                  <div class="text-xs font-extrabold text-slate-900 truncate">Paket Ulangan &amp; Kunci • ${escapeHtml(subj)} (${escapeHtml(cls)})</div>
-                  <div class="text-[11px] text-slate-500">Buat atau ubah paket ulangan &amp; kunci jawaban khusus untuk mapel dan kelas ini</div>
-                </div>
-              </div>
-              <button type="button" onclick="window.switchTeacherClassTab('koreksi')"
-                class="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold inline-flex items-center gap-1.5 transition shrink-0">
-                <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Kembali ke Input Jawaban Siswa
-              </button>
-            </div>
             ${renderManajemenUlanganView()}
           </div>
         `;
       }
 
-      // 3. TAB: KOREKSI / INPUT JAWABAN SISWA (DEFAULT saat klik submenu kelas!)
+      // 3. TAB: KOREKSI (Input Jawaban Siswa)
       if (activeTab === 'koreksi') {
-        const classExams = getVisibleExams().filter(e =>
+        const classExams = (state.exams || []).filter(e =>
           isSameSubject(e.subject, subj) &&
           String(e.class_name || '').trim().toLowerCase() === cls.toLowerCase()
         );
@@ -6060,18 +6026,18 @@
               ${topBarHtml}
               <div class="glass-surface rounded-3xl p-10 text-center space-y-4">
                 <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 mx-auto flex items-center justify-center">
-                  <i data-lucide="file-key-2" class="w-7 h-7"></i>
+                  <i data-lucide="file-question" class="w-7 h-7"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-bold text-slate-800">Belum Ada Paket Ulangan untuk ${escapeHtml(subj)} (${escapeHtml(cls)})</h3>
+                  <h3 class="text-base font-bold text-slate-800">Belum Ada Paket Ulangan</h3>
                   <p class="text-xs text-slate-500 max-w-md mx-auto mt-1">
-                    Klik tombol <strong>Paket Ulangan &amp; Kunci</strong> untuk membuat soal dan kunci jawaban terlebih dahulu sebelum memasukkan jawaban siswa.
+                    Belum ada paket ulangan untuk mata pelajaran <strong>${escapeHtml(subj)}</strong> di <strong>${escapeHtml(cls)}</strong>. Silakan buat paket ulangan terlebih dahulu sebelum memasukkan jawaban siswa.
                   </p>
                 </div>
                 <div>
                   <button type="button" onclick="window.switchTeacherClassTab('ulangan')"
                     class="flowora-btn-primary px-5 py-2.5 rounded-xl text-xs font-bold text-white inline-flex items-center gap-2">
-                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Buat Paket Ulangan &amp; Kunci
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Buat Paket Ulangan Sekarang
                   </button>
                 </div>
               </div>
@@ -6087,28 +6053,24 @@
 
         const selectorHtml = `
           <div class="bg-white border border-slate-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-            <div class="flex items-center gap-2.5 min-w-0">
+            <div class="flex items-center gap-2.5">
               <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
                 <i data-lucide="pen-tool" class="w-4 h-4"></i>
               </div>
-              <div class="min-w-0">
-                <h4 class="text-xs font-extrabold text-slate-900">Input Jawaban Siswa • ${escapeHtml(subj)} (${escapeHtml(cls)})</h4>
-                <p class="text-[11px] text-slate-500">${classExams.length} Paket Ulangan tersedia untuk kelas ini</p>
+              <div>
+                <h4 class="text-xs font-extrabold text-slate-900">Pilih Paket Ulangan untuk Dikoreksi</h4>
+                <p class="text-[11px] text-slate-500">${escapeHtml(subj)} • ${escapeHtml(cls)} (${classExams.length} Paket Tersedia)</p>
               </div>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center gap-2">
               <select onchange="window.handleChangeActiveExam(this.value)"
-                class="flex-1 sm:flex-initial bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer">
+                class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer">
                 ${classExams.map(ex => `
                   <option value="${ex.id}" ${ex.id === currentExam.id ? 'selected' : ''}>
                     ${escapeHtml(ex.title || 'Ulangan')} (${ex.total_questions || 10} Soal • KKM: ${ex.kkm || 75})
                   </option>
                 `).join('')}
               </select>
-              <button type="button" onclick="window.switchTeacherClassTab('ulangan')"
-                class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold inline-flex items-center gap-1.5 transition shrink-0">
-                <i data-lucide="file-key-2" class="w-3.5 h-3.5"></i> Paket Ulangan &amp; Kunci
-              </button>
             </div>
           </div>
         `;
@@ -6880,7 +6842,6 @@
       const isAdmin = isAdminUser();
       const tRole = getCurrentTeacherRoleMeta();
       const isWaliLockedClass = Boolean(!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade);
-      const isScopedClassView = Boolean(!isAdmin && state.activeMenu === 'mapel_kelas_detail' && state.selectedTeacherSubject && state.selectedTeacherClass);
 
       const initTitle = editingExam ? String(editingExam.title || '').trim() : '';
       const initSubject = editingExam
@@ -7101,69 +7062,51 @@
               </select>
             </div>
 
-            ${isScopedClassView ? `
-              <input type="hidden" id="exam-subject" value="${escapeHtml(state.selectedTeacherSubject)}" />
-              <input type="hidden" id="exam-teacher" value="${escapeHtml(state.currentUser?.id || '')}" />
-              <input type="hidden" id="exam-class" value="${escapeHtml(state.selectedTeacherClass)}" />
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Nilai KKM</label>
-                  <input type="number" id="exam-kkm" required min="1" max="100" value="${escapeHtml(initKkm)}" placeholder="Contoh: 75"
-                    class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700">Mata Pelajaran</label>
+                  ${isAdmin ? '<button type="button" onclick="window.navigateMenu(\'manajemen_mapel\')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Mapel</button>' : ''}
                 </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal</label>
-                  <input type="date" id="exam-date" required value="${escapeHtml(initDate)}"
-                    class="w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
+                <select id="exam-subject" required
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  ${subjectOptions}
+                </select>
               </div>
-            ` : `
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="block text-xs font-bold text-slate-700">Mata Pelajaran</label>
-                    ${isAdmin ? '<button type="button" onclick="window.navigateMenu(\'manajemen_mapel\')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Mapel</button>' : ''}
-                  </div>
-                  <select id="exam-subject" required
-                    class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    ${subjectOptions}
-                  </select>
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700">Nama Guru</label>
+                  ${!isAdmin ? '<span class="text-[10px] font-extrabold text-indigo-600 flex items-center gap-0.5"><i data-lucide="lock" class="w-3 h-3"></i> Terkunci</span>' : ''}
                 </div>
-                <div>
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="block text-xs font-bold text-slate-700">Nama Guru</label>
-                    ${!isAdmin ? '<span class="text-[10px] font-extrabold text-indigo-600 flex items-center gap-0.5"><i data-lucide="lock" class="w-3 h-3"></i> Terkunci</span>' : ''}
-                  </div>
-                  <select id="exam-teacher" ${!isAdmin ? 'disabled' : ''}
-                    class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${!isAdmin ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-indigo-500'}">
-                    ${teacherOptions}
-                  </select>
-                </div>
+                <select id="exam-teacher" ${!isAdmin ? 'disabled' : ''}
+                  class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${!isAdmin ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-indigo-500'}">
+                  ${teacherOptions}
+                </select>
               </div>
+            </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="block text-xs font-bold text-slate-700">Pilih Kelas</label>
-                    ${isWaliLockedClass ? '<span class="text-[10px] font-extrabold text-indigo-600 flex items-center gap-0.5"><i data-lucide="lock" class="w-3 h-3"></i> Terkunci</span>' : ''}
-                  </div>
-                  <select id="exam-class" required ${isWaliLockedClass ? 'disabled' : ''}
-                    class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${isWaliLockedClass ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-indigo-500'}">
-                    ${classOptions}
-                  </select>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700">Pilih Kelas</label>
+                  ${isWaliLockedClass ? '<span class="text-[10px] font-extrabold text-indigo-600 flex items-center gap-0.5"><i data-lucide="lock" class="w-3 h-3"></i> Terkunci</span>' : ''}
                 </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Nilai KKM</label>
-                  <input type="number" id="exam-kkm" required min="1" max="100" value="${escapeHtml(initKkm)}" placeholder="Contoh: 75"
-                    class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal</label>
-                  <input type="date" id="exam-date" required value="${escapeHtml(initDate)}"
-                    class="w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
+                <select id="exam-class" required ${isWaliLockedClass ? 'disabled' : ''}
+                  class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${isWaliLockedClass ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-indigo-500'}">
+                  ${classOptions}
+                </select>
               </div>
-            `}
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Nilai KKM</label>
+                <input type="number" id="exam-kkm" required min="1" max="100" value="${escapeHtml(initKkm)}" placeholder="Contoh: 75"
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal</label>
+                <input type="date" id="exam-date" required value="${escapeHtml(initDate)}"
+                  class="w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
 
             <div class="space-y-2">
               <div class="flex items-center justify-between gap-2">
@@ -7233,13 +7176,8 @@
             subjectChoices.map(subj => `<option value="${escapeHtml(subj)}" ${subj.toLowerCase() === state.examSubjectFilter.toLowerCase() ? 'selected' : ''}>${escapeHtml(subj)}</option>`).join('');
         }
 
-        const q = isScopedClassView ? '' : String(state.examSearchQuery || '').trim().toLowerCase();
+        const q = String(state.examSearchQuery || '').trim().toLowerCase();
         const filteredExams = visibleExams.filter(ex => {
-          if (isScopedClassView) {
-            const clsMatch = String(ex.class_name || '').trim().toLowerCase() === String(state.selectedTeacherClass || '').trim().toLowerCase();
-            const subjMatch = isSameSubject(ex.subject, state.selectedTeacherSubject);
-            return clsMatch && subjMatch;
-          }
           if (state.examClassFilter !== 'ALL' && ex.class_name !== state.examClassFilter) return false;
           if (state.examSubjectFilter !== 'ALL' && String(ex.subject || '').toLowerCase() !== state.examSubjectFilter.toLowerCase()) return false;
           if (q) {
@@ -7252,19 +7190,17 @@
 
         const defaultClassFilter = isWaliLockedClass ? tRole.assignedGrade : 'ALL';
         const defaultSubjectFilter = isSingleSubject ? subjectList[0] : 'ALL';
-        const hasActiveFilters = !isScopedClassView && (state.examClassFilter !== defaultClassFilter || state.examSubjectFilter !== defaultSubjectFilter || q !== '');
+        const hasActiveFilters = state.examClassFilter !== defaultClassFilter || state.examSubjectFilter !== defaultSubjectFilter || q !== '';
         const examsPage = paginateItems(filteredExams, 'exams');
-        const badgeCountText = isScopedClassView
-          ? `${filteredExams.length} Paket`
-          : (hasActiveFilters
-            ? `${filteredExams.length} dari ${visibleExams.length} Paket`
-            : `${visibleExams.length} Paket`);
+        const badgeCountText = hasActiveFilters
+          ? `${filteredExams.length} dari ${visibleExams.length} Paket`
+          : `${visibleExams.length} Paket`;
 
         return `
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h3 class="text-base font-extrabold text-slate-900">Daftar Paket Ulangan Tersimpan</h3>
-              <p class="text-xs text-slate-500">${isScopedClassView ? `Paket ulangan khusus ${escapeHtml(state.selectedTeacherSubject)} • ${escapeHtml(state.selectedTeacherClass)}` : (state.currentUser?.role === 'guru' ? 'Menampilkan paket ulangan sesuai kelas & mapel yang Anda ampu' : 'Klik "Pilih Analisis" untuk mengaktifkan paket ulangan')}</p>
+              <p class="text-xs text-slate-500">${state.currentUser?.role === 'guru' ? 'Menampilkan paket ulangan sesuai kelas & mapel yang Anda ampu' : 'Klik "Pilih Analisis" untuk mengaktifkan paket ulangan'}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               ${hasActiveFilters ? `
@@ -7277,7 +7213,6 @@
             </div>
           </div>
 
-          ${isScopedClassView ? '' : `
           <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
             <select id="exam-filter-class" ${isWaliLockedClass ? 'disabled title="Terkunci di kelas ampuan Anda"' : 'onchange="window.handleFilterExams()"'}
               class="sm:col-span-3 px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${isWaliLockedClass ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 text-slate-700 focus:ring-2 focus:ring-indigo-500'}">
@@ -7291,18 +7226,15 @@
               placeholder="Cari judul, mapel, atau guru..."
               class="sm:col-span-5 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
-          `}
 
           <div class="space-y-3">
             ${examsPage.totalItems === 0 ? `
               <div class="py-10 text-center text-xs text-slate-400">
-                ${isScopedClassView
-              ? `Belum ada paket ulangan tersimpan untuk ${escapeHtml(state.selectedTeacherSubject)} (${escapeHtml(state.selectedTeacherClass)}).`
-              : (hasActiveFilters
-                ? 'Tidak ada paket ulangan yang sesuai dengan filter.'
-                : (visibleExams.length === 0 && state.exams.length > 0
-                  ? 'Belum ada paket ulangan yang sesuai dengan kelas/mapel ampuan Anda.'
-                  : 'Belum ada paket ulangan tersimpan.'))}
+                ${hasActiveFilters
+              ? 'Tidak ada paket ulangan yang sesuai dengan filter.'
+              : (visibleExams.length === 0 && state.exams.length > 0
+                ? 'Belum ada paket ulangan yang sesuai dengan kelas/mapel ampuan Anda.'
+                : 'Belum ada paket ulangan tersimpan.')}
               </div>
             ` : examsPage.items.map(ex => {
         const s = computeExamStatistics(ex);
@@ -7322,14 +7254,14 @@
                 <div class="p-4 rounded-2xl border transition ${isEditingCard ? 'bg-amber-50/40 border-amber-300 ring-2 ring-amber-200/70 shadow-sm' : (isSelected ? 'bg-indigo-50/70 border-indigo-300 shadow-sm' : 'bg-white border-slate-200/80 hover:border-slate-300')} flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div class="space-y-1.5">
                     <div class="flex items-center gap-2 flex-wrap">
-                      ${isScopedClassView ? '' : `<span class="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-extrabold">${escapeHtml(ex.class_name)}</span>`}
+                      <span class="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-extrabold">${escapeHtml(ex.class_name)}</span>
                       ${typeBadgesHtml}
-                      ${isScopedClassView ? '' : `<span class="text-xs font-bold text-indigo-700">${escapeHtml(ex.subject)}</span>`}
-                      <span class="text-[11px] text-slate-400">${isScopedClassView ? '' : '• '}${ex.exam_date}</span>
+                      <span class="text-xs font-bold text-indigo-700">${escapeHtml(ex.subject)}</span>
+                      <span class="text-[11px] text-slate-400">• ${ex.exam_date}</span>
                       ${isEditingCard ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-extrabold">Sedang Diedit</span>' : ''}
                     </div>
                     <h4 class="text-sm font-extrabold text-slate-900">${escapeHtml(ex.title)}</h4>
-                    ${(!isScopedClassView && teacherObj) ? `<div class="text-[11px] text-slate-500 font-semibold">Nama Guru: <span class="text-slate-700">${escapeHtml(teacherObj.full_name)}</span></div>` : ''}
+                    ${teacherObj ? `<div class="text-[11px] text-slate-500 font-semibold">Nama Guru: <span class="text-slate-700">${escapeHtml(teacherObj.full_name)}</span></div>` : ''}
                     <div class="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
                       <span>KKM: <strong>${ex.kkm}</strong></span>
                       <span>Soal: <strong>${ex.total_questions} ${exMeta.isMultiType ? 'Soal Campuran' : exMeta.typeMeta.shortLabel}</strong></span>
@@ -7353,17 +7285,10 @@
                   </div>
 
                   <div class="flex sm:flex-col items-center sm:items-end justify-end gap-2 shrink-0">
-                    ${isScopedClassView ? `
-                      <button type="button" onclick="window.handleOpenExamForInput('${ex.id}')"
-                        class="px-4 py-2 rounded-full text-xs font-bold transition bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs">
-                        <i data-lucide="pen-tool" class="w-3.5 h-3.5"></i> Input Jawaban
-                      </button>
-                    ` : `
-                      <button type="button" onclick="window.handleChangeActiveExam('${ex.id}')"
-                        class="px-4 py-2 rounded-full text-xs font-bold transition ${isSelected ? 'bg-emerald-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}">
-                        ${isSelected ? '✓ Sedang Aktif' : 'Pilih Analisis'}
-                      </button>
-                    `}
+                    <button type="button" onclick="window.handleChangeActiveExam('${ex.id}')"
+                      class="px-4 py-2 rounded-full text-xs font-bold transition ${isSelected ? 'bg-emerald-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}">
+                      ${isSelected ? '✓ Sedang Aktif' : 'Pilih Analisis'}
+                    </button>
                     <div class="flex items-center gap-1.5">
                       <button type="button" onclick="window.handleEditExam('${ex.id}')"
                         class="px-3 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition flex items-center gap-1" title="Edit Paket Ulangan">
@@ -7535,7 +7460,6 @@
       const isAdmin = isAdminUser();
       const tRole = getCurrentTeacherRoleMeta();
       const isWaliLockedClass = Boolean(!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade);
-      const isScopedClassView = Boolean(!isAdmin && state.activeMenu === 'mapel_kelas_detail' && state.selectedTeacherSubject && state.selectedTeacherClass);
       const teacherSubjects = !isAdmin ? getTeacherAssignedSubjects(state.currentUser) : [];
       const isSingleSubject = !isAdmin && teacherSubjects.length === 1;
 
@@ -7573,7 +7497,6 @@
       const isAdmin = isAdminUser();
       const tRole = getCurrentTeacherRoleMeta();
       const isWaliLockedClass = Boolean(!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade);
-      const isScopedClassView = Boolean(!isAdmin && state.activeMenu === 'mapel_kelas_detail' && state.selectedTeacherSubject && state.selectedTeacherClass);
       const teacherSubjects = !isAdmin ? getTeacherAssignedSubjects(state.currentUser) : [];
       const isSingleSubject = !isAdmin && teacherSubjects.length === 1;
 
@@ -7610,19 +7533,14 @@
 
       const isAdmin = isAdminUser();
       const tRole = getCurrentTeacherRoleMeta();
-      const isScopedClassCtx = Boolean(!isAdmin && state.activeMenu === 'mapel_kelas_detail' && state.selectedTeacherSubject && state.selectedTeacherClass);
       const title = document.getElementById('exam-title').value.trim();
-      const subject = isScopedClassCtx
-        ? state.selectedTeacherSubject
-        : document.getElementById('exam-subject').value.trim();
+      const subject = document.getElementById('exam-subject').value.trim();
       const teacherId = !isAdmin && state.currentUser?.id
         ? state.currentUser.id
         : (document.getElementById('exam-teacher')?.value || null);
-      const className = isScopedClassCtx
-        ? state.selectedTeacherClass
-        : ((!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade)
-          ? tRole.assignedGrade
-          : document.getElementById('exam-class').value.trim());
+      const className = (!isAdmin && tRole?.isWaliKelas && tRole.assignedGrade)
+        ? tRole.assignedGrade
+        : document.getElementById('exam-class').value.trim();
       const kkm = Number(document.getElementById('exam-kkm').value);
       const examDate = document.getElementById('exam-date').value;
 
