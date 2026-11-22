@@ -10156,19 +10156,22 @@
               }
             </p>
           </div>
+          ${activeTab === 'kelas' ? `
+            <button type="button" onclick="window.handleOpenAddClassModal()"
+              class="px-5 py-2.5 rounded-full flowora-btn-primary text-white text-xs md:text-sm font-bold flex items-center gap-2 shadow-sm shrink-0 self-start md:self-auto">
+              <i data-lucide="plus" class="w-4 h-4"></i> Tambah Kelas
+            </button>
+          ` : `
+            <button type="button" onclick="window.handleOpenAddSubjectModal()"
+              class="px-5 py-2.5 rounded-full flowora-btn-primary text-white text-xs md:text-sm font-bold flex items-center gap-2 shadow-sm shrink-0 self-start md:self-auto">
+              <i data-lucide="plus" class="w-4 h-4"></i> Tambah Mapel
+            </button>
+          `}
         </div>
 
         ${activeTab === 'mapel' ? `
           <!-- TAB 1: DAFTAR MATA PELAJARAN -->
           <div class="space-y-4">
-            <div class="flex items-center justify-between gap-4">
-              <p class="text-xs md:text-sm text-slate-500">Kelola daftar mata pelajaran madrasah</p>
-              <button type="button" onclick="window.handleOpenAddSubjectModal()"
-                class="px-5 py-2.5 rounded-full flowora-btn-primary text-white text-xs md:text-sm font-bold flex items-center gap-2 shadow-sm shrink-0">
-                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Mapel
-              </button>
-            </div>
-
             <div class="overflow-x-auto custom-scroll">
               <table class="w-full text-left border-collapse">
                 <thead>
@@ -10226,14 +10229,6 @@
         ` : `
           <!-- TAB 2: DAFTAR KELAS -->
           <div class="space-y-4">
-            <div class="flex items-center justify-between gap-4">
-              <p class="text-xs md:text-sm text-slate-500">Kelola daftar rombongan belajar / kelas madrasah, penetapan wali kelas, serta pantau jumlah siswa &amp; ulangan</p>
-              <button type="button" onclick="window.handleOpenAddClassModal()"
-                class="px-5 py-2.5 rounded-full flowora-btn-primary text-white text-xs md:text-sm font-bold flex items-center gap-2 shadow-sm shrink-0">
-                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Kelas
-              </button>
-            </div>
-
             <div class="overflow-x-auto custom-scroll">
               <table class="w-full text-left border-collapse">
                 <thead>
