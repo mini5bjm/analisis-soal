@@ -3023,7 +3023,7 @@
     function getSubjectShortCode(name) {
       const norm = normalizeSubjectKey(name);
       if (norm.includes('baca tulis') || norm.includes('btq') || norm.includes('bta')) return 'BTQ';
-      if (norm.includes('quran') || norm.includes('qur an')) return 'QM';
+      if (norm.includes('quran') || norm.includes('qur an')) return 'QH';
       if (norm.includes('akidah') || norm.includes('aqidah')) return 'AA';
       if (norm.includes('fikih') || norm.includes('fiqih')) return 'FK';
       if (norm.includes('ski')) return 'SKI';
@@ -6362,282 +6362,600 @@
       `;
     }
 
-    // ==================== 1. DASHBOARD ANALITIK (FLOWORA BENTO STYLE) ====================
+    // ==================== 1. DASHBOARD ANALITIK (MODERN BENTO UI) ====================
     function renderDashboardView(exam, stats) {
       const isAdmin = isAdminUser();
       const visibleExams = getVisibleExams();
       const totalExams = visibleExams.length;
-      const strokeDash = `${stats.classicalMastery}, 100`;
 
-      // Calculate per-exam progress bars
-      const examSummaries = visibleExams.map((ex, idx) => {
+      // Sapaan dinamis & informasi pengguna
+      const hour = new Date().getHours();
+      const greeting = hour < 11 ? 'Selamat Pagi' : hour < 15 ? 'Selamat Siang' : hour < 18 ? 'Selamat Sore' : 'Selamat Malam';
+      const userName = state.currentUser?.full_name || (isAdmin ? 'Administrator' : 'Guru');
+      const roleSub = formatTeacherHeaderSub(state.currentUser) || (isAdmin ? 'Administrator Madrasah' : 'Guru');
+      const schoolName = state.academicSettings?.schoolName || DEFAULT_SCHOOL_NAME;
+      const activeYear = state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR;
+      const activeSem = state.sessionSemester || DEFAULT_SEMESTER;
+
+      // Agregasi statistik lintas seluruh paket ulangan yang terlihat
+      let totalSubmissions = 0;
+      let totalPassed = 0;
+      let totalRemedial = 0;
+      let weightedScoreSum = 0;
+      let overallMax = 0;
+      let overallMin = 100;
+      let examsWithResults = 0;
+      let totalQuestionItems = 0;
+      let needReviewItems = 0;
+
+      const perExamStatsMap = new Map();
+      visibleExams.forEach(ex => {
         const s = computeExamStatistics(ex);
-        const colors = ['bg-indigo-600', 'bg-purple-600', 'bg-emerald-500', 'bg-amber-500'];
-        return {
-          ...ex,
-          avg: s.avgScore,
-          mastery: s.classicalMastery,
-          count: s.totalStudents,
-          barColor: colors[idx % colors.length]
-        };
+        perExamStatsMap.set(ex.id, s);
+        if (s.totalStudents > 0) {
+          examsWithResults++;
+          totalSubmissions += s.totalStudents;
+          totalPassed += s.passedCount;
+          totalRemedial += s.remedialCount;
+          weightedScoreSum += (Number(s.avgScore || 0) * s.totalStudents);
+          if (Number(s.highestScore || 0) > overallMax) overallMax = Number(s.highestScore || 0);
+          if (Number(s.lowestScore || 0) < overallMin) overallMin = Number(s.lowestScore || 0);
+          totalQuestionItems += Number(ex.total_questions || 0);
+          needReviewItems += (s.itemAnalysis || []).filter(i => i.masteryTier !== 'high').length;
+        }
       });
 
+      const overallAvgScore = totalSubmissions > 0 ? Math.round((weightedScoreSum / totalSubmissions) * 10) / 10 : 0;
+      const overallMastery = totalSubmissions > 0 ? Math.round((totalPassed / totalSubmissions) * 100) : 0;
+      const displayMin = totalSubmissions > 0 ? overallMin : 0;
+      const strokeDash = `${overallMastery}, 100`;
+      const masteryStatus = totalSubmissions === 0
+        ? { label: 'Belum Ada Data', color: 'text-slate-500', badgeBg: 'bg-slate-100 text-slate-600', stroke: '#94a3b8' }
+        : overallMastery >= 85
+          ? { label: 'Sangat Baik', color: 'text-emerald-600', badgeBg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', stroke: '#10b981' }
+          : overallMastery >= 70
+            ? { label: 'Cukup Efektif', color: 'text-indigo-600', badgeBg: 'bg-indigo-50 text-indigo-700 border border-indigo-200/80', stroke: '#4f46e5' }
+            : { label: 'Perlu Evaluasi', color: 'text-amber-600', badgeBg: 'bg-amber-50 text-amber-700 border border-amber-200/80', stroke: '#f59e0b' };
+
+      // Data khusus Admin
+      const allClasses = getAvailableClassNames();
+      const allStudents = Array.isArray(state.students) ? state.students : [];
+      const maleStudents = allStudents.filter(s => s && s.gender !== 'P').length;
+      const femaleStudents = allStudents.filter(s => s && s.gender === 'P').length;
+      const allTeachers = (state.teachers || []).filter(t => t && t.role !== 'admin');
+      const allSubjects = (state.subjects || []).filter(s => s && s.name);
+      const assignedSlotsCount = Object.values(state.teachingAssignments || {}).filter(Boolean).length;
+      const loginLogs = sanitizeTeacherLoginLogs(
+        (Array.isArray(state.teacherLoginLogs) && state.teacherLoginLogs.length > 0)
+          ? state.teacherLoginLogs
+          : loadTeacherLoginLogs()
+      );
+      const onlineTeacherCount = loginLogs.filter(l => l.status === 'ONLINE').length;
+
+      const classBreakdown = allClasses.map(cls => {
+        const normCls = normalizeGradeClass(cls).toLowerCase();
+        const clsStudents = allStudents.filter(s => s && normalizeGradeClass(s.class_name).toLowerCase() === normCls);
+        const clsMale = clsStudents.filter(s => s.gender !== 'P').length;
+        const clsFemale = clsStudents.filter(s => s.gender === 'P').length;
+        const clsExams = visibleExams.filter(ex => normalizeGradeClass(ex.class_name).toLowerCase() === normCls);
+        const homeroom = getHomeroomTeacherForClass(cls);
+        return {
+          name: cls,
+          roman: toRomanGrade(cls),
+          total: clsStudents.length,
+          male: clsMale,
+          female: clsFemale,
+          examCount: clsExams.length,
+          homeroomName: homeroom?.name || 'Belum diatur'
+        };
+      });
+      const maxClassStudents = Math.max(1, ...classBreakdown.map(c => c.total));
+
+      // Data khusus Guru
+      const subjectClassesMap = !isAdmin ? getTeacherSubjectClassesMap(state.currentUser) : {};
+      const subjectEntries = Object.entries(subjectClassesMap);
+      const uniqueAssignedClasses = sortClassNamesNatural(
+        Array.from(new Set(subjectEntries.flatMap(([, clist]) => clist)))
+      );
+      const assignedStudentsCount = !isAdmin
+        ? allStudents.filter(s => s && uniqueAssignedClasses.some(c => normalizeGradeClass(c).toLowerCase() === normalizeGradeClass(s.class_name).toLowerCase())).length
+        : allStudents.length;
+      const firstSubj = subjectEntries[0]?.[0] || '';
+      const firstCls = subjectEntries[0]?.[1]?.[0] || '';
+
+      const subjectCardThemes = [
+        { badge: 'bg-indigo-600 text-white shadow-indigo-200', softBg: 'bg-indigo-50/70 border-indigo-100', pill: 'bg-white hover:bg-indigo-600 text-indigo-700 hover:text-white border-indigo-200/80' },
+        { badge: 'bg-emerald-600 text-white shadow-emerald-200', softBg: 'bg-emerald-50/70 border-emerald-100', pill: 'bg-white hover:bg-emerald-600 text-emerald-700 hover:text-white border-emerald-200/80' },
+        { badge: 'bg-violet-600 text-white shadow-violet-200', softBg: 'bg-violet-50/70 border-violet-100', pill: 'bg-white hover:bg-violet-600 text-violet-700 hover:text-white border-violet-200/80' },
+        { badge: 'bg-sky-600 text-white shadow-sky-200', softBg: 'bg-sky-50/70 border-sky-100', pill: 'bg-white hover:bg-sky-600 text-sky-700 hover:text-white border-sky-200/80' },
+        { badge: 'bg-amber-600 text-white shadow-amber-200', softBg: 'bg-amber-50/70 border-amber-100', pill: 'bg-white hover:bg-amber-600 text-amber-700 hover:text-white border-amber-200/80' },
+        { badge: 'bg-rose-600 text-white shadow-rose-200', softBg: 'bg-rose-50/70 border-rose-100', pill: 'bg-white hover:bg-rose-600 text-rose-700 hover:text-white border-rose-200/80' }
+      ];
+
+      const subjectCardsHtml = subjectEntries.length === 0
+        ? `
+          <div class="col-span-full py-12 px-6 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto mb-3">
+              <i data-lucide="book-open" class="w-6 h-6"></i>
+            </div>
+            <p class="text-sm font-extrabold text-slate-700">Belum ada penugasan mata pelajaran</p>
+            <p class="text-xs text-slate-500 mt-1">Hubungi Administrator madrasah untuk mengatur penugasan mengajar Anda.</p>
+          </div>
+        `
+        : subjectEntries.map(([subjName, classList], idx) => {
+          const theme = subjectCardThemes[idx % subjectCardThemes.length];
+          const shortCode = getSubjectShortCode(subjName);
+          const subjExams = visibleExams.filter(ex => isSameSubject(ex.subject, subjName));
+          let subjCorrected = 0;
+          subjExams.forEach(ex => {
+            subjCorrected += Number(perExamStatsMap.get(ex.id)?.totalStudents || 0);
+          });
+
+          return `
+            <div class="group rounded-2xl p-4 bg-white border border-slate-200/80 hover:border-indigo-300/80 hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-3.5">
+              <div class="flex items-start gap-3">
+                <span class="w-12 h-10 rounded-xl ${theme.badge} shadow-sm flex items-center justify-center text-[11px] font-black tracking-wide shrink-0">
+                  ${escapeHtml(shortCode)}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <h4 class="text-sm font-extrabold text-slate-900 truncate" title="${escapeHtml(subjName)}">${escapeHtml(subjName)}</h4>
+                  <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] font-semibold text-slate-500 mt-0.5">
+                    <span>${classList.length} Kelas</span>
+                    <span class="text-slate-300">•</span>
+                    <span>${subjExams.length} Paket</span>
+                    <span class="text-slate-300">•</span>
+                    <span class="${subjCorrected > 0 ? 'text-emerald-600 font-bold' : ''}">${subjCorrected} Terkoreksi</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap gap-1.5 pt-2.5 border-t border-slate-100">
+                ${classList.map(cls => {
+                  const clsHasExam = subjExams.some(ex => normalizeGradeClass(ex.class_name).toLowerCase() === normalizeGradeClass(cls).toLowerCase());
+                  return `
+                    <button type="button"
+                      data-subject="${escapeHtml(subjName)}"
+                      data-class="${escapeHtml(cls)}"
+                      onclick="window.navigateTeacherClassMapel(this.dataset.subject, this.dataset.class)"
+                      class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11.5px] font-extrabold transition-all shadow-2xs cursor-pointer ${theme.pill}"
+                      title="Buka Input Jawaban ${escapeHtml(subjName)} - ${escapeHtml(cls)}">
+                      <span class="w-4 h-4 rounded-md bg-slate-900/10 text-[9.5px] font-black flex items-center justify-center">${escapeHtml(toRomanGrade(cls))}</span>
+                      <span>${escapeHtml(cls)}</span>
+                      ${clsHasExam ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>' : ''}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }).join('');
+
       return `
-      <!-- Top Hero Banner & AI Summary Strip -->
-      <div class="glass-surface rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 border border-indigo-100/80 relative overflow-hidden">
-        <div class="absolute -right-12 -top-12 w-56 h-56 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
-        <div class="space-y-2 max-w-2xl relative z-10">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200/60 text-indigo-700 text-xs font-bold">
-            <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
-            TA ${escapeHtml(state.sessionAcademicYear || DEFAULT_ACADEMIC_YEAR)} • SEMESTER ${escapeHtml((state.sessionSemester || DEFAULT_SEMESTER).toUpperCase())}
-          </div>
-          <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Analisis Ketuntasan & Kualitas Soal <span class="flowora-gradient-text">${exam ? exam.class_name : 'Sekolah'}</span>
-          </h2>
-          <p class="text-xs md:text-sm text-slate-600 leading-relaxed">
-            ${exam
-          ? `Menampilkan evaluasi aktif untuk <strong>${exam.title}</strong> (${exam.subject} • KKM ${exam.kkm}). Sebanyak <strong>${stats.passedCount} dari ${stats.totalStudents} siswa</strong> telah mencapai batas ketuntasan minimal.`
-          : 'Belum ada paket ulangan terpilih. Silakan buat paket ulangan baru untuk memulai analisis otomatis.'}
-          </p>
-        </div>
+      <!-- 1. Modern Personalized Hero Banner -->
+      <div class="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-900 p-6 md:p-8 text-white shadow-xl shadow-indigo-950/15 border border-white/10">
+        <!-- Ambient Orbs -->
+        <div class="absolute -top-20 -right-16 w-72 h-72 bg-indigo-500/25 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 left-1/3 w-64 h-64 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute top-1/2 -left-12 w-40 h-40 bg-violet-500/20 rounded-full blur-2xl pointer-events-none"></div>
 
-        <div class="flex flex-wrap items-center gap-3 relative z-10">
-          ${isAdmin ? `
-            <button type="button" onclick="window.navigateMenu('manajemen_siswa')" class="px-5 py-3 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-2">
-              <i data-lucide="graduation-cap" class="w-4 h-4"></i> Kelola Data Siswa
-            </button>
-            <button type="button" onclick="window.navigateMenu('pengaturan_sistem')" class="px-5 py-3 rounded-full bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-bold flex items-center gap-2 shadow-sm transition">
-              <i data-lucide="settings" class="w-4 h-4 text-indigo-600"></i> Pengaturan
-            </button>
-          ` : `
-            <button type="button" onclick="window.navigateMenu('analisis_butir')" class="px-5 py-3 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center gap-2">
-              <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Lihat Analisis Butir Soal
-            </button>
-            <button type="button" onclick="window.navigateMenu('remedial_pengayaan')" class="px-5 py-3 rounded-full bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-bold flex items-center gap-2 shadow-sm transition">
-              <i data-lucide="printer" class="w-4 h-4 text-indigo-600"></i> Laporan Remedial
-            </button>
-          `}
-        </div>
-      </div>
+        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div class="space-y-3 max-w-2xl">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-emerald-300 text-[11px] font-extrabold tracking-wide">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                TA ${escapeHtml(activeYear)} • Semester ${escapeHtml(activeSem)}
+              </span>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-indigo-100 text-[11px] font-bold">
+                <i data-lucide="school" class="w-3.5 h-3.5 text-indigo-300"></i>
+                ${escapeHtml(schoolName)}
+              </span>
+            </div>
 
-      <!-- 4 Soft-Tinted KPI Cards (Flowora Feature Cards Pattern) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
-        <!-- Card 1: Violet Tint -->
-        <div class="bg-[#F5F3FF] border border-violet-200/70 rounded-3xl p-5 flex flex-col justify-between shadow-sm">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-11 h-11 rounded-2xl bg-white text-indigo-600 flex items-center justify-center shadow-sm">
-              <i data-lucide="users" class="w-5 h-5"></i>
+            <div>
+              <p class="text-xs md:text-sm font-semibold text-indigo-200/90">${greeting},</p>
+              <h2 class="text-2xl md:text-3xl font-black tracking-tight text-white mt-0.5">
+                ${escapeHtml(userName)}
+              </h2>
             </div>
-            <span class="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 text-[11px] font-extrabold">
-              ${totalExams} Paket Ulangan
-            </span>
-          </div>
-          <div>
-            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Peserta Ulangan Aktif</div>
-            <div class="flex items-baseline gap-2 mt-1">
-              <span class="text-3xl font-extrabold text-slate-900">${stats.totalStudents}</span>
-              <span class="text-xs font-bold text-emerald-600">Siswa Terkoreksi</span>
-            </div>
-          </div>
-        </div>
 
-        <!-- Card 2: Blue Tint -->
-        <div class="bg-[#EFF6FF] border border-blue-200/70 rounded-3xl p-5 flex flex-col justify-between shadow-sm">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-11 h-11 rounded-2xl bg-white text-blue-600 flex items-center justify-center shadow-sm">
-              <i data-lucide="trending-up" class="w-5 h-5"></i>
-            </div>
-            <span class="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-[11px] font-extrabold">
-              KKM: ${exam ? exam.kkm : 75}
-            </span>
+            <p class="text-xs md:text-sm text-indigo-100/80 leading-relaxed max-w-xl">
+              ${isAdmin
+                ? `Kelola operasional penilaian <strong class="text-white">${allTeachers.length} guru</strong>, <strong class="text-white">${allStudents.length} peserta didik</strong> di <strong class="text-white">${allClasses.length} kelas</strong>, serta pantau <strong class="text-white">${totalExams} paket ulangan</strong> secara real-time.`
+                : `Anda mengampu <strong class="text-white">${subjectEntries.length} mata pelajaran</strong> pada <strong class="text-white">${uniqueAssignedClasses.length} kelas</strong> (${assignedStudentsCount} siswa). Total <strong class="text-white">${totalExams} paket ulangan</strong> tercatat pada periode ini.`}
+            </p>
           </div>
-          <div>
-            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Rata-Rata Nilai Klasikal</div>
-            <div class="flex items-baseline gap-2 mt-1">
-              <span class="text-3xl font-extrabold text-slate-900">${stats.avgScore}</span>
-              <span class="text-xs font-bold text-blue-600">Max: ${stats.highestScore} | Min: ${stats.lowestScore}</span>
-            </div>
-          </div>
-        </div>
 
-        <!-- Card 3: Green Mint Tint -->
-        <div class="bg-[#F0FDF4] border border-emerald-200/70 rounded-3xl p-5 flex flex-col justify-between shadow-sm">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-11 h-11 rounded-2xl bg-white text-emerald-600 flex items-center justify-center shadow-sm">
-              <i data-lucide="check-circle-2" class="w-5 h-5"></i>
-            </div>
-            <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-extrabold">
-              ↑ ${stats.classicalMastery}% Tuntas
-            </span>
-          </div>
-          <div>
-            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Siswa Tuntas (Pengayaan)</div>
-            <div class="flex items-baseline gap-2 mt-1">
-              <span class="text-3xl font-extrabold text-slate-900">${stats.passedCount}</span>
-              <span class="text-xs font-bold text-emerald-600">Lulus KKM</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 4: Peach/Orange Tint -->
-        <div class="bg-[#FFF7ED] border border-orange-200/70 rounded-3xl p-5 flex flex-col justify-between shadow-sm">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-11 h-11 rounded-2xl bg-white text-amber-600 flex items-center justify-center shadow-sm">
-              <i data-lucide="alert-circle" class="w-5 h-5"></i>
-            </div>
-            <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[11px] font-extrabold">
-              ${100 - stats.classicalMastery}% Belum Tuntas
-            </span>
-          </div>
-          <div>
-            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Siswa Perlu Remedial</div>
-            <div class="flex items-baseline gap-2 mt-1">
-              <span class="text-3xl font-extrabold text-slate-900">${stats.remedialCount}</span>
-              <span class="text-xs font-bold text-amber-600">Wajib Tindak Lanjut</span>
-            </div>
+          <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            ${isAdmin ? `
+              <button type="button" onclick="window.navigateMenu('manajemen_siswa')" class="px-4 py-2.5 rounded-2xl bg-white text-indigo-950 hover:bg-indigo-50 text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-slate-950/20 transition cursor-pointer">
+                <i data-lucide="graduation-cap" class="w-4 h-4 text-indigo-600"></i> Data Siswa
+              </button>
+              <button type="button" onclick="window.navigateMenu('rekap_laporan')" class="px-4 py-2.5 rounded-2xl bg-white/12 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 text-xs font-extrabold flex items-center gap-2 transition cursor-pointer">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-300"></i> Rekap &amp; Laporan
+              </button>
+              <button type="button" onclick="window.navigateMenu('pengaturan_sistem')" class="px-4 py-2.5 rounded-2xl bg-white/12 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 text-xs font-extrabold flex items-center gap-2 transition cursor-pointer">
+                <i data-lucide="settings" class="w-4 h-4 text-indigo-200"></i> Pengaturan
+              </button>
+            ` : `
+              ${firstSubj && firstCls ? `
+                <button type="button"
+                  data-subject="${escapeHtml(firstSubj)}"
+                  data-class="${escapeHtml(firstCls)}"
+                  onclick="window.navigateTeacherClassMapel(this.dataset.subject, this.dataset.class)"
+                  class="px-4 py-2.5 rounded-2xl bg-white text-indigo-950 hover:bg-indigo-50 text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-slate-950/20 transition cursor-pointer">
+                  <i data-lucide="pen-tool" class="w-4 h-4 text-indigo-600"></i> Input Jawaban Cepat
+                </button>
+              ` : ''}
+              <button type="button" onclick="window.navigateMenu('analisis_butir')" class="px-4 py-2.5 rounded-2xl bg-white/12 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 text-xs font-extrabold flex items-center gap-2 transition cursor-pointer">
+                <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-300"></i> Analisis Butir
+              </button>
+              <button type="button" onclick="window.navigateMenu('remedial_pengayaan')" class="px-4 py-2.5 rounded-2xl bg-white/12 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 text-xs font-extrabold flex items-center gap-2 transition cursor-pointer">
+                <i data-lucide="award" class="w-4 h-4 text-amber-300"></i> Remedial &amp; Pengayaan
+              </button>
+            `}
           </div>
         </div>
       </div>
 
-      <!-- Bento Grid Row: Progress Per Ulangan + Top Performers + Donut Chart -->
+      <!-- 2. Modern 4-Column KPI Metric Strip -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        ${isAdmin ? `
+          <!-- Admin KPI 1: Total Siswa -->
+          <div class="group bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center ring-1 ring-indigo-100">
+                <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-extrabold">
+                L: ${maleStudents} • P: ${femaleStudents}
+              </span>
+            </div>
+            <div>
+              <div class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Total Peserta Didik</div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-3xl font-black text-slate-900 tabular-nums">${allStudents.length}</span>
+                <span class="text-xs font-bold text-indigo-600">di ${allClasses.length} Kelas</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Admin KPI 2: Tenaga Pendidik -->
+          <div class="group bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center ring-1 ring-emerald-100">
+                <i data-lucide="users" class="w-5 h-5"></i>
+              </div>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-extrabold">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                ${onlineTeacherCount} Online
+              </span>
+            </div>
+            <div>
+              <div class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Tenaga Pendidik</div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-3xl font-black text-slate-900 tabular-nums">${allTeachers.length}</span>
+                <span class="text-xs font-bold text-emerald-600">${allSubjects.length} Mata Pelajaran</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Admin KPI 3: Paket Ulangan -->
+          <div class="group bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-11 h-11 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center ring-1 ring-violet-100">
+                <i data-lucide="file-check-2" class="w-5 h-5"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 text-[11px] font-extrabold">
+                ${totalSubmissions} Koreksi
+              </span>
+            </div>
+            <div>
+              <div class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Paket Ulangan Aktif</div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-3xl font-black text-slate-900 tabular-nums">${totalExams}</span>
+                <span class="text-xs font-bold text-violet-600">${examsWithResults} Sudah Dinilai</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Admin KPI 4: Rata-rata & Ketuntasan -->
+          <div class="group bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center ring-1 ring-amber-100">
+                <i data-lucide="trending-up" class="w-5 h-5"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-full ${masteryStatus.badgeBg} text-[11px] font-extrabold">
+                ${overallMastery}% Tuntas
+              </span>
+            </div>
+            <div>
+              <div class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Rata-Rata Madrasah</div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-3xl font-black text-slate-900 tabular-nums">${overallAvgScore}</span>
+                <span class="text-xs font-bold text-slate-500">Tuntas ${totalPassed} • Rem ${totalRemedial}</span>
+              </div>
+            </div>
+          </div>
+        ` : `
+          <!-- Guru KPI 1: Mata Pelajaran & Rombel -->
+          <div class="group bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center ring-1 ring-indigo-100">
+                <i data-lucide="book-open" class="w-5 h-5"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-extrabold">
+                ${uniqueAssignedClasses.length} Rombel
+              </span>
+            </div>
+            <div>
+              <div class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Mapel Diampu</div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-3xl font-black text-slate-900 tabular-nums">${subjectEntries.length}</span>
+                <span class="text-xs font-bold text-indigo-600">${assignedStudentsCount} Siswa</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Guru KPI 2: Paket Ulangan -->
+          <div class="group bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-11 h-11 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center ring-1 ring-violet-100">
+                <i data-lucide="layers" class="w-5 h-5"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 text-[11px] font-extrabold">
+                ${examsWithResults} Terkoreksi
+              </span>
+            </div>
+            <div>
+              <div class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Paket Ulangan</div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-3xl font-black text-slate-900 tabular-nums">${totalExams}</span>
+                <span class="text-xs font-bold text-violet-600">${totalSubmissions} Lembar Nilai</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Guru KPI 3: Rata-rata Nilai -->
+          <div class="group bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center ring-1 ring-sky-100">
+                <i data-lucide="trending-up" class="w-5 h-5"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 text-[11px] font-extrabold">
+                Max ${overallMax} • Min ${displayMin}
+              </span>
+            </div>
+            <div>
+              <div class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Rata-Rata Nilai</div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-3xl font-black text-slate-900 tabular-nums">${overallAvgScore}</span>
+                <span class="text-xs font-bold text-sky-600">Skala 0 – 100</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Guru KPI 4: Tuntas vs Remedial -->
+          <div class="group bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center ring-1 ring-emerald-100">
+                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-full ${masteryStatus.badgeBg} text-[11px] font-extrabold">
+                ${overallMastery}% Tuntas
+              </span>
+            </div>
+            <div>
+              <div class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Ketuntasan Siswa</div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-3xl font-black text-slate-900 tabular-nums">${totalPassed}</span>
+                <span class="text-xs font-bold text-emerald-600">Tuntas</span>
+                <span class="text-xs font-bold text-amber-600">• ${totalRemedial} Remedial</span>
+              </div>
+            </div>
+          </div>
+        `}
+      </div>
+
+      <!-- 3. Modern Bento Content Section -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- Left Column (5 cols): Progress Rata-rata & Ketuntasan Paket Ulangan -->
-        <div class="lg:col-span-5 glass-surface rounded-3xl p-6 flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between mb-5">
-              <div>
-                <h3 class="text-base font-extrabold text-slate-900">Perbandingan Paket Ulangan</h3>
-                <p class="text-xs text-slate-500">Rata-rata nilai & persentase ketuntasan per kelas</p>
-              </div>
-              <span class="p-2 rounded-xl bg-indigo-50 text-indigo-600">
-                <i data-lucide="layers" class="w-4 h-4"></i>
-              </span>
-            </div>
-
-            <div class="space-y-4">
-              ${examSummaries.map(item => `
-                <div onclick="window.handleChangeActiveExam('${item.id}')" class="p-3.5 rounded-2xl border ${item.id === exam?.id ? 'bg-indigo-50/60 border-indigo-200' : 'bg-white border-slate-100 hover:border-slate-200'} cursor-pointer transition">
-                  <div class="flex items-center justify-between text-xs font-bold mb-1.5">
-                    <span class="text-slate-800 truncate">${item.title} <span class="text-indigo-600">(${item.class_name})</span></span>
-                    <span class="text-slate-900 font-extrabold">${item.mastery}% Tuntas</span>
-                  </div>
-                  <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div class="h-full ${item.barColor} rounded-full transition-all duration-500" style="width: ${item.mastery}%"></div>
-                  </div>
-                  <div class="flex items-center justify-between text-[11px] text-slate-500 mt-1.5">
-                    <span>Rata-rata: <strong>${item.avg}</strong> (KKM ${item.kkm})</span>
-                    <span>${item.count} Siswa</span>
-                  </div>
+        ${isAdmin ? `
+          <!-- Admin Left (8 cols): Sebaran Siswa & Rombel per Kelas -->
+          <div class="lg:col-span-8 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between gap-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <i data-lucide="building-2" class="w-5 h-5"></i>
                 </div>
-              `).join('')}
-            </div>
-          </div>
-
-          ${!isAdmin ? `
-            <button type="button" onclick="window.navigateMenu('manajemen_ulangan')" class="mt-5 w-full py-2.5 px-4 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
-              <span>Kelola Semua Paket Ulangan</span>
-              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-            </button>
-          ` : ''}
-        </div>
-
-        <!-- Middle Column (4 cols): Peringkat & Status Siswa Terbaru -->
-        <div class="lg:col-span-4 glass-surface rounded-3xl p-6 flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between mb-5">
-              <div>
-                <h3 class="text-base font-extrabold text-slate-900">Distribusi Nilai Siswa</h3>
-                <p class="text-xs text-slate-500">Daftar hasil koreksi pada ulangan aktif</p>
+                <div>
+                  <h3 class="text-base font-extrabold text-slate-900">Sebaran Rombel &amp; Peserta Didik</h3>
+                  <p class="text-xs text-slate-500">Ringkasan jumlah siswa, wali kelas, dan paket ulangan tiap kelas</p>
+                </div>
               </div>
-              <span class="p-2 rounded-xl bg-emerald-50 text-emerald-600">
-                <i data-lucide="award" class="w-4 h-4"></i>
-              </span>
+              <button type="button" onclick="window.navigateMenu('manajemen_mapel')"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/80 text-xs font-extrabold transition cursor-pointer shrink-0">
+                <span>Kelola Mapel &amp; Kelas</span>
+                <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+              </button>
             </div>
 
-            <div class="space-y-3 max-h-[290px] overflow-y-auto custom-scroll pr-1">
-              ${stats.results.length === 0 ? `
-                <div class="text-center py-8 text-xs text-slate-400">Belum ada data nilai siswa.</div>
-              ` : stats.results.slice(0, 6).map((r, i) => {
-        const examMeta = stats.examMeta || decodeExamMeta(exam);
-        const graded = scoreStudentResponse(exam, r.student_answers);
-        const subLabel = examMeta.hasWeightedScore
-          ? `Skor ${graded.earnedTotal}/${graded.maxTotal} poin (${graded.correctCount}/${exam.total_questions} ${examMeta.allNumeric ? 'tuntas' : 'benar'})`
-          : `Benar ${graded.correctCount}/${exam.total_questions} soal`;
-        return `
-                <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50/80 border border-slate-100">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <div class="w-8 h-8 rounded-full ${r.score >= exam.kkm ? 'bg-indigo-600 text-white' : 'bg-amber-500 text-white'} font-extrabold text-xs flex items-center justify-center shrink-0">
-                      #${i + 1}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              ${classBreakdown.map(c => {
+                const widthPct = Math.max(6, Math.round((c.total / maxClassStudents) * 100));
+                return `
+                  <div class="rounded-2xl p-4 bg-slate-50/70 hover:bg-white border border-slate-200/70 hover:border-indigo-200 hover:shadow-sm transition-all space-y-2.5">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-9 h-9 rounded-xl bg-indigo-600 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-xs">
+                          ${escapeHtml(c.roman)}
+                        </span>
+                        <div class="min-w-0">
+                          <div class="text-sm font-extrabold text-slate-900 truncate">${escapeHtml(c.name)}</div>
+                          <div class="text-[11px] text-slate-500 truncate" title="Wali Kelas: ${escapeHtml(c.homeroomName)}">Wali: ${escapeHtml(c.homeroomName)}</div>
+                        </div>
+                      </div>
+                      <div class="text-right shrink-0">
+                        <div class="text-base font-black text-slate-900 tabular-nums">${c.total}</div>
+                        <div class="text-[10px] font-bold text-slate-400">Siswa</div>
+                      </div>
                     </div>
-                    <div class="min-w-0">
-                      <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(r.student_name)}</div>
-                      <div class="text-[11px] text-slate-500">${subLabel}</div>
+                    <div class="w-full h-2 bg-slate-200/80 rounded-full overflow-hidden">
+                      <div class="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500" style="width: ${c.total > 0 ? widthPct : 0}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                      <span>L: <strong class="text-sky-700">${c.male}</strong> • P: <strong class="text-pink-600">${c.female}</strong></span>
+                      <span class="px-2 py-0.5 rounded-full bg-white border border-slate-200/80 text-slate-600 font-bold text-[10.5px]">${c.examCount} Paket</span>
                     </div>
                   </div>
-                  <div class="text-right shrink-0">
-                    <div class="text-sm font-extrabold ${r.score >= exam.kkm ? 'text-emerald-600' : 'text-rose-600'}">${r.score}</div>
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${r.score >= exam.kkm ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
-                      ${r.score >= exam.kkm ? 'Tuntas' : 'Remedial'}
-                    </span>
-                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Admin Right (4 cols): Ringkasan Evaluasi & Penugasan -->
+          <div class="lg:col-span-4 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between gap-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-base font-extrabold text-slate-900">Ketuntasan Madrasah</h3>
+                <p class="text-xs text-slate-500">Agregasi seluruh evaluasi aktif</p>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10.5px] font-extrabold">Target ≥ 85%</span>
+            </div>
+
+            <div class="flex flex-col items-center justify-center py-1">
+              <div class="relative w-44 h-44 flex items-center justify-center">
+                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                  <path class="text-slate-100" stroke-width="3.6" stroke="currentColor" fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path stroke="${masteryStatus.stroke}" stroke-width="3.6" stroke-dasharray="${strokeDash}" stroke-linecap="round" fill="none"
+                    class="transition-all duration-700"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span class="text-3xl font-black text-slate-900 tabular-nums">${overallMastery}%</span>
+                  <span class="text-[11px] font-bold text-slate-500">Tuntas KKM</span>
                 </div>
-              `;
-      }).join('')}
+              </div>
             </div>
-          </div>
 
-          ${!isAdmin ? `
-            <button type="button" onclick="window.navigateMenu('input_nilai')" class="mt-5 w-full py-2.5 px-4 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
-              <span>Input / Edit Nilai Siswa</span>
-              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+            <div class="space-y-2.5 bg-slate-50/90 p-4 rounded-2xl border border-slate-100 text-xs">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-500 font-semibold">Status Evaluasi</span>
+                <span class="font-extrabold ${masteryStatus.color}">${masteryStatus.label}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-500 font-semibold">Penugasan Mengajar</span>
+                <span class="font-extrabold text-indigo-700">${assignedSlotsCount} Slot Aktif</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-500 font-semibold">Tuntas / Remedial</span>
+                <span class="font-extrabold text-slate-800">${totalPassed} / ${totalRemedial} Siswa</span>
+              </div>
+            </div>
+
+            <button type="button" onclick="window.navigateMenu('rekap_laporan')"
+              class="w-full py-2.5 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition flex items-center justify-center gap-2 shadow-sm cursor-pointer">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+              <span>Buka Rekap &amp; Laporan</span>
             </button>
-          ` : ''}
-        </div>
-
-        <!-- Right Column (3 cols): Flowora Performance Donut Chart Card -->
-        <div class="lg:col-span-3 glass-surface rounded-3xl p-6 flex flex-col items-center justify-between text-center">
-          <div class="w-full flex items-center justify-between mb-2">
-            <span class="text-sm font-extrabold text-slate-900">Ketuntasan Klasikal</span>
-            <span class="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-bold">Target ≥ 85%</span>
           </div>
-
-          <!-- SVG Donut Chart -->
-          <div class="relative w-44 h-44 my-2 flex items-center justify-center">
-            <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
-              <path class="text-slate-100" stroke-width="3.8" stroke="currentColor" fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <path class="text-indigo-600 transition-all duration-700" stroke-width="3.8" stroke-dasharray="${strokeDash}" stroke-linecap="round" stroke="currentColor" fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            </svg>
-            <div class="absolute inset-0 flex flex-col items-center justify-center">
-              <span class="text-3xl font-extrabold text-slate-900">${stats.classicalMastery}%</span>
-              <span class="text-[11px] font-semibold text-slate-500">Tuntas KKM</span>
-            </div>
-          </div>
-
-          <div class="w-full space-y-2 text-left bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-500 font-medium">Status Klasikal:</span>
-              <span class="font-extrabold ${stats.classicalMastery >= 75 ? 'text-emerald-600' : 'text-amber-600'}">
-                ${stats.classicalMastery >= 85 ? 'Sangat Baik' : stats.classicalMastery >= 70 ? 'Cukup Efektif' : 'Perlu Evaluasi'}
+        ` : `
+          <!-- Guru Left (8 cols): Akses Cepat Mata Pelajaran & Kelas yang Diampu -->
+          <div class="lg:col-span-8 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col gap-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <i data-lucide="layout-grid" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-extrabold text-slate-900">Mata Pelajaran &amp; Kelas Diampu</h3>
+                  <p class="text-xs text-slate-500">Pilih kelas pada kartu di bawah untuk langsung masuk ke Input Jawaban Siswa</p>
+                </div>
+              </div>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold shrink-0">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                Titik hijau = sudah ada paket ulangan
               </span>
             </div>
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-500 font-medium">Perlu Penguatan / Ulasan:</span>
-              <span class="font-extrabold text-indigo-600">
-                ${stats.itemAnalysis.filter(i => i.masteryTier !== 'high').length} dari ${exam?.total_questions || 0} Soal
-              </span>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              ${subjectCardsHtml}
             </div>
           </div>
-        </div>
 
+          <!-- Guru Right (4 cols): Ringkasan Ketuntasan Klasikal & Tindak Lanjut -->
+          <div class="lg:col-span-4 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between gap-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-base font-extrabold text-slate-900">Ketuntasan Klasikal</h3>
+                <p class="text-xs text-slate-500">Capaian seluruh ulangan Anda</p>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10.5px] font-extrabold">Target ≥ 85%</span>
+            </div>
+
+            <!-- SVG Circular Gauge -->
+            <div class="flex flex-col items-center justify-center py-1">
+              <div class="relative w-44 h-44 flex items-center justify-center">
+                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                  <path class="text-slate-100" stroke-width="3.6" stroke="currentColor" fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path stroke="${masteryStatus.stroke}" stroke-width="3.6" stroke-dasharray="${strokeDash}" stroke-linecap="round" fill="none"
+                    class="transition-all duration-700"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span class="text-3xl font-black text-slate-900 tabular-nums">${overallMastery}%</span>
+                  <span class="text-[11px] font-bold text-slate-500">Tuntas KKM</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stacked Bar & Status Details -->
+            <div class="space-y-3">
+              <div>
+                <div class="flex items-center justify-between text-[11px] font-bold mb-1.5">
+                  <span class="text-emerald-700">Tuntas (${totalPassed})</span>
+                  <span class="text-amber-700">Remedial (${totalRemedial})</span>
+                </div>
+                <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden flex">
+                  <div class="h-full bg-emerald-500 transition-all duration-500" style="width: ${totalSubmissions > 0 ? overallMastery : 0}%"></div>
+                  <div class="h-full bg-amber-400 transition-all duration-500" style="width: ${totalSubmissions > 0 ? (100 - overallMastery) : 0}%"></div>
+                </div>
+              </div>
+
+              <div class="space-y-2 bg-slate-50/90 p-3.5 rounded-2xl border border-slate-100 text-xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-slate-500 font-semibold">Status Klasikal</span>
+                  <span class="font-extrabold ${masteryStatus.color}">${masteryStatus.label}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-slate-500 font-semibold">Soal Perlu Penguatan</span>
+                  <span class="font-extrabold text-indigo-700">${needReviewItems} dari ${totalQuestionItems} Soal</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2.5 pt-1">
+                <button type="button" onclick="window.navigateMenu('analisis_butir')"
+                  class="py-2.5 px-3 rounded-2xl bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white text-[11.5px] font-extrabold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                  <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
+                  <span>Analisis Butir</span>
+                </button>
+                <button type="button" onclick="window.navigateMenu('remedial_pengayaan')"
+                  class="py-2.5 px-3 rounded-2xl bg-amber-50 hover:bg-amber-500 text-amber-700 hover:text-white text-[11.5px] font-extrabold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                  <i data-lucide="award" class="w-3.5 h-3.5"></i>
+                  <span>Tindak Lanjut</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `}
       </div>
 
-      <!-- Real-Time Teacher Login History Card -->
-      <div id="dashboard-login-history-card" class="glass-surface rounded-3xl p-6 space-y-4">
+      ${isAdmin ? `
+      <!-- 4. Real-Time Teacher Login History Card (Admin Monitoring) -->
+      <div id="dashboard-login-history-card" class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-4">
         ${renderDashboardLoginHistoryHtml()}
       </div>
+      ` : ''}
     `;
     }
 
