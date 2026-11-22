@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>SIHASUL — Sistem Analisis Hasil Ulangan</title>
 
   <!-- PWA Manifest Data URI (1-File Standard) -->
@@ -49,17 +49,37 @@
   </script>
 
   <style>
-    /* Full-Page Blogger Overlay Reset */
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    /* Full-Page Overlay Reset (Dynamic Viewport agar pas 100% layar HP/Tablet/Desktop) */
     #flowora-app-root {
       position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      height: var(--app-height, 100dvh);
+      max-height: 100%;
       z-index: 999999;
       background-color: #F8FAFC;
       overflow: hidden;
       font-family: 'Plus Jakarta Sans', sans-serif;
       color: #0F172A;
+    }
+
+    .main-scroll-area {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
     }
 
     /* Ambient Flowora Background Blobs */
@@ -141,8 +161,11 @@
         top: 0;
         left: 0;
         bottom: 0;
+        height: 100% !important;
+        max-height: var(--app-height, 100dvh) !important;
         width: 18rem;
         max-width: 85vw;
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
         z-index: 50 !important;
         background: #ffffff !important;
         transform: translateX(-108%);
@@ -156,10 +179,11 @@
 
       .mobile-bottom-nav {
         display: flex !important;
+        bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
       }
 
       .main-scroll-area {
-        padding-bottom: 6.5rem !important;
+        padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px)) !important;
       }
     }
 
@@ -167,6 +191,9 @@
       .desktop-sidebar {
         display: flex !important;
         position: static !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
         transform: none !important;
       }
 
@@ -799,6 +826,32 @@
         }
       }
     } catch (e) { }
+
+    /* Sinkronkan tinggi aktual layar (viewport nyata) di HP & Tablet agar sidebar & konten tidak terpotong di bawah */
+    (function () {
+      function syncAppHeight() {
+        var innerH = window.innerHeight || document.documentElement.clientHeight || 0;
+        var vv = window.visualViewport;
+        var h = innerH;
+        if (vv && vv.height && Math.abs((vv.scale || 1) - 1) < 0.02) {
+          h = innerH ? Math.min(innerH, vv.height) : vv.height;
+        }
+        if (h && h > 200) {
+          document.documentElement.style.setProperty('--app-height', Math.floor(h) + 'px');
+        }
+      }
+      syncAppHeight();
+      window.addEventListener('DOMContentLoaded', syncAppHeight, { passive: true });
+      window.addEventListener('load', syncAppHeight, { passive: true });
+      window.addEventListener('resize', syncAppHeight, { passive: true });
+      window.addEventListener('orientationchange', function () {
+        syncAppHeight();
+        setTimeout(syncAppHeight, 200);
+      }, { passive: true });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', syncAppHeight, { passive: true });
+      }
+    })();
   </script>
 </head>
 
@@ -826,9 +879,9 @@
     </div>
 
     <!-- ==================== VIEW 1: LOGIN SCREEN ==================== -->
-    <div id="auth-view" class="w-full h-full overflow-y-auto custom-scroll flex items-center justify-center p-4 md:p-8">
+    <div id="auth-view" class="w-full h-full min-h-0 overflow-y-auto custom-scroll flex items-start lg:items-center justify-center p-4 md:p-8">
       <div id="auth-card"
-        class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 glass-surface rounded-3xl overflow-hidden shadow-2xl border border-white/80 animate-view-in">
+        class="w-full max-w-5xl my-auto grid grid-cols-1 lg:grid-cols-12 glass-surface rounded-3xl overflow-hidden shadow-2xl border border-white/80 animate-view-in">
 
         <!-- Left Hero Showcase (Flowora Style) -->
         <div
@@ -968,8 +1021,8 @@
         class="no-print hidden lg:hidden fixed inset-0 bg-slate-900/45 backdrop-blur-xs z-40 transition-opacity"></div>
 
       <!-- DESKTOP LEFT SIDEBAR / MOBILE SLIDE-OUT DRAWER -->
-      <aside id="app-sidebar" class="desktop-sidebar no-print w-72 h-full glass-sidebar flex-col justify-between p-5 shrink-0 z-50 lg:z-20">
-        <div class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-0.5">
+      <aside id="app-sidebar" class="desktop-sidebar no-print w-72 h-full min-h-0 glass-sidebar flex-col justify-between gap-3 p-4 shrink-0 z-50 lg:z-20 overflow-hidden">
+        <div class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-0.5 pb-1">
           <!-- Brand Logo -->
           <div class="flex items-center justify-between px-2 mb-5">
             <div class="flex items-center gap-3">
@@ -1020,10 +1073,10 @@
         </div>
 
         <!-- User Profile & Logout Card -->
-        <div class="p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-3">
-          <div class="flex items-center gap-3">
+        <div class="shrink-0 p-3 rounded-2xl bg-slate-50/95 border border-slate-200/80 space-y-2.5">
+          <div class="flex items-center gap-2.5">
             <div id="user-avatar-circle"
-              class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 text-white font-bold text-sm flex items-center justify-center shrink-0">
+              class="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
               GU
             </div>
             <div class="min-w-0 flex-1">
@@ -1031,7 +1084,7 @@
               <div id="user-display-sub" class="text-[11px] text-slate-500 truncate">Matematika Wajib</div>
             </div>
           </div>
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <button type="button" id="btn-return-admin-desktop" onclick="window.handleReturnToAdmin()"
               class="hidden w-full py-2 px-3 rounded-full bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 text-xs font-bold transition items-center justify-center gap-1.5">
               <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i> Kembali ke Admin
@@ -1045,7 +1098,7 @@
       </aside>
 
       <!-- MAIN CONTENT CONTAINER -->
-      <div class="flex-1 h-full flex flex-col overflow-hidden">
+      <div class="flex-1 min-w-0 min-h-0 h-full flex flex-col overflow-hidden">
 
         <!-- Top Glass Header -->
         <header
@@ -1113,7 +1166,7 @@
 
         <!-- Scrollable Dynamic Section Content -->
         <main id="main-content-container"
-          class="main-scroll-area flex-1 overflow-y-auto custom-scroll p-4 md:p-8 space-y-6">
+          class="main-scroll-area flex-1 min-h-0 overflow-y-auto custom-scroll p-4 md:p-6 lg:p-8 pb-24 lg:pb-10 space-y-6">
           <!-- Rendered dynamically by renderCurrentMenu() -->
         </main>
 
