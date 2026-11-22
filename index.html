@@ -6826,7 +6826,7 @@
                 <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
                   <path class="text-slate-100" stroke-width="3.6" stroke="currentColor" fill="none"
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path stroke="${masteryStatus.stroke}" stroke-width="3.6" stroke-dasharray="${strokeDash}" stroke-linecap="round" fill="none"
+                  <path stroke="${masteryStatus.stroke}" stroke-width="3.6" stroke-dasharray="${strokeDash}" stroke-linecap="round" stroke-opacity="${overallMastery > 0 ? 1 : 0}" fill="none"
                     class="transition-all duration-700"
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                 </svg>
@@ -6851,12 +6851,6 @@
                 <span class="font-extrabold text-slate-800">${totalPassed} / ${totalRemedial} Siswa</span>
               </div>
             </div>
-
-            <button type="button" onclick="window.navigateMenu('rekap_laporan')"
-              class="w-full py-2.5 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition flex items-center justify-center gap-2 shadow-sm cursor-pointer">
-              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-              <span>Buka Rekap &amp; Laporan</span>
-            </button>
           </div>
         ` : `
           <!-- Guru Left (8 cols): Akses Cepat Mata Pelajaran & Kelas yang Diampu -->
@@ -6898,7 +6892,7 @@
                 <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
                   <path class="text-slate-100" stroke-width="3.6" stroke="currentColor" fill="none"
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path stroke="${masteryStatus.stroke}" stroke-width="3.6" stroke-dasharray="${strokeDash}" stroke-linecap="round" fill="none"
+                  <path stroke="${masteryStatus.stroke}" stroke-width="3.6" stroke-dasharray="${strokeDash}" stroke-linecap="round" stroke-opacity="${overallMastery > 0 ? 1 : 0}" fill="none"
                     class="transition-all duration-700"
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                 </svg>
@@ -6931,19 +6925,6 @@
                   <span class="text-slate-500 font-semibold">Soal Perlu Penguatan</span>
                   <span class="font-extrabold text-indigo-700">${needReviewItems} dari ${totalQuestionItems} Soal</span>
                 </div>
-              </div>
-
-              <div class="grid grid-cols-2 gap-2.5 pt-1">
-                <button type="button" onclick="window.navigateMenu('analisis_butir')"
-                  class="py-2.5 px-3 rounded-2xl bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white text-[11.5px] font-extrabold transition flex items-center justify-center gap-1.5 cursor-pointer">
-                  <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
-                  <span>Analisis Butir</span>
-                </button>
-                <button type="button" onclick="window.navigateMenu('remedial_pengayaan')"
-                  class="py-2.5 px-3 rounded-2xl bg-amber-50 hover:bg-amber-500 text-amber-700 hover:text-white text-[11.5px] font-extrabold transition flex items-center justify-center gap-1.5 cursor-pointer">
-                  <i data-lucide="award" class="w-3.5 h-3.5"></i>
-                  <span>Tindak Lanjut</span>
-                </button>
               </div>
             </div>
           </div>
