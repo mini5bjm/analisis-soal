@@ -3252,15 +3252,28 @@
       state.examClassFilter = cls;
       state.examSearchQuery = '';
 
+      const visible = getVisibleExams();
+      const existingExam = visible.find(e =>
+        isSameSubject(e.subject, subj) &&
+        String(e.class_name || '').trim().toLowerCase() === cls.toLowerCase()
+      );
+
+      const isEditing = Boolean(state.editingExamId);
+      const hasExisting = Boolean(existingExam);
+
       openFormModal({
-        title: state.editingExamId ? 'Edit Paket Ulangan & Kunci' : 'Paket Ulangan & Kunci',
-        subtitle: `${subj} • ${cls} — Buat, ubah, atau pilih paket ulangan untuk kelas ini`,
+        title: isEditing ? 'Edit Paket Ulangan & Kunci' : (hasExisting ? 'Paket Ulangan & Kunci Aktif' : 'Paket Ulangan & Kunci'),
+        subtitle: isEditing
+          ? `${subj} • ${cls} — Perbarui judul, KKM, tanggal, atau kunci jawaban`
+          : (hasExisting
+            ? `${subj} • ${cls} — Rincian paket ulangan & kunci jawaban yang aktif`
+            : `${subj} • ${cls} — Cukup isi 1 kali paket ulangan & kunci untuk kelas ini`),
         icon: 'file-key-2',
         iconClass: 'bg-indigo-600 text-white shadow-sm',
-        badgeText: state.editingExamId ? 'Mode Edit' : `${cls}`,
-        maxWidthClass: 'max-w-5xl',
+        badgeText: isEditing ? 'Mode Edit' : (hasExisting ? '1 Paket Aktif' : `${cls}`),
+        maxWidthClass: 'max-w-4xl',
         bodyHtml: renderManajemenUlanganView(),
-        focusId: 'exam-title',
+        focusId: isEditing || !hasExisting ? 'exam-title' : null,
         onCancel: () => {
           state.editingExamId = null;
         }
@@ -7423,6 +7436,254 @@
       const initTotalQ = editingMeta ? editingMeta.sections.reduce((sum, s) => sum + (Number(s.count) || 0), 0) : 0;
       const initSummaryText = `${initCheckedCount} Jenis • ${initCheckedCount > 1 ? `Total ${initTotalQ} Soal` : `${initTotalQ} Soal`}`;
 
+      // ==================== MODE GURU (1 KELAS & 1 MAPEL: HANYA WAJIB 1 KALI ISI) ====================
+      if (isScopedClassView) {
+        const scopedExams = visibleExams.filter(ex => {
+          const clsMatch = String(ex.class_name || '').trim().toLowerCase() === String(state.selectedTeacherClass || '').trim().toLowerCase();
+          const subjMatch = isSameSubject(ex.subject, state.selectedTeacherSubject);
+          return clsMatch && subjMatch;
+        });
+
+        // KONDISI 1: SUDAH ADA PAKET ULANGAN TERSIMPAN & TIDAK SEDANG EDIT
+        if (scopedExams.length > 0 && !editingExam) {
+          const primaryExam = scopedExams[0];
+          const s = computeExamStatistics(primaryExam);
+          const exMeta = s.examMeta || decodeExamMeta(primaryExam);
+          const typeBadgesHtml = exMeta.sections.map(sec => {
+            const badgeLabel = exMeta.isMultiType
+              ? `${sec.typeMeta.shortLabel} (${sec.count})`
+              : `${sec.typeMeta.label}`;
+            return `<span class="px-2.5 py-0.5 rounded-full border text-[11px] font-extrabold ${sec.typeMeta.badgeClass}">${badgeLabel}</span>`;
+          }).join(' ');
+
+          const otherDuplicates = scopedExams.slice(1);
+
+          return `
+          <div id="exam-form-card" class="space-y-5">
+            <!-- 1. Banner Info 1 Kali Paket -->
+            <div class="rounded-2xl bg-emerald-50/90 border border-emerald-200/80 p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div class="flex items-start sm:items-center gap-3.5">
+                <div class="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h3 class="text-base font-extrabold text-emerald-950">Paket Ulangan &amp; Kunci Sudah Diisi</h3>
+                    <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10.5px] font-black">1 Paket Aktif</span>
+                  </div>
+                  <p class="text-xs text-emerald-800/80 mt-0.5 leading-relaxed">
+                    User guru hanya wajib mengisi <strong>1 kali</strong> paket ulangan dan kunci untuk <strong>${escapeHtml(state.selectedTeacherSubject)} (${escapeHtml(state.selectedTeacherClass)})</strong>. Paket ini sudah siap digunakan untuk penilaian seluruh siswa.
+                  </p>
+                </div>
+              </div>
+              <button type="button" onclick="window.handleOpenExamForInput('${primaryExam.id}')"
+                class="px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-2 shadow-sm shrink-0 self-start sm:self-auto cursor-pointer">
+                <i data-lucide="pen-tool" class="w-4 h-4"></i>
+                <span>Input Jawaban Siswa</span>
+              </button>
+            </div>
+
+            <!-- 2. Kartu Rincian Paket Ulangan Tersimpan -->
+            <div class="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm space-y-5">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                <div class="space-y-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[11px] font-extrabold">${escapeHtml(primaryExam.class_name)}</span>
+                    ${typeBadgesHtml}
+                    <span class="text-xs font-bold text-slate-500">• Tanggal: <strong class="text-slate-800">${escapeHtml(primaryExam.exam_date || '-')}</strong></span>
+                  </div>
+                  <h4 class="text-lg font-black text-slate-900">${escapeHtml(primaryExam.title)}</h4>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button type="button" onclick="window.handleEditExam('${primaryExam.id}')"
+                    class="px-4 py-2 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-extrabold transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit Paket &amp; Kunci
+                  </button>
+                  <button type="button" onclick="window.handleDeleteExam('${primaryExam.id}')"
+                    class="px-3.5 py-2 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-extrabold transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus
+                  </button>
+                </div>
+              </div>
+
+              <!-- Metrics Strip -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+                  <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nilai KKM</span>
+                  <div class="text-xl font-black text-slate-900 mt-0.5">${primaryExam.kkm}</div>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+                  <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Jumlah Soal</span>
+                  <div class="text-xl font-black text-slate-900 mt-0.5">${primaryExam.total_questions} <span class="text-xs font-bold text-slate-500">Soal</span></div>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+                  <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Bobot Maksimal</span>
+                  <div class="text-xl font-black text-indigo-600 mt-0.5">${exMeta.maxTotalScore} <span class="text-xs font-bold text-slate-500">Poin</span></div>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+                  <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Terkoreksi</span>
+                  <div class="text-xl font-black text-emerald-600 mt-0.5">${s.totalStudents} <span class="text-xs font-bold text-slate-500">Siswa (${s.classicalMastery}%)</span></div>
+                </div>
+              </div>
+
+              <!-- Kunci Jawaban -->
+              <div class="space-y-2">
+                <div class="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
+                  <i data-lucide="key-round" class="w-4 h-4 text-indigo-600"></i>
+                  <span>Kunci Jawaban Tersimpan</span>
+                </div>
+                ${exMeta.isMultiType ? `
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    ${exMeta.sections.map(sec => `
+                      <div class="p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100/80 space-y-1">
+                        <div class="flex items-center justify-between text-[11px] font-extrabold text-indigo-900">
+                          <span>${sec.typeMeta.label} (${sec.count} Soal)</span>
+                          <span class="text-indigo-600">${sec.typeMeta.shortLabel}</span>
+                        </div>
+                        <div class="text-xs font-mono font-bold text-slate-800 break-all bg-white p-2 rounded-xl border border-indigo-100">
+                          ${escapeHtml(sec.displayKey)}
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : `
+                  <div class="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-100/80">
+                    <div class="text-[11px] font-extrabold text-indigo-900 mb-1">
+                      ${exMeta.hasNumericSection ? 'Nilai Maksimal Tiap Nomor:' : 'Kunci Jawaban:'}
+                    </div>
+                    <div class="text-xs font-mono font-bold text-slate-800 break-all bg-white p-2.5 rounded-xl border border-indigo-100">
+                      ${escapeHtml(exMeta.displayKey)}
+                    </div>
+                  </div>
+                `}
+              </div>
+
+              <!-- Action Footer -->
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="window.closeFormModal()"
+                  class="px-5 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+                  Tutup
+                </button>
+                <button type="button" onclick="window.handleOpenExamForInput('${primaryExam.id}')"
+                  class="px-6 py-2.5 rounded-full flowora-btn-primary text-white text-xs font-bold transition flex items-center gap-2 shadow-sm cursor-pointer">
+                  <i data-lucide="pen-tool" class="w-4 h-4"></i> Lanjut Input Jawaban Siswa
+                </button>
+              </div>
+            </div>
+
+            ${otherDuplicates.length > 0 ? `
+              <!-- Alert & Cleanup Duplikat -->
+              <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200/90 text-amber-900 space-y-3 text-xs">
+                <div class="flex items-center gap-2 font-extrabold">
+                  <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                  <span>Ditemukan ${otherDuplicates.length} paket ulangan duplikat untuk kelas ini</span>
+                </div>
+                <p class="text-amber-800/90 leading-relaxed">
+                  Karena guru hanya wajib mengisi 1 kali paket ulangan per mapel &amp; kelas, Anda dapat menghapus paket cadangan di bawah ini agar rapi:
+                </p>
+                <div class="space-y-2">
+                  ${otherDuplicates.map(dup => `
+                    <div class="p-2.5 rounded-xl bg-white border border-amber-200 flex items-center justify-between gap-2">
+                      <span class="font-bold text-slate-800 truncate">${escapeHtml(dup.title)} (${dup.exam_date || '-'})</span>
+                      <button type="button" onclick="window.handleDeleteExam('${dup.id}')"
+                        class="px-3 py-1 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-bold transition shrink-0 cursor-pointer">
+                        Hapus Duplikat
+                      </button>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+          `;
+        }
+
+        // KONDISI 2: BELUM ADA PAKET ULANGAN (scopedExams.length === 0) ATAU SEDANG EDIT (editingExam)
+        return `
+        <div id="exam-form-card" class="space-y-5">
+          <!-- Banner Pengingat 1 Kali -->
+          <div class="rounded-2xl ${editingExam ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-indigo-50 border-indigo-200 text-indigo-900'} border p-4 flex items-start gap-3">
+            <div class="w-9 h-9 rounded-xl ${editingExam ? 'bg-amber-600 text-white' : 'bg-indigo-600 text-white'} flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+              <i data-lucide="${editingExam ? 'pencil' : 'info'}" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-extrabold ${editingExam ? 'text-amber-950' : 'text-indigo-950'}">
+                ${editingExam ? 'Mode Edit Paket Ulangan &amp; Kunci' : `Pengisian Paket Ulangan &amp; Kunci (${escapeHtml(state.selectedTeacherSubject)} • ${escapeHtml(state.selectedTeacherClass)})`}
+              </h4>
+              <p class="text-[11.5px] ${editingExam ? 'text-amber-800/90' : 'text-indigo-800/90'} mt-0.5 leading-relaxed">
+                ${editingExam
+                  ? 'Perbarui judul, KKM, tanggal, jenis soal, atau kunci jawaban. Perubahan kunci akan otomatis menghitung ulang nilai siswa yang telah diinput.'
+                  : `User guru hanya wajib mengisi <strong>1 kali</strong> paket ulangan dan kunci untuk setiap mata pelajaran dan kelas. Setelah disimpan, paket ini langsung aktif untuk penilaian siswa kelas ini.`
+                }
+              </p>
+            </div>
+          </div>
+
+          <!-- Form Pembuatan / Pengeditan -->
+          <div class="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm">
+            <form onsubmit="window.handleSaveExam(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Judul Ulangan / Penilaian</label>
+                <select id="exam-title" required
+                  class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  ${titleOptions}
+                </select>
+              </div>
+
+              <input type="hidden" id="exam-subject" value="${escapeHtml(state.selectedTeacherSubject)}" />
+              <input type="hidden" id="exam-teacher" value="${escapeHtml(state.currentUser?.id || '')}" />
+              <input type="hidden" id="exam-class" value="${escapeHtml(state.selectedTeacherClass)}" />
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Nilai KKM</label>
+                  <input type="number" id="exam-kkm" required min="1" max="100" value="${escapeHtml(initKkm)}" placeholder="Contoh: 75"
+                    class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal</label>
+                  <input type="date" id="exam-date" required value="${escapeHtml(initDate)}"
+                    class="w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <label class="text-xs font-bold text-slate-700">Jenis Soal <span class="font-medium text-slate-400">(Pilih 1 atau lebih)</span></label>
+                  <span id="exam-total-summary-badge" class="text-[11px] font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full">${initSummaryText}</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  ${qTypeChecklistHtml}
+                </div>
+              </div>
+
+              <div id="exam-type-configs-container" class="space-y-3">
+                ${qTypeConfigCardsHtml}
+              </div>
+
+              <div class="pt-2 flex items-center justify-end gap-2.5">
+                ${editingExam ? `
+                  <button type="button" onclick="window.handleCancelEditExam()"
+                    class="py-2.5 px-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+                    Batal
+                  </button>
+                ` : `
+                  <button type="button" onclick="window.closeFormModal()"
+                    class="py-2.5 px-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+                    Tutup
+                  </button>
+                `}
+                <button type="submit" class="py-2.5 px-6 rounded-full flowora-btn-primary text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer">
+                  <i data-lucide="save" class="w-4 h-4"></i>
+                  <span>${editingExam ? 'Simpan Perubahan' : 'Simpan Paket Ulangan'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        `;
+      }
+
       return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -7435,7 +7696,7 @@
               </div>
               <div>
                 <h3 class="text-base font-extrabold text-slate-900">${editingExam ? 'Edit Paket Ulangan & Kunci' : 'Buat Paket Ulangan & Kunci'}</h3>
-                <p class="text-xs text-slate-500">${editingExam ? 'Perbarui detail paket ulangan, KKM, atau kunci jawaban' : (isScopedClassView ? 'Atur judul, KKM, tanggal, jenis soal, dan kunci jawaban' : 'Atur jenis soal, mata pelajaran, KKM, dan kunci jawaban')}</p>
+                <p class="text-xs text-slate-500">${editingExam ? 'Perbarui detail paket ulangan, KKM, atau kunci jawaban' : 'Atur jenis soal, mata pelajaran, KKM, dan kunci jawaban'}</p>
               </div>
             </div>
             ${editingExam ? '<span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-extrabold shrink-0">Mode Edit</span>' : ''}
@@ -7450,69 +7711,51 @@
               </select>
             </div>
 
-            ${isScopedClassView ? `
-              <input type="hidden" id="exam-subject" value="${escapeHtml(state.selectedTeacherSubject)}" />
-              <input type="hidden" id="exam-teacher" value="${escapeHtml(state.currentUser?.id || '')}" />
-              <input type="hidden" id="exam-class" value="${escapeHtml(state.selectedTeacherClass)}" />
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Nilai KKM</label>
-                  <input type="number" id="exam-kkm" required min="1" max="100" value="${escapeHtml(initKkm)}" placeholder="Contoh: 75"
-                    class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700">Mata Pelajaran</label>
+                  ${isAdmin ? '<button type="button" onclick="window.navigateMenu(\'manajemen_mapel\')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Mapel</button>' : ''}
                 </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal</label>
-                  <input type="date" id="exam-date" required value="${escapeHtml(initDate)}"
-                    class="w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
+                <select id="exam-subject" required
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  ${subjectOptions}
+                </select>
               </div>
-            ` : `
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="block text-xs font-bold text-slate-700">Mata Pelajaran</label>
-                    ${isAdmin ? '<button type="button" onclick="window.navigateMenu(\'manajemen_mapel\')" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Mapel</button>' : ''}
-                  </div>
-                  <select id="exam-subject" required
-                    class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    ${subjectOptions}
-                  </select>
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700">Nama Guru</label>
+                  ${!isAdmin ? '<span class="text-[10px] font-extrabold text-indigo-600 flex items-center gap-0.5"><i data-lucide="lock" class="w-3 h-3"></i> Terkunci</span>' : ''}
                 </div>
-                <div>
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="block text-xs font-bold text-slate-700">Nama Guru</label>
-                    ${!isAdmin ? '<span class="text-[10px] font-extrabold text-indigo-600 flex items-center gap-0.5"><i data-lucide="lock" class="w-3 h-3"></i> Terkunci</span>' : ''}
-                  </div>
-                  <select id="exam-teacher" ${!isAdmin ? 'disabled' : ''}
-                    class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${!isAdmin ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-indigo-500'}">
-                    ${teacherOptions}
-                  </select>
-                </div>
+                <select id="exam-teacher" ${!isAdmin ? 'disabled' : ''}
+                  class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${!isAdmin ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-indigo-500'}">
+                  ${teacherOptions}
+                </select>
               </div>
+            </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label class="block text-xs font-bold text-slate-700">Pilih Kelas</label>
-                    ${isWaliLockedClass ? '<span class="text-[10px] font-extrabold text-indigo-600 flex items-center gap-0.5"><i data-lucide="lock" class="w-3 h-3"></i> Terkunci</span>' : ''}
-                  </div>
-                  <select id="exam-class" required ${isWaliLockedClass ? 'disabled' : ''}
-                    class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${isWaliLockedClass ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-indigo-500'}">
-                    ${classOptions}
-                  </select>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-700">Pilih Kelas</label>
+                  ${isWaliLockedClass ? '<span class="text-[10px] font-extrabold text-indigo-600 flex items-center gap-0.5"><i data-lucide="lock" class="w-3 h-3"></i> Terkunci</span>' : ''}
                 </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Nilai KKM</label>
-                  <input type="number" id="exam-kkm" required min="1" max="100" value="${escapeHtml(initKkm)}" placeholder="Contoh: 75"
-                    class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal</label>
-                  <input type="date" id="exam-date" required value="${escapeHtml(initDate)}"
-                    class="w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
+                <select id="exam-class" required ${isWaliLockedClass ? 'disabled' : ''}
+                  class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold focus:outline-none ${isWaliLockedClass ? 'bg-slate-100 text-slate-600 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-indigo-500'}">
+                  ${classOptions}
+                </select>
               </div>
-            `}
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Nilai KKM</label>
+                <input type="number" id="exam-kkm" required min="1" max="100" value="${escapeHtml(initKkm)}" placeholder="Contoh: 75"
+                  class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal</label>
+                <input type="date" id="exam-date" required value="${escapeHtml(initDate)}"
+                  class="w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
 
             <div class="space-y-2">
               <div class="flex items-center justify-between gap-2">
@@ -7997,6 +8240,17 @@
         return;
       }
 
+      if (!editingId && isScopedClassCtx) {
+        const existingExam = state.exams.find(ex =>
+          isSameSubject(ex.subject, subject) &&
+          String(ex.class_name || '').trim().toLowerCase() === className.toLowerCase()
+        );
+        if (existingExam) {
+          showToast(`Paket ulangan untuk ${subject} (${className}) sudah ada. Guru hanya wajib mengisi 1 kali paket ulangan per mapel dan kelas. Silakan gunakan tombol Edit untuk mengubah.`, 'warning');
+          return;
+        }
+      }
+
       if (!Number.isFinite(kkm) || kkm < 1 || kkm > 100) {
         showToast('Masukkan Nilai KKM antara 1 hingga 100.', 'warning');
         return;
@@ -8193,7 +8447,17 @@
       });
 
       if (isTeacherPaketModalOpen()) {
-        window.openTeacherPaketUlanganModal({ keepEditState: false });
+        if (!editingId && isScopedClassCtx) {
+          closeFormModal();
+          state.activeExamId = examRecord.id;
+          state.teacherClassViewTab = 'koreksi';
+          renderNavigationMenus();
+          renderCurrentMenu();
+          showToast('Paket ulangan & kunci berhasil disimpan! Silakan input jawaban siswa.', 'success');
+        } else {
+          window.openTeacherPaketUlanganModal({ keepEditState: false });
+          renderCurrentMenu();
+        }
       }
     };
 
